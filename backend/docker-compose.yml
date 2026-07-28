@@ -1,0 +1,33 @@
+name: howsu
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: howsu-postgres
+    environment:
+      POSTGRES_USER: howsu
+      POSTGRES_PASSWORD: howsu_dev_password
+      POSTGRES_DB: howsu
+    ports:
+      - "5432:5432"
+    volumes:
+      - howsu_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U howsu -d howsu"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: howsu-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  howsu_pgdata:
