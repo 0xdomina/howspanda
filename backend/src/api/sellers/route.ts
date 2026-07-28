@@ -10,11 +10,11 @@ import createSellerWorkflow, {
 
 export const PostSellerCreateSchema = z.strictObject({
   name: z.string(),
-  handle: z.string().optional(),
+  handle: z.string(),
   logo: z.string().optional(),
   description: z.string().optional(),
   admin: z.strictObject({
-    email: z.string(),
+    email: z.string().email(),
     first_name: z.string().optional(),
     last_name: z.string().optional(),
   }),

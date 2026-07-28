@@ -24,6 +24,7 @@ export type SellerOrder = (OrderDTO & {
 type StepInput = {
   parentOrder: OrderDTO
   sellersItems: Record<string, CartLineItemDTO[]>
+  ungroupedItemCount: number
 }
 
 function prepareOrderData(
@@ -71,7 +72,7 @@ function prepareOrderData(
 const createSellerOrdersStep = createStep(
   "create-seller-orders",
   async (
-    { sellersItems, parentOrder }: StepInput,
+    { sellersItems, parentOrder, ungroupedItemCount }: StepInput,
     { container, context }
   ) => {
     const linkDefs: LinkDefinition[] = []
@@ -85,7 +86,8 @@ const createSellerOrdersStep = createStep(
       id: sellerIds,
     })
 
-    if (sellerIds.length === 1) {
+    // shortcut only applies when the seller owns ALL cart items
+    if (sellerIds.length === 1 && ungroupedItemCount === 0) {
       // single-seller cart: the parent order IS the seller order
       linkDefs.push({
         [MARKETPLACE_MODULE]: {

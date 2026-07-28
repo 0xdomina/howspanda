@@ -2,7 +2,10 @@ import {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import {
+  ContainerRegistrationKeys,
+  MedusaError,
+} from "@medusajs/framework/utils"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -17,6 +20,13 @@ export const GET = async (
       id: [req.auth_context.actor_id],
     },
   })
+
+  if (!sellerAdmin) {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Seller not found for authenticated actor"
+    )
+  }
 
   res.json({
     seller_admin: sellerAdmin,

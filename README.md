@@ -28,3 +28,8 @@ Sellers are a custom `seller` actor type. Flow:
 Checkout uses `POST /store/carts/:id/complete-marketplace`: carts spanning N sellers
 produce 1 parent order + N child seller orders, and a pending commission line
 (default 10%, per-seller `commission_rate`) is recorded for each seller order.
+
+> Known gap (deferred to the fulfillment phase): child seller orders are created
+> without their own inventory reservations, so fulfilling items with
+> `manage_inventory: true` from a child order will fail until reservations are
+> transferred from the parent order.

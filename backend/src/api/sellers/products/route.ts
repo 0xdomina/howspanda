@@ -3,7 +3,10 @@ import {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { HttpTypes } from "@medusajs/framework/types"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import {
+  ContainerRegistrationKeys,
+  MedusaError,
+} from "@medusajs/framework/utils"
 import createSellerProductWorkflow from "../../../workflows/marketplace/create-seller-product"
 
 export const POST = async (
@@ -37,7 +40,14 @@ export const GET = async (
     },
   })
 
+  if (!sellerAdmin) {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Seller not found for authenticated actor"
+    )
+  }
+
   res.json({
-    products: sellerAdmin.seller.products,
+    products: sellerAdmin.seller.products ?? [],
   })
 }

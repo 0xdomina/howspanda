@@ -181,11 +181,7 @@ medusaIntegrationTestRunner({
 
           expect(commissions.status).toEqual(200)
           expect(commissions.data.commission_lines).toHaveLength(0)
-          expect(commissions.data.summary).toEqual({
-            gross: 0,
-            commission: 0,
-            net: 0,
-          })
+          expect(commissions.data.summary).toEqual({})
         })
       })
     })

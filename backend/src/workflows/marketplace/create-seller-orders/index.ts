@@ -34,10 +34,12 @@ const createSellerOrdersWorkflow = createWorkflow(
       },
     })
 
+    // The lock TTL must outlive the worst-case cart-completion + splitting
+    // duration (payment provider calls included).
     acquireLockStep({
       key: input.cart_id,
       timeout: 2,
-      ttl: 10,
+      ttl: 120,
     })
 
     const { id: orderId } = completeCartWorkflow.runAsStep({
@@ -76,7 +78,7 @@ const createSellerOrdersWorkflow = createWorkflow(
       { existingLinks },
       (data) => data.existingLinks.length === 0
     ).then(() => {
-      const { sellersItems } = groupSellerItemsStep({
+      const { sellersItems, ungroupedItemCount } = groupSellerItemsStep({
         cart: carts[0],
       } as unknown as GroupSellerItemsStepInput)
 
@@ -86,13 +88,17 @@ const createSellerOrdersWorkflow = createWorkflow(
       } = createSellerOrdersStep({
         parentOrder: order,
         sellersItems,
+        ungroupedItemCount,
       })
 
-      createRemoteLinkStep(linkDefs)
-
+      // The seller<->order links are the idempotency marker for the split
+      // (checked as `existingLinks` above), so they must be written last —
+      // a crash before them causes a full retry instead of a silent ledger gap.
       createCommissionLinesStep({
         orders: sellerOrders,
       })
+
+      createRemoteLinkStep(linkDefs)
 
       return sellerOrders
     })

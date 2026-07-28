@@ -2,7 +2,10 @@ import {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import {
+  ContainerRegistrationKeys,
+  MedusaError,
+} from "@medusajs/framework/utils"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -22,25 +25,34 @@ export const GET = async (
     },
   })
 
+  if (!sellerAdmin) {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Seller not found for authenticated actor"
+    )
+  }
+
   const lines = sellerAdmin.seller.commission_lines || []
 
-  // simple aggregate so sellers see what they're owed at a glance
-  const totals = lines.reduce(
+  // per-currency aggregate so sellers see what they're owed at a glance
+  const summary = lines.reduce(
     (acc, line) => {
       if (!line) {
         return acc
       }
-      acc.gross += Number(line.order_total)
-      acc.commission += Number(line.commission_amount)
-      acc.net += Number(line.net_amount)
+      const currency = line.currency_code
+      acc[currency] ??= { gross: 0, commission: 0, net: 0 }
+      acc[currency].gross += Number(line.order_total)
+      acc[currency].commission += Number(line.commission_amount)
+      acc[currency].net += Number(line.net_amount)
       return acc
     },
-    { gross: 0, commission: 0, net: 0 }
+    {} as Record<string, { gross: number; commission: number; net: number }>
   )
 
   res.json({
     commission_rate: sellerAdmin.seller.commission_rate,
-    summary: totals,
+    summary,
     commission_lines: lines,
   })
 }

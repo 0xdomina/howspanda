@@ -17,6 +17,7 @@ const groupSellerItemsStep = createStep(
     const query = container.resolve(ContainerRegistrationKeys.QUERY)
 
     const sellersItems: Record<string, CartLineItemDTO[]> = {}
+    let ungroupedItemCount = 0
 
     await promiseAll((cart.items || []).map(async (item) => {
       const { data: [product] } = await query.graph({
@@ -30,6 +31,7 @@ const groupSellerItemsStep = createStep(
       const sellerId = product.seller?.id
 
       if (!sellerId) {
+        ungroupedItemCount++
         return
       }
       sellersItems[sellerId] = [
@@ -40,6 +42,7 @@ const groupSellerItemsStep = createStep(
 
     return new StepResponse({
       sellersItems,
+      ungroupedItemCount,
     })
   }
 )
