@@ -19,6 +19,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/marketplace",
     },
     {
+      resolve: "./src/modules/ai",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,
