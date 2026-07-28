@@ -1,11 +1,12 @@
-# Design: AI-Powered Multi-Vendor Marketplace
+# Design: How's u — AI-Powered Multi-Vendor Marketplace
 
 **Date:** 2026-07-28
 **Status:** Approved by owner
+**Platform name:** How's u
 
 ## Purpose
 
-A multi-vendor commerce marketplace (Jumia/Amazon model) that infuses AI into commerce to help people shop more and sell more. The AI focus at launch is the **seller side**: helping informal businesses list, price, market, and understand their business — with a near-zero barrier to entry (sellers never need API keys or third-party accounts).
+**How's u** is a multi-vendor commerce marketplace (Jumia/Amazon model) that infuses AI into commerce to help people shop more and sell more. The AI focus at launch is the **seller side**: helping informal businesses list, price, market, and understand their business — with a near-zero barrier to entry (sellers never need API keys or third-party accounts).
 
 Backend logic and flows come first; the frontend UI/UX will be redesigned by the owner after the backend is finalized.
 
