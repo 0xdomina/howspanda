@@ -33,3 +33,27 @@ produce 1 parent order + N child seller orders, and a pending commission line
 > without their own inventory reservations, so fulfilling items with
 > `manage_inventory: true` from a child order will fail until reservations are
 > transferred from the parent order.
+
+## AI Module (Phase 3) — "one brain, many memories"
+
+Platform-owned AI for sellers (no seller API keys, ever). Provider is a
+config switch: `AI_PROVIDER=groq|mock|mock-fail`, `AI_MODEL`, `GROQ_API_KEY`
+in `backend/.env` (Vercel AI SDK abstraction — swapping providers is an env
+change, not a code change).
+
+Seller endpoints (Bearer seller JWT):
+
+| Endpoint | Capability |
+|---|---|
+| `POST /sellers/ai/listing` | Listing writer — title/description/tags/SEO from rough notes |
+| `POST /sellers/ai/pricing` | Pricing advisor — grounded in anonymized marketplace price stats |
+| `POST /sellers/ai/insights` | Business insights — answers from the seller's own products/orders only |
+| `POST /sellers/ai/accounting` | Accounting digest — commission ledger math done in code, explained by AI |
+| `POST /sellers/ai/marketing` | Marketing coach — brand voice, promos, bundles from the seller's catalog |
+| `GET /sellers/ai/quota` | Current month usage/limit/remaining |
+
+Rules: every call is quota-checked first (free tier
+`AI_FREE_TIER_MONTHLY_LIMIT`/month, per-seller overrides via `ai_quota`);
+quota exhaustion → friendly 429; provider failure → friendly 503 and the
+action is never billed. AI failures never block commerce. Every AI call's
+context is hard-scoped to the authenticated seller's own data.
