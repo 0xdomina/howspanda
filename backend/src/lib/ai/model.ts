@@ -1,6 +1,6 @@
 import { createGroq } from "@ai-sdk/groq"
+import type { LanguageModelV2 } from "@ai-sdk/provider"
 import { LanguageModel } from "ai"
-import { MockLanguageModelV2 } from "ai/test"
 
 export class AiUnavailableError extends Error {
   constructor(message: string) {
@@ -54,8 +54,15 @@ function detectCapability(prompt: unknown): string {
   return match?.[1] ?? "insights"
 }
 
-function buildMockModel(fail: boolean): MockLanguageModelV2 {
-  return new MockLanguageModelV2({
+// Hand-rolled LanguageModelV2 instead of `ai/test`'s MockLanguageModelV2:
+// that entrypoint requires msw/vitest, which cannot load in Medusa's
+// CommonJS runtime. Behavior is identical for doGenerate.
+function buildMockModel(fail: boolean): LanguageModelV2 {
+  return {
+    specificationVersion: "v2",
+    provider: "mock",
+    modelId: "mock-model",
+    supportedUrls: {},
     doGenerate: async (options) => {
       // expose the exact prompt for isolation assertions in tests
       ;(globalThis as any).__howsuLastAiPrompt = JSON.stringify(options.prompt)
@@ -75,7 +82,10 @@ function buildMockModel(fail: boolean): MockLanguageModelV2 {
         warnings: [],
       }
     },
-  })
+    doStream: async () => {
+      throw new AiUnavailableError("mock provider does not support streaming")
+    },
+  }
 }
 
 export function getModel(): LanguageModel {
