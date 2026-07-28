@@ -15,3 +15,16 @@ AI-powered multi-vendor marketplace — shop more, sell more.
 3. Storefront: `cd frontend; npm run dev` → http://localhost:8000
 
 Environment files: copy `backend/.env.template` → `backend/.env`; create `frontend/.env.local` with your publishable API key (Admin → Settings → Publishable API Keys). Never commit `.env*` files with real secrets.
+
+## Marketplace API (Phase 2)
+
+Sellers are a custom `seller` actor type. Flow:
+
+1. `POST /auth/seller/emailpass/register` → registration JWT
+2. `POST /sellers` (Bearer registration JWT) → create seller + admin
+3. `POST /auth/seller/emailpass` → authenticated JWT
+4. `GET /sellers/me` · `POST|GET /sellers/products` · `GET /sellers/orders` · `GET /sellers/commissions`
+
+Checkout uses `POST /store/carts/:id/complete-marketplace`: carts spanning N sellers
+produce 1 parent order + N child seller orders, and a pending commission line
+(default 10%, per-seller `commission_rate`) is recorded for each seller order.

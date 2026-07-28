@@ -402,8 +402,14 @@ export async function placeOrder(cartId?: string) {
     ...(await getAuthHeaders()),
   }
 
-  const cartRes = await sdk.store.cart
-    .complete(id, {}, headers)
+  const cartRes = await sdk.client
+    .fetch<HttpTypes.StoreCompleteCartResponse>(
+      `/store/carts/${id}/complete-marketplace`,
+      {
+        method: "POST",
+        headers,
+      }
+    )
     .then(async (cartRes) => {
       const cartCacheTag = await getCacheTag("carts")
       revalidateTag(cartCacheTag)
