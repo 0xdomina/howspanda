@@ -155,6 +155,9 @@ export default async function seedDemoData({ container }: ExecArgs) {
   const region =
     existingRegions.find((existing) => existing.name === "Europe") ??
     createdRegions.find((created) => created.name === "Europe")!;
+  const nigeriaRegion =
+    existingRegions.find((existing) => existing.name === "Nigeria") ??
+    createdRegions.find((created) => created.name === "Nigeria")!;
   logger.info("Finished seeding regions.");
 
   logger.info("Seeding tax regions...");
@@ -274,6 +277,15 @@ export default async function seedDemoData({ container }: ExecArgs) {
           },
         ],
       },
+      {
+        name: "Nigeria",
+        geo_zones: [
+          {
+            country_code: "ng",
+            type: "country",
+          },
+        ],
+      },
     ],
   });
 
@@ -349,6 +361,40 @@ export default async function seedDemoData({ container }: ExecArgs) {
           {
             region_id: region.id,
             amount: 10,
+          },
+        ],
+        rules: [
+          {
+            attribute: "enabled_in_store",
+            value: "true",
+            operator: "eq",
+          },
+          {
+            attribute: "is_return",
+            value: "false",
+            operator: "eq",
+          },
+        ],
+      },
+      {
+        name: "Nigeria Standard Shipping",
+        price_type: "flat",
+        provider_id: "manual_manual",
+        service_zone_id: fulfillmentSet.service_zones[1].id,
+        shipping_profile_id: shippingProfile.id,
+        type: {
+          label: "Standard",
+          description: "Ship within Nigeria in 2-4 days.",
+          code: "standard-ng",
+        },
+        prices: [
+          {
+            currency_code: "ngn",
+            amount: 2500,
+          },
+          {
+            region_id: nigeriaRegion.id,
+            amount: 2500,
           },
         ],
         rules: [

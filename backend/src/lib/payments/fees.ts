@@ -18,6 +18,13 @@ export const CRYPTO_USDC_ID = "pp_crypto-usdc_crypto-usdc"
 
 export type FeeModel = {
   label: string
+  /**
+   * Eligible to be the auto-recommended default. Only fiat rails qualify:
+   * crypto has a zero platform fee but requires the buyer to hold USDC and do
+   * an on-chain transfer, so it's always listed/selectable but never the silent
+   * default.
+   */
+  autoRecommend: boolean
   /** compute the provider fee in minor units for a given amount (minor units) */
   fee: (amountMinor: number) => number
 }
@@ -29,6 +36,7 @@ const NAIRA = 100 // 1 NGN in kobo
 export const FEE_TABLE: Record<string, FeeModel> = {
   [PAYSTACK_ID]: {
     label: "Paystack",
+    autoRecommend: true,
     fee: (amount) => {
       const pct = amount * 0.015
       const flat = amount < 2500 * NAIRA ? 0 : 100 * NAIRA // ₦100 waived under ₦2,500
@@ -37,10 +45,12 @@ export const FEE_TABLE: Record<string, FeeModel> = {
   },
   [FLUTTERWAVE_ID]: {
     label: "Flutterwave",
+    autoRecommend: true,
     fee: (amount) => Math.min(Math.round(amount * 0.014), 2000 * NAIRA), // cap ₦2,000
   },
   [CRYPTO_USDC_ID]: {
     label: "Crypto (USDC)",
+    autoRecommend: false, // listed + selectable, but never the silent default
     fee: () => 0, // no platform fee; gas is abstracted by the settlement layer
   },
 }
@@ -55,8 +65,9 @@ export type ProviderOption = {
 
 /**
  * Rank the fee-eligible, enabled providers ascending by effective fee. The
- * cheapest is flagged `recommended`; the storefront preselects it but the buyer
- * may pick any option. Ties break deterministically by provider id.
+ * cheapest FIAT rail is flagged `recommended` (the storefront preselects it);
+ * crypto is listed and selectable but never the silent default. The buyer may
+ * still pick any option. Ties break deterministically by provider id.
  */
 export function rankProviders(
   amountMinor: number,
@@ -76,8 +87,13 @@ export function rankProviders(
     })
     .sort((a, b) => a.fee - b.fee || a.provider_id.localeCompare(b.provider_id))
 
-  if (options.length) {
-    options[0].recommended = true
+  // Recommend the cheapest auto-recommend-eligible (fiat) option; since the
+  // list is fee-sorted, the first eligible one is the cheapest fiat rail.
+  const recommended = options.find(
+    (o) => FEE_TABLE[o.provider_id]?.autoRecommend
+  )
+  if (recommended) {
+    recommended.recommended = true
   }
 
   return options
