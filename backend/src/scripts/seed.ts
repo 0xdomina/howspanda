@@ -98,6 +98,9 @@ export default async function seedDemoData({ container }: ExecArgs) {
         {
           currency_code: "usd",
         },
+        {
+          currency_code: "ngn",
+        },
       ],
     },
   });
@@ -111,28 +114,68 @@ export default async function seedDemoData({ container }: ExecArgs) {
     },
   });
   logger.info("Seeding region data...");
-  const { result: regionResult } = await createRegionsWorkflow(container).run({
-    input: {
-      regions: [
-        {
-          name: "Europe",
-          currency_code: "eur",
-          countries,
-          payment_providers: ["pp_system_default"],
-        },
+  const regionsToSeed = [
+    {
+      name: "Europe",
+      currency_code: "eur",
+      countries,
+      payment_providers: ["pp_system_default"],
+    },
+    {
+      name: "Nigeria",
+      currency_code: "ngn",
+      countries: ["ng"],
+      payment_providers: [
+        "pp_paystack_paystack",
+        "pp_flutterwave_flutterwave",
+        "pp_system_default",
       ],
     },
+  ];
+  const { data: existingRegions } = await query.graph({
+    entity: "region",
+    fields: ["id", "name"],
   });
-  const region = regionResult[0];
+  const missingRegions = regionsToSeed.filter(
+    (region) =>
+      !existingRegions.some((existing) => existing.name === region.name)
+  );
+  let createdRegions: { id: string; name: string }[] = [];
+  if (missingRegions.length) {
+    const { result: regionResult } = await createRegionsWorkflow(
+      container
+    ).run({
+      input: {
+        regions: missingRegions,
+      },
+    });
+    createdRegions = regionResult;
+  }
+  const region =
+    existingRegions.find((existing) => existing.name === "Europe") ??
+    createdRegions.find((created) => created.name === "Europe")!;
   logger.info("Finished seeding regions.");
 
   logger.info("Seeding tax regions...");
-  await createTaxRegionsWorkflow(container).run({
-    input: countries.map((country_code) => ({
-      country_code,
-      provider_id: "tp_system",
-    })),
+  const taxCountries = [...countries, "ng"];
+  const { data: existingTaxRegions } = await query.graph({
+    entity: "tax_region",
+    fields: ["country_code"],
   });
+  const missingTaxCountries = taxCountries.filter(
+    (country_code) =>
+      !existingTaxRegions.some(
+        (existing) => existing.country_code === country_code
+      )
+  );
+  if (missingTaxCountries.length) {
+    await createTaxRegionsWorkflow(container).run({
+      input: missingTaxCountries.map((country_code) => ({
+        country_code,
+        provider_id: "tp_system",
+      })),
+    });
+  }
   logger.info("Finished seeding tax regions.");
 
   logger.info("Seeding stock location data...");

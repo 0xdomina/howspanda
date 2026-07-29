@@ -35,5 +35,28 @@ module.exports = defineConfig({
         },
       },
     },
+    {
+      resolve: "@medusajs/medusa/payment",
+      options: {
+        providers: [
+          {
+            resolve: "./src/modules/payment-providers/paystack",
+            id: "paystack",
+            options: {
+              secretKey: process.env.PAYSTACK_SECRET_KEY,
+              publicKey: process.env.PAYSTACK_PUBLIC_KEY,
+            },
+          },
+          {
+            resolve: "./src/modules/payment-providers/flutterwave",
+            id: "flutterwave",
+            options: {
+              secretKey: process.env.FLUTTERWAVE_SECRET_KEY,
+              publicKey: process.env.FLUTTERWAVE_PUBLIC_KEY,
+            },
+          },
+        ],
+      },
+    },
   ],
 })
