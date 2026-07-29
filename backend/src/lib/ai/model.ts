@@ -13,9 +13,10 @@ export const DEFAULT_AI_MODEL = "llama-3.3-70b-versatile"
 
 export function getModelId(): string {
   const provider = process.env.AI_PROVIDER || "groq"
-  if (provider !== "groq") {
+  if (provider === "mock" || provider === "mock-fail") {
     return provider
   }
+  // unknown providers never reach the usage ledger — getModel() throws first
   return process.env.AI_MODEL || DEFAULT_AI_MODEL
 }
 
@@ -96,6 +97,9 @@ export function getModel(): LanguageModel {
   }
   if (provider === "mock-fail") {
     return buildMockModel(true)
+  }
+  if (provider !== "groq") {
+    throw new AiUnavailableError(`Unknown AI_PROVIDER "${provider}"`)
   }
 
   const apiKey = process.env.GROQ_API_KEY

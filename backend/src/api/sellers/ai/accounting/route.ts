@@ -23,7 +23,8 @@ function aggregate(lines: any[]) {
     byCurrency[currency].net += Number(line.net_amount)
     byCurrency[currency].orders += 1
 
-    const month = String(line.created_at).slice(0, 7)
+    // bucket by calendar month in UTC — e.g. "2026-07"
+    const month = new Date(line.created_at).toISOString().slice(0, 7)
     byMonth[month] ??= { gross: 0, net: 0 }
     byMonth[month].gross += Number(line.order_total)
     byMonth[month].net += Number(line.net_amount)

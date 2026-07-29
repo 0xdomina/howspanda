@@ -16,7 +16,10 @@ export const PostAiPricingSchema = z.object({
   title: z.string().min(2),
   category: z.string().optional(),
   cost: z.number().positive().optional(),
-  currency_code: z.string().default("ngn"),
+  currency_code: z
+    .string()
+    .default("ngn")
+    .transform((c) => c.toLowerCase()),
 })
 
 export const PostAiInsightsSchema = z.object({

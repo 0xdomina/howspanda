@@ -2,10 +2,12 @@ import {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { ILockingModule } from "@medusajs/framework/types"
+import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { AI_MODULE } from "../../modules/ai"
 import AiModuleService, {
   AiQuotaExceededError,
+  QuotaStatus,
 } from "../../modules/ai/service"
 import { getModelId } from "./model"
 import { AiUsageTokens } from "./capabilities"
@@ -25,9 +27,13 @@ type HandlerOutput<T> = {
 
 // Shared guard for every AI route:
 // - resolves the seller from the authenticated actor (hard isolation)
+// - serializes the whole quota-check → provider → record sequence per
+//   seller via the Locking Module, so concurrent requests can't slip past
+//   the monthly limit between the read and the insert
 // - enforces quota BEFORE calling the provider (friendly 429)
 // - maps any provider failure to a friendly 503 — AI never blocks commerce
-// - records usage only on success
+// - records usage only on success; a bookkeeping hiccup after a successful
+//   provider call must never turn the response into a 503
 export async function runAiRoute<T>(
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse,
@@ -37,47 +43,66 @@ export async function runAiRoute<T>(
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER)
   const aiService: AiModuleService = req.scope.resolve(AI_MODULE)
+  const locking: ILockingModule = req.scope.resolve(Modules.LOCKING)
 
   const seller = await resolveSeller(query, req.auth_context.actor_id)
 
-  try {
-    await aiService.assertQuota(seller.seller_id)
-  } catch (e) {
-    if (e instanceof AiQuotaExceededError) {
-      res.status(429).json({
-        ok: false,
-        code: "quota_exhausted",
-        message:
-          `You've used all ${e.limit} free AI actions for this month. ` +
-          `Your store keeps running as usual — AI tools unlock again next month.`,
-      })
-      return
-    }
-    throw e
-  }
+  await locking.execute(
+    `ai-quota-${seller.seller_id}`,
+    async () => {
+      try {
+        await aiService.assertQuota(seller.seller_id)
+      } catch (e) {
+        if (e instanceof AiQuotaExceededError) {
+          res.status(429).json({
+            ok: false,
+            code: "quota_exhausted",
+            message:
+              `You've used all ${e.limit} free AI actions for this month. ` +
+              `Your store keeps running as usual — AI tools unlock again next month.`,
+          })
+          return
+        }
+        throw e
+      }
 
-  try {
-    const { result, usage, extra } = await handler({ query, seller })
+      let output: HandlerOutput<T>
+      try {
+        output = await handler({ query, seller })
+      } catch (e) {
+        logger.error(`AI capability "${capability}" failed: ${e}`)
+        res.status(503).json({
+          ok: false,
+          code: "ai_unavailable",
+          message:
+            "The AI assistant is temporarily unavailable. Your store keeps " +
+            "running — please try again shortly.",
+        })
+        return
+      }
 
-    await aiService.recordUsage({
-      seller_id: seller.seller_id,
-      capability,
-      model_id: getModelId(),
-      prompt_tokens: usage.inputTokens ?? null,
-      completion_tokens: usage.outputTokens ?? null,
-    })
+      const { result, usage, extra } = output
 
-    const quota = await aiService.getQuotaStatus(seller.seller_id)
+      let quota: QuotaStatus | null = null
+      try {
+        await aiService.recordUsage({
+          seller_id: seller.seller_id,
+          capability,
+          model_id: getModelId(),
+          prompt_tokens: usage.inputTokens ?? null,
+          completion_tokens: usage.outputTokens ?? null,
+        })
 
-    res.json({ ok: true, capability, result, ...(extra ?? {}), quota })
-  } catch (e) {
-    logger.error(`AI capability "${capability}" failed: ${e}`)
-    res.status(503).json({
-      ok: false,
-      code: "ai_unavailable",
-      message:
-        "The AI assistant is temporarily unavailable. Your store keeps " +
-        "running — please try again shortly.",
-    })
-  }
+        quota = await aiService.getQuotaStatus(seller.seller_id)
+      } catch (e) {
+        logger.warn(
+          `AI usage bookkeeping for "${capability}" failed after a ` +
+            `successful provider call: ${e}`
+        )
+      }
+
+      res.json({ ok: true, capability, result, ...(extra ?? {}), quota })
+    },
+    { timeout: 30 }
+  )
 }

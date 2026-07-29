@@ -14,17 +14,20 @@ type Body = z.infer<typeof PostAiPricingSchema>
 
 // Aggregated, anonymized marketplace stats — the advisor never sees
 // individual competitors, only min/median/max in the same currency.
+// Scoped to product variant prices so unrelated price rows (shipping
+// options, etc.) don't skew the stats.
 async function getMarketPriceStats(
   query: any,
   currencyCode: string
 ): Promise<MarketPriceStats> {
-  const { data: prices } = await query.graph({
-    entity: "price",
-    fields: ["amount", "currency_code"],
-    filters: { currency_code: currencyCode },
+  const { data: variants } = await query.graph({
+    entity: "variant",
+    fields: ["prices.amount", "prices.currency_code"],
   })
 
-  const amounts = (prices ?? [])
+  const amounts = (variants ?? [])
+    .flatMap((v: any) => v.prices ?? [])
+    .filter((p: any) => p?.currency_code === currencyCode)
     .map((p: any) => Number(p.amount))
     .filter((n: number) => Number.isFinite(n) && n > 0)
     .sort((a: number, b: number) => a - b)
@@ -39,11 +42,17 @@ async function getMarketPriceStats(
     }
   }
 
+  const mid = Math.floor(amounts.length / 2)
+  const median =
+    amounts.length % 2
+      ? amounts[mid]
+      : Math.round((amounts[mid - 1] + amounts[mid]) / 2)
+
   return {
     currency_code: currencyCode,
     sample_size: amounts.length,
     min: amounts[0],
-    median: amounts[Math.floor(amounts.length / 2)],
+    median,
     max: amounts[amounts.length - 1],
   }
 }
