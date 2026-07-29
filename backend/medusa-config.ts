@@ -55,6 +55,18 @@ module.exports = defineConfig({
               publicKey: process.env.FLUTTERWAVE_PUBLIC_KEY,
             },
           },
+          {
+            resolve: "./src/modules/payment-providers/crypto-usdc",
+            id: "crypto-usdc",
+            options: {
+              enabled: process.env.CRYPTO_ENABLED,
+              networkEnv: process.env.CRYPTO_NETWORK_ENV,
+              defaultNetwork: process.env.CRYPTO_DEFAULT_NETWORK,
+              circleApiKey: process.env.CIRCLE_API_KEY,
+              circleEntitySecret: process.env.CIRCLE_ENTITY_SECRET,
+              circleWalletSetId: process.env.CIRCLE_WALLET_SET_ID,
+            },
+          },
         ],
       },
     },

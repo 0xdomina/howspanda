@@ -128,6 +128,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
       payment_providers: [
         "pp_paystack_paystack",
         "pp_flutterwave_flutterwave",
+        "pp_crypto-usdc_crypto-usdc",
         "pp_system_default",
       ],
     },
