@@ -136,7 +136,8 @@ describe("Payments — crypto USDC provider (mock)", () => {
     expect(data.network).toEqual("base")
     expect(data.env).toEqual("testnet")
     expect(data.address).toContain("mock-base-")
-    expect(data.wallet_id).toEqual("mock-wallet-base")
+    // per-intent wallet (correlation fix) — no longer a shared network wallet
+    expect(data.wallet_id).toEqual(`mock-wallet-${data.reference}`)
     // ₦17,500 ÷ ₦1,600 = 10.9375 → "10.94"
     expect(data.usdc_amount).toEqual("10.94")
   })
@@ -151,6 +152,24 @@ describe("Payments — crypto USDC provider (mock)", () => {
     // subsequent poll: confirmed
     const second = await crypto.authorizePayment({ data: init.data } as any)
     expect(second.status).toEqual("authorized")
+  })
+
+  it("keeps two concurrent intents isolated — no cross-confirmation", async () => {
+    const a = await crypto.initiatePayment(initInput(17_500))
+    const b = await crypto.initiatePayment(initInput(32_000))
+
+    // distinct per-intent deposit addresses + wallets
+    expect((a.data as any).address).not.toEqual((b.data as any).address)
+    expect((a.data as any).wallet_id).not.toEqual((b.data as any).wallet_id)
+
+    // confirming A must not confirm B: A polls twice → authorized, while B's
+    // first-and-only poll stays pending.
+    await crypto.authorizePayment({ data: a.data } as any)
+    const aDone = await crypto.authorizePayment({ data: a.data } as any)
+    expect(aDone.status).toEqual("authorized")
+
+    const bFirst = await crypto.authorizePayment({ data: b.data } as any)
+    expect(bFirst.status).toEqual("pending_authorization")
   })
 })
 

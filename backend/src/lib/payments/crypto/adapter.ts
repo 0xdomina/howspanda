@@ -26,6 +26,22 @@ export interface SettlementStatus {
   usdc_received?: string
 }
 
+// Inbound-settlement lookup. wallet_id scopes the check to the intent's own
+// deposit wallet; expected_usdc guards against under-payments. Both optional
+// so the mock (and older sessions) keep working.
+export interface SettlementQuery {
+  reference: string
+  wallet_id?: string
+  expected_usdc?: string
+}
+
+// Outbound USDC transfer (seller payout) — mirrors SettlementStatus.
+export interface WithdrawalStatus {
+  reference: string
+  status: "pending" | "confirmed" | "failed"
+  tx_hash?: string
+}
+
 export interface CryptoSettlement {
   readonly network: CryptoNetwork
   readonly env: NetworkEnv
@@ -33,7 +49,13 @@ export interface CryptoSettlement {
     reference: string
     usdc_amount: string
   }): Promise<DepositIntent>
-  checkSettlement(reference: string): Promise<SettlementStatus>
+  checkSettlement(query: SettlementQuery): Promise<SettlementStatus>
+  createWithdrawal(input: {
+    reference: string
+    address: string
+    usdc_amount: string
+  }): Promise<WithdrawalStatus>
+  checkWithdrawal(reference: string): Promise<WithdrawalStatus>
 }
 
 export class CryptoUnavailableError extends Error {

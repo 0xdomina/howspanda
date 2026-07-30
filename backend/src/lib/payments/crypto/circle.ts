@@ -5,7 +5,9 @@ import {
   CryptoUnavailableError,
   DepositIntent,
   NetworkEnv,
+  SettlementQuery,
   SettlementStatus,
+  WithdrawalStatus,
 } from "./adapter"
 
 export type CircleOptions = {
@@ -14,9 +16,9 @@ export type CircleOptions = {
   walletSetId?: string
 }
 
-// Reuse one receiving wallet per (network,env) across requests within a
-// process, so we don't spin up a new Circle wallet on every checkout.
-const WALLET_CACHE = new Map<string, { id: string; address: string }>()
+// Platform TREASURY wallet per (network,env) — outbound-only (payouts).
+// Deposits get a fresh per-intent wallet instead (see createDepositIntent).
+const TREASURY_CACHE = new Map<string, { id: string; address: string }>()
 
 /**
  * Live settlement via Circle developer-controlled wallets (USDC-native, no
@@ -67,13 +69,10 @@ export class CircleCryptoSettlement implements CryptoSettlement {
     return this.clientPromise
   }
 
-  private async receivingWallet(): Promise<{ id: string; address: string }> {
-    const cacheKey = `${this.network}:${this.env}`
-    const cached = WALLET_CACHE.get(cacheKey)
-    if (cached) {
-      return cached
-    }
-
+  private async provisionWallet(refId?: string): Promise<{
+    id: string
+    address: string
+  }> {
     const client = await this.client()
     try {
       const res = await client.createWallets({
@@ -81,14 +80,13 @@ export class CircleCryptoSettlement implements CryptoSettlement {
         count: 1,
         walletSetId: this.options.walletSetId,
         accountType: "SCA",
+        ...(refId ? { metadata: [{ refId }] } : {}),
       })
       const wallet = res?.data?.wallets?.[0]
       if (!wallet?.address || !wallet?.id) {
         throw new Error("Circle createWallets returned no wallet")
       }
-      const entry = { id: wallet.id, address: wallet.address }
-      WALLET_CACHE.set(cacheKey, entry)
-      return entry
+      return { id: wallet.id, address: wallet.address }
     } catch (e: any) {
       throw new CryptoUnavailableError(
         `Circle wallet provisioning failed: ${e?.message ?? e}`
@@ -96,11 +94,27 @@ export class CircleCryptoSettlement implements CryptoSettlement {
     }
   }
 
+  private async treasuryWallet(): Promise<{ id: string; address: string }> {
+    const cacheKey = `${this.network}:${this.env}`
+    const cached = TREASURY_CACHE.get(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const entry = await this.provisionWallet(`treasury-${cacheKey}`)
+    TREASURY_CACHE.set(cacheKey, entry)
+    return entry
+  }
+
   async createDepositIntent(input: {
     reference: string
     usdc_amount: string
   }): Promise<DepositIntent> {
-    const wallet = await this.receivingWallet()
+    // Fresh wallet per intent so each checkout has its own deposit address —
+    // settlement checks are then scoped to this wallet and can never see
+    // another intent's inbound transfer. (Testnet-PoC cost note: per-intent
+    // wallets are free on testnet; on mainnet, batch/reap idle wallets.)
+    const wallet = await this.provisionWallet(input.reference)
     return {
       network: this.network,
       env: this.env,
@@ -112,28 +126,28 @@ export class CircleCryptoSettlement implements CryptoSettlement {
     }
   }
 
-  async checkSettlement(reference: string): Promise<SettlementStatus> {
-    const wallet = WALLET_CACHE.get(`${this.network}:${this.env}`)
-    if (!wallet) {
+  async checkSettlement(query: SettlementQuery): Promise<SettlementStatus> {
+    const { reference, wallet_id, expected_usdc } = query
+    if (!wallet_id) {
+      // Never guess another intent's wallet — without the intent's own
+      // wallet_id the settlement simply stays pending.
       return { reference, status: "pending" }
     }
 
     const client = await this.client()
     try {
-      // PoC LIMITATION (must fix before live crypto): this matches ANY completed
-      // inbound transfer into the SHARED receiving wallet — it does NOT correlate
-      // the transfer to this `reference` or the expected `usdc_amount`. With
-      // concurrent checkouts two orders could each see the other's deposit and
-      // both settle. Provision a per-intent deposit address (or match by
-      // amount + reference/memo) before enabling live settlement.
       const res = await client.listTransactions({
-        walletIds: [wallet.id],
+        walletIds: [wallet_id],
         blockchain: this.blockchain(),
       })
-      const inbound = (res?.data?.transactions ?? []).find(
-        (t: any) =>
-          t?.transactionType === "INBOUND" && t?.state === "COMPLETE"
-      )
+      const expected = expected_usdc ? Number(expected_usdc) : 0
+      const inbound = (res?.data?.transactions ?? []).find((t: any) => {
+        if (t?.transactionType !== "INBOUND" || t?.state !== "COMPLETE") {
+          return false
+        }
+        const received = Number(t?.amounts?.[0] ?? 0)
+        return !expected || received >= expected
+      })
       if (!inbound) {
         return { reference, status: "pending" }
       }
@@ -146,6 +160,60 @@ export class CircleCryptoSettlement implements CryptoSettlement {
     } catch (e: any) {
       throw new CryptoUnavailableError(
         `Circle settlement check failed: ${e?.message ?? e}`
+      )
+    }
+  }
+
+  async createWithdrawal(input: {
+    reference: string
+    address: string
+    usdc_amount: string
+  }): Promise<WithdrawalStatus> {
+    const treasury = await this.treasuryWallet()
+    const client = await this.client()
+    try {
+      // Find the treasury's USDC token id, then send to the seller address.
+      const balances = await client.getWalletTokenBalance({ id: treasury.id })
+      const usdc = (balances?.data?.tokenBalances ?? []).find((b: any) =>
+        String(b?.token?.symbol ?? "").toUpperCase().startsWith("USDC")
+      )
+      if (!usdc?.token?.id) {
+        throw new Error("treasury wallet holds no USDC token")
+      }
+      await client.createTransaction({
+        walletId: treasury.id,
+        tokenId: usdc.token.id,
+        destinationAddress: input.address,
+        amount: [input.usdc_amount],
+        refId: input.reference,
+        fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+      })
+      return { reference: input.reference, status: "pending" }
+    } catch (e: any) {
+      throw new CryptoUnavailableError(
+        `Circle withdrawal failed: ${e?.message ?? e}`
+      )
+    }
+  }
+
+  async checkWithdrawal(reference: string): Promise<WithdrawalStatus> {
+    const client = await this.client()
+    try {
+      const res = await client.listTransactions({ refId: reference })
+      const tx = (res?.data?.transactions ?? [])[0]
+      if (!tx) {
+        return { reference, status: "pending" }
+      }
+      if (tx.state === "COMPLETE") {
+        return { reference, status: "confirmed", tx_hash: tx.txHash }
+      }
+      if (["FAILED", "CANCELLED", "DENIED"].includes(String(tx.state))) {
+        return { reference, status: "failed" }
+      }
+      return { reference, status: "pending" }
+    } catch (e: any) {
+      throw new CryptoUnavailableError(
+        `Circle withdrawal check failed: ${e?.message ?? e}`
       )
     }
   }

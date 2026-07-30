@@ -103,7 +103,13 @@ class CryptoUsdcProviderService extends AbstractPaymentProvider<CryptoUsdcOption
     }
 
     const settlement = getCryptoSettlement(data?.network as string | undefined)
-    const result = await settlement.checkSettlement(reference)
+    // wallet_id + expected_usdc scope the check to THIS intent's deposit
+    // wallet (correlation fix) — both stored in session data since Phase 4.
+    const result = await settlement.checkSettlement({
+      reference,
+      wallet_id: data?.wallet_id as string | undefined,
+      expected_usdc: data?.usdc_amount as string | undefined,
+    })
 
     let status: PaymentSessionStatus
     switch (result.status) {
