@@ -34,7 +34,7 @@ function secretKey(): string {
   return process.env.PAYSTACK_SECRET_KEY ?? ""
 }
 
-function isMockMode(): boolean {
+export function isMockMode(): boolean {
   const key = secretKey()
   return !key || key === "mock"
 }

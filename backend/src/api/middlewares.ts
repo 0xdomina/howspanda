@@ -111,5 +111,11 @@ export default defineMiddlewares({
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostSellerPayoutSchema)],
     },
+    {
+      // Paystack signs the exact raw bytes — keep them for the HMAC check
+      matcher: "/hooks/payouts/paystack",
+      methods: ["POST"],
+      bodyParser: { preserveRawBody: true },
+    },
   ],
 })
