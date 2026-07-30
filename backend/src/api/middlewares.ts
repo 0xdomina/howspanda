@@ -46,6 +46,11 @@ export const PostPayoutAccountSchema = z.discriminatedUnion("type", [
   }),
 ])
 
+export const PostSellerPayoutSchema = z.object({
+  rail: z.enum(["paystack", "crypto-usdc"]),
+  idempotency_key: z.string().optional(),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -100,6 +105,11 @@ export default defineMiddlewares({
       matcher: "/sellers/payout-accounts",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostPayoutAccountSchema)],
+    },
+    {
+      matcher: "/sellers/payouts",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostSellerPayoutSchema)],
     },
   ],
 })

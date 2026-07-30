@@ -6,6 +6,7 @@ import Payout from "./models/payout"
 import PayoutAccount from "./models/payout-account"
 
 const DEFAULT_CLEARANCE_DAYS = 7
+const DEFAULT_MIN_PAYOUT_NGN = 5000
 
 export type CurrencyBalance = {
   pending: number
@@ -30,6 +31,13 @@ class MarketplaceModuleService extends MedusaService({
     return Number.isFinite(parsed) && parsed >= 0
       ? parsed
       : DEFAULT_CLEARANCE_DAYS
+  }
+
+  payoutMinNgn(): number {
+    const parsed = Number(process.env.PAYOUT_MIN_NGN)
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DEFAULT_MIN_PAYOUT_NGN
   }
 
   /**
@@ -151,6 +159,90 @@ class MarketplaceModuleService extends MedusaService({
     const [updated] = await this.updateCommissionLines([
       { id: line.id, status: "reversed" as const, reversal_reason: reason },
     ])
+    return updated
+  }
+
+  /**
+   * Idempotent payout transitions (webhook + reconcile may race — a repeat
+   * of the same verdict is a no-op). Each one moves the payout AND its swept
+   * commission lines together so the ledger can never disagree with the row.
+   */
+  async markPayoutPaid(payoutId: string) {
+    const payout = await this.retrievePayout(payoutId)
+    if (payout.status === "paid") {
+      return payout
+    }
+
+    const [updated] = await this.updatePayouts([
+      { id: payoutId, status: "paid" as const, paid_at: new Date() },
+    ])
+
+    const reserved = await this.listCommissionLines(
+      { payout_id: payoutId, status: "reserved" },
+      { take: null }
+    )
+    if (reserved.length) {
+      await this.updateCommissionLines(
+        reserved.map((line) => ({ id: line.id, status: "paid" as const }))
+      )
+    }
+
+    return updated
+  }
+
+  async markPayoutFailed(payoutId: string, reason: string) {
+    const payout = await this.retrievePayout(payoutId)
+    if (payout.status === "failed") {
+      return payout
+    }
+
+    const [updated] = await this.updatePayouts([
+      { id: payoutId, status: "failed" as const, failure_reason: reason },
+    ])
+
+    // release the swept lines so a later payout can pick them up again
+    const reserved = await this.listCommissionLines(
+      { payout_id: payoutId, status: "reserved" },
+      { take: null }
+    )
+    if (reserved.length) {
+      await this.updateCommissionLines(
+        reserved.map((line) => ({
+          id: line.id,
+          status: "available" as const,
+          payout_id: null,
+        }))
+      )
+    }
+
+    return updated
+  }
+
+  async markPayoutReversed(payoutId: string) {
+    const payout = await this.retrievePayout(payoutId)
+    if (payout.status === "reversed") {
+      return payout
+    }
+
+    const [updated] = await this.updatePayouts([
+      { id: payoutId, status: "reversed" as const },
+    ])
+
+    // the money bounced back — paid lines return to available for a retry
+    const paid = await this.listCommissionLines(
+      { payout_id: payoutId, status: "paid" },
+      { take: null }
+    )
+    if (paid.length) {
+      await this.updateCommissionLines(
+        paid.map((line) => ({
+          id: line.id,
+          status: "available" as const,
+          payout_id: null,
+        }))
+      )
+    }
+
     return updated
   }
 }
