@@ -183,51 +183,37 @@ describe("Payments — network-agnostic crypto settlement", () => {
 })
 
 /**
- * In-app boot check: proves the 3 providers register as enabled and the app stays
- * healthy. It boots the full Medusa app against a freshly-migrated temp DB.
+ * In-app boot check: boots the full Medusa app against a freshly-migrated temp
+ * DB and proves the 3 payment providers register as enabled and /health stays 200.
  *
- * Gated behind RUN_INAPP_TESTS because Medusa's migrator discovers each module's
- * migration files by globbing an ABSOLUTE path, and this workspace lives at
- * "C:\Users\mosho\Desktop\How's you" — the apostrophe + space break that glob, so
- * ZERO module migrations run on the temp DB and boot fails with
- * `relation "payment_provider" does not exist`. This hits EVERY app-booting spec
- * (e.g. marketplace.spec.ts), not just this one, and also breaks provisioning a
- * fresh production DB. Proven fix: run from a path with no apostrophe/space —
- * `medusa db:migrate` under NODE_OPTIONS=--preserve-symlinks via the clean
- * howsu-link junction migrates all 149 tables (incl. payment_provider/tax_provider).
- * Jest resolves symlinks back to the real path regardless of that flag, so the
- * durable fix is to relocate the project to a clean path; then set
- * RUN_INAPP_TESTS=true with DB_USERNAME/DB_PASSWORD/DB_HOST/DB_PORT to run this.
- *
- * Until then, provider registration + a real store checkout are proven end-to-end
- * by the Phase 4 live proof, and the deterministic units above cover payment logic.
+ * Like the other in-app specs (health/marketplace/ai) this needs a running Postgres
+ * and DB_HOST/DB_PORT/DB_USERNAME/DB_PASSWORD in the environment; the deterministic
+ * units above run offline with no DB.
  */
-if (process.env.RUN_INAPP_TESTS === "true") {
-  medusaIntegrationTestRunner({
-    inApp: true,
-    env: {},
-    testSuite: ({ api, getContainer }) => {
-      describe("Payments — in-app registration + no-regression", () => {
-        it("registers Paystack, Flutterwave and crypto-usdc as enabled providers", async () => {
-          const paymentService = getContainer().resolve(Modules.PAYMENT)
-          const providers = await paymentService.listPaymentProviders({})
-          const ids = providers.map((p: any) => p.id)
+medusaIntegrationTestRunner({
+  inApp: true,
+  env: {},
+  testSuite: ({ api, getContainer }) => {
+    describe("Payments — in-app registration + no-regression", () => {
+      it("registers Paystack, Flutterwave and crypto-usdc as enabled providers", async () => {
+        const paymentService = getContainer().resolve(Modules.PAYMENT)
+        const providers = await paymentService.listPaymentProviders({})
+        const ids = providers.map((p: any) => p.id)
 
-          expect(ids).toEqual(
-            expect.arrayContaining([PAYSTACK_ID, FLUTTERWAVE_ID, CRYPTO_USDC_ID])
+        expect(ids).toEqual(
+          expect.arrayContaining([PAYSTACK_ID, FLUTTERWAVE_ID, CRYPTO_USDC_ID])
+        )
+        for (const id of [PAYSTACK_ID, FLUTTERWAVE_ID, CRYPTO_USDC_ID]) {
+          expect(providers.find((p: any) => p.id === id)!.is_enabled).toBe(
+            true
           )
-          for (const id of [PAYSTACK_ID, FLUTTERWAVE_ID, CRYPTO_USDC_ID]) {
-            expect(providers.find((p: any) => p.id === id)!.is_enabled).toBe(
-              true
-            )
-          }
-        })
-
-        it("keeps /health responding 200", async () => {
-          const res = await api.get("/health")
-          expect(res.status).toEqual(200)
-        })
+        }
       })
-    },
-  })
-}
+
+      it("keeps /health responding 200", async () => {
+        const res = await api.get("/health")
+        expect(res.status).toEqual(200)
+      })
+    })
+  },
+})
