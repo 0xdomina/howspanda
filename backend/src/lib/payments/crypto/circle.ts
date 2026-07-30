@@ -120,7 +120,12 @@ export class CircleCryptoSettlement implements CryptoSettlement {
 
     const client = await this.client()
     try {
-      // Look for a completed inbound USDC transfer into the receiving wallet.
+      // PoC LIMITATION (must fix before live crypto): this matches ANY completed
+      // inbound transfer into the SHARED receiving wallet — it does NOT correlate
+      // the transfer to this `reference` or the expected `usdc_amount`. With
+      // concurrent checkouts two orders could each see the other's deposit and
+      // both settle. Provision a per-intent deposit address (or match by
+      // amount + reference/memo) before enabling live settlement.
       const res = await client.listTransactions({
         walletIds: [wallet.id],
         blockchain: this.blockchain(),

@@ -124,4 +124,7 @@ DB_HOST=localhost DB_PORT=5432 DB_USERNAME=... DB_PASSWORD=... \
 > Known gaps (deferred to the payouts phase): on-chain crypto refunds are not yet
 > executed (the amount is echoed for ledger consistency); the NGN->USDC rate is a
 > fixed placeholder, not a live oracle; `PAYMENT_DEFAULT_CURRENCY` in `.env.template`
-> is documentation-only.
+> is documentation-only. **Live crypto is not production-ready**: settlement
+> matches any inbound transfer to a shared receiving wallet and is not correlated
+> per checkout, so per-intent deposit addresses (or amount+reference matching)
+> must be added before enabling it.
