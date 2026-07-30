@@ -121,10 +121,100 @@ DB_HOST=localhost DB_PORT=5432 DB_USERNAME=... DB_PASSWORD=... \
   npx jest integration-tests/http/payments.spec.ts --runInBand --forceExit
 ```
 
-> Known gaps (deferred to the payouts phase): on-chain crypto refunds are not yet
+> Known gaps (deferred to later phases): on-chain crypto refunds are not yet
 > executed (the amount is echoed for ledger consistency); the NGN->USDC rate is a
 > fixed placeholder, not a live oracle; `PAYMENT_DEFAULT_CURRENCY` in `.env.template`
-> is documentation-only. **Live crypto is not production-ready**: settlement
-> matches any inbound transfer to a shared receiving wallet and is not correlated
-> per checkout, so per-intent deposit addresses (or amount+reference matching)
-> must be added before enabling it.
+> is documentation-only. ~~Live crypto settlement matches any inbound transfer to a
+> shared receiving wallet~~ — fixed in Phase 5: every deposit intent gets its own
+> Circle wallet and settlement requires an inbound transfer to that wallet matching
+> the expected USDC amount.
+
+## Payouts & Settlement (Phase 5)
+
+Money OUT — the mirror of Phase 4's money IN. Commission lines earned at checkout
+flow through a settlement ledger into seller payouts over two rails: **Paystack
+Transfers** (NGN bank accounts) and **USDC withdrawals** (Circle, network-agnostic).
+Both rails have deterministic offline mocks, same convention as Phase 4.
+
+### Settlement state machine
+
+```
+checkout ─→ pending ─(clearance window)→ available ─(payout sweep)→ reserved ─→ paid
+                │                          │  ▲                        │
+                └─→ reversed (refund)  ────┘  └─(payout failed)────────┘
+
+paid + refund ─→ negated ":reversal" offset line born available (clawback)
+```
+
+- `pending → available` after `PAYOUT_CLEARANCE_DAYS` (default 7) — a time-based
+  placeholder until the escrow/delivery-confirmation phase replaces the trigger.
+- Balance buckets per currency: `pending`, `available`, `reserved`, `paid_out`
+  (`reversed` lines are excluded; clawback offsets net out of `available`).
+- Reversals: `POST /admin/commissions/reverse` `{ order_id, reason }` — unpaid
+  lines flip to `reversed`; already-paid lines get a negated `:reversal` offset
+  line; `reserved` lines conflict until the in-flight payout is reconciled.
+
+### Payout lifecycle & idempotency
+
+`requested → processing → paid | failed | reversed`. Contract:
+
+- The provider-side transfer reference is **always the payout id** — Paystack
+  rejects duplicate references, so a crashed-and-replayed workflow can never
+  double-pay.
+- `idempotency_key` is unique per payout; replaying the same key returns the
+  same payout untouched (`sched-<seller_id>-<YYYYMMDD>` for cron runs = one
+  scheduled payout per seller per day).
+- A payout sweeps the **full available NGN balance** (≥ `PAYOUT_MIN_NGN`,
+  default 5000) into `reserved`; workflow failure compensates: zero payout rows,
+  all lines released back to `available`.
+- `failed` releases lines to `available`; `reversed` (money bounced after paid)
+  returns paid lines to `available`.
+
+### Rails
+
+| Rail | Destination | Live behavior | Mock behavior (`mock`/blank key) |
+|---|---|---|---|
+| `paystack` | Verified NUBAN (name-resolve + transfer recipient) | `/bank/resolve`, `/transferrecipient`, `/transfer`, HMAC-SHA512 webhook, `/transfer/verify` | resolve fails for `00`-prefixed accounts; `RCP_mock_*`, `TRF_mock_*`; verify pending→success; `fail` in reference → failed |
+| `crypto-usdc` | `base`/`solana` address | Circle treasury wallet → `createTransaction` with refId, poll by refId | withdrawal pending→confirmed (`0xmockout*`); `fail` in address → failed |
+
+Crypto deposits (Phase 4 gap fix): every intent provisions its **own** Circle
+wallet and `checkSettlement({ reference, wallet_id, expected_usdc })` only
+confirms an inbound transfer to that wallet for at least the expected amount —
+two concurrent checkouts can never cross-confirm.
+
+### API
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /sellers/balance` | seller | Balance buckets + clearance/minimum config |
+| `GET\|POST /sellers/payout-accounts` | seller | List/register destinations (bank verified by name-resolve; first of type = default) |
+| `GET\|POST /sellers/payouts` | seller | Payout history / request a payout (`{ rail, idempotency_key? }`) |
+| `POST /hooks/payouts/paystack` | public (HMAC in live) | `transfer.success\|failed\|reversed` → payout transitions; unknown events acked 200 |
+| `GET /admin/payouts` | admin | All payouts, filter `status`, `seller_id` |
+| `POST /admin/payouts/run` | admin | Run the scheduled sweep now (`{ seller_id? }`) |
+| `POST /admin/payouts/:id/reconcile` | admin | Poll that payout's rail now |
+| `POST /admin/commissions/reverse` | admin | Refund/chargeback ledger reversal |
+
+### Scheduling
+
+Three cron jobs (`src/jobs/`): `clear-commission-lines` (hourly, always on),
+`scheduled-payouts` (daily 02:00) and `reconcile-payouts` (every 15 min) — the
+latter two are no-ops unless `PAYOUT_SCHEDULE_ENABLED=true`, so dev/test
+environments never fire transfers by accident.
+
+### Configuration (`backend/.env`)
+
+| Var | Purpose |
+|---|---|
+| `PAYOUT_CLEARANCE_DAYS` | Days before a pending commission line becomes available (default 7) |
+| `PAYOUT_MIN_NGN` | Minimum available NGN balance to pay out (default 5000) |
+| `PAYOUT_SCHEDULE_ENABLED` | `true` to enable the payout + reconcile crons |
+
+### Testing
+
+`integration-tests/http/payouts.spec.ts`: offline units for both rail mocks +
+the correlation fix, and an in-app suite covering ledger clearance/balance
+buckets, the create-payout workflow (reserve/idempotent replay/below-minimum
+compensation), webhook success/failure, crypto reconcile, and both reversal
+paths. Full suite: 5 spec files, 46 tests.
+
