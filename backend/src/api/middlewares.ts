@@ -33,6 +33,19 @@ export const PostAiMarketingSchema = z.object({
   tone: z.string().optional(),
 })
 
+export const PostPayoutAccountSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("bank_account"),
+    bank_code: z.string().min(3),
+    account_number: z.string().regex(/^\d{10}$/, "NUBAN is 10 digits"),
+  }),
+  z.object({
+    type: z.literal("crypto_address"),
+    network: z.enum(["base", "solana"]),
+    address: z.string().min(10),
+  }),
+])
+
 export default defineMiddlewares({
   routes: [
     {
@@ -82,6 +95,11 @@ export default defineMiddlewares({
       matcher: "/sellers/ai/marketing",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostAiMarketingSchema)],
+    },
+    {
+      matcher: "/sellers/payout-accounts",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostPayoutAccountSchema)],
     },
   ],
 })
