@@ -57,3 +57,71 @@ Rules: every call is quota-checked first (free tier
 quota exhaustion → friendly 429; provider failure → friendly 503 and the
 action is never billed. AI failures never block commerce. Every AI call's
 context is hard-scoped to the authenticated seller's own data.
+
+## Payments (Phase 4)
+
+Africa-first, multi-rail payments: two fiat gateways (Paystack, Flutterwave) plus a
+network-agnostic crypto USDC rail. Buyers see every enabled rail ranked by fee with
+the cheapest **fiat** rail pre-selected; crypto is always offered but never the silent
+default. Adding a provider later (e.g. Monnify) is a config + small module change.
+
+### Providers
+
+| Provider id | Rail | Live behavior | Mock mode when |
+|---|---|---|---|
+| `pp_paystack_paystack` | Fiat (NGN, kobo) | Hosted checkout URL, HMAC-SHA512 webhook, refunds | secret absent/`mock` |
+| `pp_flutterwave_flutterwave` | Fiat (NGN) | Hosted payment link, verif-hash webhook, refunds | secret absent/`mock` |
+| `pp_crypto-usdc_crypto-usdc` | Crypto USDC | Circle developer-controlled wallets, poll-based settlement | `CIRCLE_API_KEY` absent/`mock` |
+| `pp_system_default` | Manual | Medusa built-in; excluded from fee routing | - |
+
+Every provider runs in deterministic **mock mode** offline when its secret is missing
+or set to the literal `mock`, so the app boots and tests run with no keys and no network.
+Providers are attached to the Nigeria region in `src/scripts/seed.ts`.
+
+### Fee routing
+
+`GET /store/payment-options?amount=<minor>&currency=ngn` returns the enabled rails
+ranked cheapest-first with a single `recommended` flag on the cheapest *fiat* rail.
+Fees (minor units): Paystack 1.5% + NGN 100 flat (waived under NGN 2,500, capped NGN
+2,000); Flutterwave 1.4% (capped NGN 2,000); crypto 0 (gas abstracted). It is a
+read-only quote and never mutates carts or sessions. Checkout itself stays
+`POST /store/carts/:id/complete-marketplace`. Logic lives in `src/lib/payments/fees.ts`.
+
+### Crypto USDC - network-agnostic, no seed phrase
+
+USDC on Circle developer-controlled wallets: Circle custodies keys behind an API key +
+entity secret, so **users never handle a seed phrase**. Networks `base` and `solana`
+today (extensible to `bsc`, `somnia`, `arc`); testnet<->mainnet is a pure env switch.
+NGN->USDC uses a fixed configurable rate (`CRYPTO_NGN_PER_USDC`, a placeholder for a
+real oracle later). An unknown network throws instead of silently picking a wrong
+chain. Settlement seam: `src/lib/payments/crypto/` (mock + Circle adapters).
+
+### Configuration (`backend/.env`)
+
+| Var | Purpose |
+|---|---|
+| `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY` | Paystack keys; `mock`/blank = mock mode |
+| `FLUTTERWAVE_SECRET_KEY` / `FLUTTERWAVE_PUBLIC_KEY` | Flutterwave keys; `mock`/blank = mock mode |
+| `CRYPTO_ENABLED` | `true` to offer the crypto rail |
+| `CRYPTO_DEFAULT_NETWORK` | `base` (default) or `solana` |
+| `CRYPTO_NETWORK_ENV` | `testnet` (default) or `mainnet` |
+| `CRYPTO_NGN_PER_USDC` | Fixed NGN-per-USDC quote rate (default 1600) |
+| `CIRCLE_API_KEY` | Circle key; `mock`/blank = mock settlement |
+| `CIRCLE_ENTITY_SECRET` / `CIRCLE_WALLET_SET_ID` | Circle developer-controlled-wallet config (live) |
+
+### Testing
+
+`integration-tests/http/payments.spec.ts` covers deterministic offline units (fee
+routing, each provider mock state machine, network-agnostic settlement) plus an in-app
+boot check that the three providers register enabled and `/health` stays 200. Run with
+a running Postgres and DB creds from `.env`:
+
+```
+DB_HOST=localhost DB_PORT=5432 DB_USERNAME=... DB_PASSWORD=... \
+  npx jest integration-tests/http/payments.spec.ts --runInBand --forceExit
+```
+
+> Known gaps (deferred to the payouts phase): on-chain crypto refunds are not yet
+> executed (the amount is echoed for ledger consistency); the NGN->USDC rate is a
+> fixed placeholder, not a live oracle; `PAYMENT_DEFAULT_CURRENCY` in `.env.template`
+> is documentation-only.
