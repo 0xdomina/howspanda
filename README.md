@@ -297,5 +297,88 @@ replaced by this delivery-confirmation trigger.
 idempotent replays, cross-seller 404s, confirm-receipt release, sweep release
 and 30-day fallback, return hold → reversal, cancel-return, non-returnable and
 mixed orders, post-release 409, admin hold/release, and the escrow → payout
-seam. Full suite: 6 spec files, 60 tests.
+seam. Full suite as of Phase 6: 6 spec files, 60 tests.
+
+## Store Identity & Redeemables (Phase 7)
+
+Every seller gets a public front door, and a shelf of **redeemable
+instruments** — gift cards, vouchers and tickets — sold or gifted from their
+store and honoured digitally at checkout or physically at the counter/door.
+
+### The front door
+
+`GET /store/sellers/:handle` → seller profile + published products + priced
+instruments currently for sale. Bearer codes are **never** exposed on public
+surfaces — the storefront lists templates without their `code`, and the public
+code check only answers for a code the caller already holds.
+
+### The `redeemables` module
+
+Third custom module (`src/modules/redeemables`): `Redeemable` (the coded
+instrument) + `Redemption` (append-only audit of every draw). Codes are
+unguessable — `GC-`/`VC-`/`TK-` prefix + 12 crypto-random chars from an
+unambiguous alphabet (no 0/O/1/I/L), e.g. `GC-H6D5-U46E-AJR2`. The QR payload
+is simply the code.
+
+| Type | Prefix | Value model | Checkout | In-store |
+|---|---|---|---|---|
+| Gift card | `GC-` | `face_value` with a `balance` that draws down across uses | applies up to `min(balance, total)` | seller draws down any amount ≤ balance |
+| Voucher | `VC-` | one-shot `fixed` or `percent` discount | fixed capped at total; percent rounded | fixed redeems at its value; percent logs the use (seller applies it on their own till) |
+| Ticket | `TK-` | one-shot `face_value` admission | **rejected** — "redeemed at the venue" | seller admits at the door, `amount_applied = face_value` |
+
+Gift cards deplete (balance 0 → `redeemed`); vouchers and tickets die on
+first use. Lazy expiry: an expired code flips to `expired` the moment anyone
+touches it.
+
+### Creation & sale
+
+- **Free issuance**: seller mints 1–100 coded instances per call (batch
+  gifting, door lists).
+- **Priced templates**: setting `price` creates a single template row plus an
+  auto-created, seller-linked **published product** (the template's
+  `product_id`). Each sale mints a **fresh coded instance per unit** to the
+  buyer's email via the `order.placed` subscriber — templates themselves are
+  never redeemable.
+- Commission is taken **at purchase only**; redemption moves no money.
+- **Instant escrow release** for seller orders that are redeemable-only (the
+  seller has no goods to ship — the code *is* the product). Mixed orders keep
+  the Phase 6 delivery-confirmation window.
+- Admin reversal/clawback (`POST /admin/commissions/reverse`, Phase 5) is the
+  dispute backstop.
+
+### Two redemption doors
+
+**Checkout (digital)** — `POST /store/carts/:id/apply-redeemable` prices the
+code against the cart (store-scoped: 400 if the cart holds other sellers'
+items; one code per cart; tickets rejected) and stages line-item adjustments +
+cart metadata. `complete-marketplace` then **consumes the code first** and
+places the order; if order placement fails after consumption, an undo
+compensation restores the balance/status and deletes the audit row — the code
+survives a failed checkout intact.
+
+**In-store (physical)** — the buyer shows the code/QR, the owning seller posts
+it to `POST /sellers/redeemables/redeem`. Foreign codes are invisible (404,
+never 400) so codes can't be probed across stores.
+
+### API
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /store/sellers/:handle` | publishable key | Storefront: profile + products + for-sale instruments (no codes) |
+| `GET /store/redeemables/:code` | publishable key | Public code check → status, value, QR payload, issuing store |
+| `POST /store/carts/:id/apply-redeemable` | publishable key | Apply a code to a cart (adjustments + metadata) |
+| `GET /sellers/redeemables` | seller | List own instruments, filter `type`/`status` |
+| `POST /sellers/redeemables` | seller | Mint free instances (quantity 1–100) or a priced template |
+| `POST /sellers/redeemables/redeem` | seller | In-store redemption by code/QR |
+| `POST /sellers/redeemables/:id/cancel` | seller | Cancel an own, still-active code |
+
+### Testing
+
+`integration-tests/http/redeemables.spec.ts`: 15 in-app tests — storefront
+code-stripping, batch minting, validation 400s, public check, gift-card
+drawdown to zero with replay/overdraw guards, voucher/ticket single-use,
+cross-store 404s and store-scope 400s, lazy expiry, cancel, cart apply,
+consume/undo compensation, and the subscriber (template minting + instant
+release + idempotent replay). Plus the live-proof ritual against the dev
+server in mock mode. Full suite: 7 spec files, 75 tests.
 
