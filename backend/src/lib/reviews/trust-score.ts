@@ -114,6 +114,37 @@ export function computeTrustScore(input: {
   }
 }
 
+// A raw ledger line still carrying its order id — what reconciliation needs.
+export type RawLine = LineFact & { order_id: string }
+
+// Fold the ledger's clawback representation into honest per-order facts.
+// A refund on an already-*paid* line does NOT flip the original to "reversed";
+// the ledger instead books a synthetic negative offset line
+// (order_id "<id>:reversal", status "available", never delivered). Left raw
+// that offset would (a) pose as a phantom undelivered order after the
+// deliverable-age window and (b) never register as a dispute. So: drop the
+// offset rows and re-label their original order as "reversed" — now a paid
+// clawback counts exactly like a pre-payout reversal and no ghost order drags
+// fulfillment down.
+const REVERSAL_SUFFIX = ":reversal"
+export function reconcileLines(raw: RawLine[]): LineFact[] {
+  const clawedBack = new Set<string>()
+  for (const l of raw) {
+    if (l.order_id.endsWith(REVERSAL_SUFFIX)) {
+      clawedBack.add(l.order_id.slice(0, -REVERSAL_SUFFIX.length))
+    }
+  }
+  return raw
+    .filter((l) => !l.order_id.endsWith(REVERSAL_SUFFIX))
+    .map((l) => ({
+      status: clawedBack.has(l.order_id) ? "reversed" : l.status,
+      delivered_at: l.delivered_at,
+      confirmed_at: l.confirmed_at,
+      held_at: l.held_at,
+      created_at: l.created_at,
+    }))
+}
+
 // I/O wrapper: gather this seller's published ratings + ledger lines, then score.
 export async function getTrustScore(
   container: MedusaContainer,
@@ -132,15 +163,23 @@ export async function getTrustScore(
     { take: null }
   )
 
+  // A non-numeric env must not silently disable the cold-start gate
+  // (deliveredCount < NaN is always false) — fall back to the default of 5.
+  const parsedMin = Number(process.env.TRUST_SCORE_MIN_ORDERS)
+  const minOrders = Number.isFinite(parsedMin) && parsedMin > 0 ? parsedMin : 5
+
   return computeTrustScore({
     ratings: published.map((r) => r.rating),
-    lines: lines.map((l) => ({
-      status: l.status,
-      delivered_at: l.delivered_at,
-      confirmed_at: l.confirmed_at,
-      held_at: l.held_at,
-      created_at: l.created_at,
-    })),
-    minOrders: Number(process.env.TRUST_SCORE_MIN_ORDERS ?? 5),
+    lines: reconcileLines(
+      lines.map((l) => ({
+        order_id: l.order_id,
+        status: l.status,
+        delivered_at: l.delivered_at,
+        confirmed_at: l.confirmed_at,
+        held_at: l.held_at,
+        created_at: l.created_at,
+      }))
+    ),
+    minOrders,
   })
 }
