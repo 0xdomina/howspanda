@@ -5,6 +5,7 @@ import {
 } from "@medusajs/framework/utils"
 import { REDEEMABLES_MODULE } from "../../../../modules/redeemables"
 import RedeemablesModuleService from "../../../../modules/redeemables/service"
+import { getTrustScore } from "../../../../lib/reviews/trust-score"
 
 // The seller's public front door: /store/<handle> renders this. Profile +
 // published products + instruments listed FOR SALE (never their codes —
@@ -40,6 +41,8 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     .filter((r) => !r.expires_at || new Date(r.expires_at).getTime() > now)
     .map(({ code: _code, seller_id: _sid, ...publicFields }) => publicFields)
 
+  const trust = await getTrustScore(req.scope, seller.id)
+
   res.json({
     seller: {
       name: seller.name,
@@ -57,5 +60,6 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         thumbnail: p!.thumbnail ?? null,
       })),
     redeemables: forSale,
+    trust,
   })
 }
