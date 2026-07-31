@@ -146,8 +146,9 @@ checkout ─→ pending ─(clearance window)→ available ─(payout sweep)→ 
 paid + refund ─→ negated ":reversal" offset line born available (clawback)
 ```
 
-- `pending → available` after `PAYOUT_CLEARANCE_DAYS` (default 7) — a time-based
-  placeholder until the escrow/delivery-confirmation phase replaces the trigger.
+- ~~`pending → available` after `PAYOUT_CLEARANCE_DAYS` (default 7)~~ — this
+  time-based placeholder was replaced in Phase 6 by delivery-confirmation
+  escrow (see below); `pending` now means "held in escrow".
 - Balance buckets per currency: `pending`, `available`, `reserved`, `paid_out`
   (`reversed` lines are excluded; clawback offsets net out of `available`).
 - Reversals: `POST /admin/commissions/reverse` `{ order_id, reason }` — unpaid
@@ -197,7 +198,8 @@ two concurrent checkouts can never cross-confirm.
 
 ### Scheduling
 
-Three cron jobs (`src/jobs/`): `clear-commission-lines` (hourly, always on),
+Three cron jobs (`src/jobs/`): `release-escrow-lines` (hourly, always on —
+replaced Phase 5's `clear-commission-lines` in Phase 6),
 `scheduled-payouts` (daily 02:00) and `reconcile-payouts` (every 15 min) — the
 latter two are no-ops unless `PAYOUT_SCHEDULE_ENABLED=true`, so dev/test
 environments never fire transfers by accident.
@@ -206,7 +208,7 @@ environments never fire transfers by accident.
 
 | Var | Purpose |
 |---|---|
-| `PAYOUT_CLEARANCE_DAYS` | Days before a pending commission line becomes available (default 7) |
+| `PAYOUT_CLEARANCE_DAYS` | Retired in Phase 6 — replaced by the `ESCROW_*` vars below |
 | `PAYOUT_MIN_NGN` | Minimum available NGN balance to pay out (default 5000) |
 | `PAYOUT_SCHEDULE_ENABLED` | `true` to enable the payout + reconcile crons |
 
@@ -217,4 +219,83 @@ the correlation fix, and an in-app suite covering ledger clearance/balance
 buckets, the create-payout workflow (reserve/idempotent replay/below-minimum
 compensation), webhook success/failure, crypto reconcile, and both reversal
 paths. Full suite: 5 spec files, 46 tests.
+
+## Escrow Release & Returns (Phase 6)
+
+Funds from a sale stay **held in escrow** (`pending`) until the buyer actually
+has the goods — release is driven by delivery and confirmation, not a timer.
+Ledger statuses are unchanged; six escrow columns on the commission line
+(`parent_order_id`, `delivered_at`, `confirmed_at`, `release_due_at`,
+`held_at`, `hold_reason`) qualify what `pending` means.
+
+### Escrow state machine
+
+```
+                     ┌─(buyer confirms receipt)──────────────┐
+checkout ─→ pending ─┼─(delivered + return window expires)───┼─→ available ─→ Phase 5 payout flow
+   (escrow)    │     └─(never delivered, 30-day fallback)────┘
+               │
+               ├─(return requested / admin hold)─→ held ─(cancel-return / admin release)─→ pending
+               │                                    │
+               └────────────────────────────────────┴─(return received by seller)─→ reversed
+```
+
+### Release triggers
+
+| Trigger | When | Result |
+|---|---|---|
+| Buyer confirms receipt | `POST /store/orders/:id/confirm-receipt` | immediate release to `available` |
+| Return window expires | `release_due_at` (delivery + `ESCROW_RETURN_WINDOW_DAYS`) ≤ now, not held | hourly sweep releases |
+| Fallback | never marked delivered after `ESCROW_FALLBACK_RELEASE_DAYS` | hourly sweep releases |
+
+Held lines (open return or admin dispute) **never** auto-release. A return
+received by the seller reverses the line through the Phase 5 reversal flow
+(incl. paid-line clawback offsets). Once escrow has released, `request-return`
+answers 409 — post-release disputes go through the admin reversal flow.
+
+### Non-returnable goods
+
+Sellers flag products with `product.metadata.non_returnable = true` —
+perishables, perfumes, cosmetics, soaps/creams per FCCPA and EU
+distance-selling guidance (sealed, hygiene-sensitive or personalized goods).
+An order counts as non-returnable only if **all** its items are flagged;
+mixed orders stay returnable. Buyer-remorse returns are blocked with a
+buyer-friendly message, but escrow still releases only on confirmed receipt —
+and **defect claims are never blocked** (support/admin path).
+
+### API
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /store/orders/:id/confirm-receipt` | publishable key + order email | Confirm receipt → immediate release |
+| `POST /store/orders/:id/request-return` | publishable key + order email | Open a return inside the window → funds held |
+| `POST /store/orders/:id/cancel-return` | publishable key + order email | Withdraw the return → release clock resumes |
+| `POST /sellers/orders/:id/mark-delivered` | seller | Mark delivered → return window starts (idempotent) |
+| `POST /sellers/orders/:id/return-received` | seller | Goods came back → commission reversed |
+| `POST /admin/escrow/hold` | admin | Dispute hold `{ order_id, reason }` |
+| `POST /admin/escrow/release` | admin | Lift a hold `{ order_id, release_now? }` |
+
+Buyer identity is order id + exact email match (guest checkout) — a
+placeholder until customer JWT lands with the frontend phase. Fulfillment
+`delivery.created` and order return events drive the same transitions via
+subscribers, so core Medusa flows trigger escrow without the explicit
+endpoints.
+
+### Configuration (`backend/.env`)
+
+| Var | Purpose |
+|---|---|
+| `ESCROW_RETURN_WINDOW_DAYS` | Buyer confirmation/return window after delivery (default 3) |
+| `ESCROW_FALLBACK_RELEASE_DAYS` | Safety release for never-delivered lines (default 30) |
+
+`PAYOUT_CLEARANCE_DAYS` is retired — Phase 5's time-based clearance is fully
+replaced by this delivery-confirmation trigger.
+
+### Testing
+
+`integration-tests/http/escrow.spec.ts`: 14 in-app tests — window start with
+idempotent replays, cross-seller 404s, confirm-receipt release, sweep release
+and 30-day fallback, return hold → reversal, cancel-return, non-returnable and
+mixed orders, post-release 409, admin hold/release, and the escrow → payout
+seam. Full suite: 6 spec files, 60 tests.
 
