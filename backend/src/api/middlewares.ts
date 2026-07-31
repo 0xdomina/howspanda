@@ -65,6 +65,17 @@ export const PostCancelReturnSchema = z.object({
   email: z.string().email(),
 })
 
+// Admin escrow intervention
+export const PostEscrowHoldSchema = z.object({
+  order_id: z.string().min(1),
+  reason: z.string().min(3),
+})
+
+export const PostEscrowReleaseSchema = z.object({
+  order_id: z.string().min(1),
+  release_now: z.boolean().optional(),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -139,6 +150,16 @@ export default defineMiddlewares({
       matcher: "/store/orders/:id/cancel-return",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostCancelReturnSchema)],
+    },
+    {
+      matcher: "/admin/escrow/hold",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostEscrowHoldSchema)],
+    },
+    {
+      matcher: "/admin/escrow/release",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostEscrowReleaseSchema)],
     },
     {
       // Paystack signs the exact raw bytes — keep them for the HMAC check
