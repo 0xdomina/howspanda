@@ -76,6 +76,28 @@ export const PostEscrowReleaseSchema = z.object({
   release_now: z.boolean().optional(),
 })
 
+// Redeemables (Phase 7): per-type field rules are enforced in the service
+export const PostSellerRedeemableSchema = z.object({
+  type: z.enum(["gift_card", "voucher", "ticket"]),
+  title: z.string().min(2),
+  face_value: z.number().positive().optional(),
+  discount_type: z.enum(["fixed", "percent"]).optional(),
+  discount_value: z.number().positive().optional(),
+  price: z.number().positive().optional(),
+  expires_at: z.coerce.date().optional(),
+  quantity: z.number().int().min(1).max(100).default(1),
+  issued_to_email: z.string().email().optional(),
+})
+
+export const PostRedeemInStoreSchema = z.object({
+  code: z.string().min(6),
+  amount: z.number().positive().optional(),
+})
+
+export const PostApplyRedeemableSchema = z.object({
+  code: z.string().min(6),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -160,6 +182,21 @@ export default defineMiddlewares({
       matcher: "/admin/escrow/release",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostEscrowReleaseSchema)],
+    },
+    {
+      matcher: "/sellers/redeemables",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostSellerRedeemableSchema)],
+    },
+    {
+      matcher: "/sellers/redeemables/redeem",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostRedeemInStoreSchema)],
+    },
+    {
+      matcher: "/store/carts/:id/apply-redeemable",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostApplyRedeemableSchema)],
     },
     {
       // Paystack signs the exact raw bytes — keep them for the HMAC check
