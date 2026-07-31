@@ -98,6 +98,43 @@ export const PostApplyRedeemableSchema = z.object({
   code: z.string().min(6),
 })
 
+// Reviews (Phase 8): email is the ownership proof (Phase 6 pattern)
+export const PostCreateReviewSchema = z.object({
+  email: z.string().email(),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().max(2000).optional(),
+  product_ratings: z
+    .array(
+      z.object({
+        product_id: z.string().min(1),
+        rating: z.number().int().min(1).max(5),
+      })
+    )
+    .optional(),
+})
+
+export const PostEditReviewSchema = z
+  .object({
+    email: z.string().email(),
+    rating: z.number().int().min(1).max(5).optional(),
+    comment: z.string().max(2000).nullable().optional(),
+  })
+  .refine((b) => b.rating !== undefined || b.comment !== undefined, {
+    message: "Provide a new rating or comment",
+  })
+
+export const DeleteReviewSchema = z.object({
+  email: z.string().email(),
+})
+
+export const PostReviewReplySchema = z.object({
+  body: z.string().min(1).max(2000),
+})
+
+export const PostRemoveReviewSchema = z.object({
+  reason: z.string().min(3),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -197,6 +234,31 @@ export default defineMiddlewares({
       matcher: "/store/carts/:id/apply-redeemable",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostApplyRedeemableSchema)],
+    },
+    {
+      matcher: "/store/orders/:id/review",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostCreateReviewSchema)],
+    },
+    {
+      matcher: "/store/reviews/:id",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostEditReviewSchema)],
+    },
+    {
+      matcher: "/store/reviews/:id",
+      methods: ["DELETE"],
+      middlewares: [validateAndTransformBody(DeleteReviewSchema)],
+    },
+    {
+      matcher: "/sellers/reviews/:id/reply",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostReviewReplySchema)],
+    },
+    {
+      matcher: "/admin/reviews/:id/remove",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostRemoveReviewSchema)],
     },
     {
       // Paystack signs the exact raw bytes — keep them for the HMAC check
