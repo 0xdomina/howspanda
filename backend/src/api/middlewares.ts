@@ -51,6 +51,20 @@ export const PostSellerPayoutSchema = z.object({
   idempotency_key: z.string().optional(),
 })
 
+// Buyer escrow actions (guest checkout): email is the ownership proof
+export const PostConfirmReceiptSchema = z.object({
+  email: z.string().email(),
+})
+
+export const PostRequestReturnSchema = z.object({
+  email: z.string().email(),
+  reason: z.string().min(3),
+})
+
+export const PostCancelReturnSchema = z.object({
+  email: z.string().email(),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -110,6 +124,21 @@ export default defineMiddlewares({
       matcher: "/sellers/payouts",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostSellerPayoutSchema)],
+    },
+    {
+      matcher: "/store/orders/:id/confirm-receipt",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostConfirmReceiptSchema)],
+    },
+    {
+      matcher: "/store/orders/:id/request-return",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostRequestReturnSchema)],
+    },
+    {
+      matcher: "/store/orders/:id/cancel-return",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostCancelReturnSchema)],
     },
     {
       // Paystack signs the exact raw bytes — keep them for the HMAC check
