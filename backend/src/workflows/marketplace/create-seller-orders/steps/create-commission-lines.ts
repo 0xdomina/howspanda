@@ -41,6 +41,10 @@ const createCommissionLinesStep = createStep(
 
       return {
         order_id: order.id,
+        // child orders stamp metadata.parent_order_id; single-seller carts
+        // reuse the parent order, so the parent IS the seller order
+        parent_order_id:
+          (order.metadata?.parent_order_id as string | undefined) ?? order.id,
         currency_code: totals.currency_code,
         order_total: total,
         rate,
