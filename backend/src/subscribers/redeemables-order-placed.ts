@@ -1,6 +1,7 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import {
   ContainerRegistrationKeys,
+  Modules,
   OrderWorkflowEvents,
 } from "@medusajs/framework/utils"
 import { REDEEMABLES_MODULE } from "../modules/redeemables"
@@ -19,17 +20,12 @@ export default async function redeemablesOrderPlacedHandler({
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
   try {
     const query = container.resolve(ContainerRegistrationKeys.QUERY)
-    const { data: [order] } = await query.graph({
-      entity: "order",
-      fields: [
-        "id",
-        "email",
-        "metadata",
-        "items.quantity",
-        "items.product_id",
-      ],
-      filters: { id: data.id },
-    })
+    // the order module merges item quantity onto line items — the raw graph
+    // leaves it on the order-item pivot and returns undefined here
+    const orderModule = container.resolve(Modules.ORDER)
+    const order = await orderModule
+      .retrieveOrder(data.id, { relations: ["items"] })
+      .catch(() => undefined)
     if (!order || order.metadata?.parent_order_id) {
       return // child seller orders ride their parent's event
     }

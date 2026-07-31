@@ -23,7 +23,8 @@ export const POST = async (
       "id",
       "metadata",
       "items.id",
-      "items.subtotal",
+      "items.unit_price",
+      "items.quantity",
       "items.product_id",
     ],
     filters: { id: req.params.id },
@@ -53,10 +54,12 @@ export const POST = async (
     })
   )
 
-  const base = cart.items.reduce(
-    (sum, item) => sum + Number(item?.subtotal ?? 0),
-    0
-  )
+  // items.subtotal is a computed total the graph won't decorate here —
+  // unit_price × quantity is the same base for these adjustment caps
+  const lineSubtotal = (item: (typeof cart.items)[number]) =>
+    Number(item?.unit_price ?? 0) * Number(item?.quantity ?? 0)
+
+  const base = cart.items.reduce((sum, item) => sum + lineSubtotal(item), 0)
   const amount = redeemables.checkoutAmountFor(redeemable, base)
   if (amount <= 0) {
     throw new MedusaError(
@@ -77,7 +80,7 @@ export const POST = async (
     if (!item || remaining <= 0) {
       continue
     }
-    const take = Math.min(Number(item.subtotal ?? 0), remaining)
+    const take = Math.min(lineSubtotal(item), remaining)
     if (take > 0) {
       adjustments.push({
         item_id: item.id,
