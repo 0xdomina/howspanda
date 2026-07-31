@@ -22,6 +22,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/ai",
     },
     {
+      resolve: "./src/modules/redeemables",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,
