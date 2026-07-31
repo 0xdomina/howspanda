@@ -20,7 +20,10 @@ class ReviewsModuleService extends MedusaService({
   ProductRating,
 }) {
   private editWindowDays(): number {
-    return Number(process.env.REVIEW_EDIT_WINDOW_DAYS ?? 7)
+    // A misconfigured/non-numeric env must not silently disable the window
+    // (NaN comparisons are always false) — fall back to the 7-day default.
+    const n = Number(process.env.REVIEW_EDIT_WINDOW_DAYS)
+    return Number.isFinite(n) && n > 0 ? n : 7
   }
 
   private assertRating(r: number) {
@@ -55,6 +58,7 @@ class ReviewsModuleService extends MedusaService({
     }
 
     const productRatings = input.product_ratings ?? []
+    const seen = new Set<string>()
     for (const pr of productRatings) {
       this.assertRating(pr.rating)
       if (!input.order_product_ids.includes(pr.product_id)) {
@@ -63,26 +67,41 @@ class ReviewsModuleService extends MedusaService({
           `Product ${pr.product_id} is not part of this order`
         )
       }
+      if (seen.has(pr.product_id)) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          `Duplicate rating for product ${pr.product_id}`
+        )
+      }
+      seen.add(pr.product_id)
     }
 
     const [review] = await this.createReviews([
       {
         seller_id: input.seller_id,
         order_id: input.order_id,
-        buyer_email: input.buyer_email,
+        buyer_email: input.buyer_email.trim().toLowerCase(),
         rating: input.rating,
         comment: input.comment ?? null,
       },
     ])
 
     if (productRatings.length) {
-      await this.createProductRatings(
-        productRatings.map((pr) => ({
-          review_id: review.id,
-          product_id: pr.product_id,
-          rating: pr.rating,
-        }))
-      )
+      // The review and its ratings can't share one commit here, so compensate:
+      // a failed ratings insert must not leave a committed review that the
+      // one-per-order guard would then lock the buyer out of forever.
+      try {
+        await this.createProductRatings(
+          productRatings.map((pr) => ({
+            review_id: review.id,
+            product_id: pr.product_id,
+            rating: pr.rating,
+          }))
+        )
+      } catch (e) {
+        await this.deleteReviews([review.id]).catch(() => {})
+        throw e
+      }
     }
 
     return await this.retrieveReview(review.id, {
@@ -134,6 +153,10 @@ class ReviewsModuleService extends MedusaService({
 
   async deleteOwnedReview(id: string, email: string) {
     await this.getEditable(id, email)
+    // product_rating.review_id has no ON DELETE CASCADE and the model declares
+    // no delete-cascade, so clear the children first or the hard delete of the
+    // parent trips the FK constraint.
+    await this.deleteProductRatings({ review_id: id })
     await this.deleteReviews([id])
   }
 
