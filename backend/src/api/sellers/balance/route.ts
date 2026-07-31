@@ -35,12 +35,12 @@ export const GET = async (
 
   // surface due pending lines immediately, so the balance a seller sees is
   // the balance a payout request would actually sweep
-  await marketplace.clearPendingLines()
+  await marketplace.releaseDueLines()
   const balances = await marketplace.getSellerBalance(sellerAdmin.seller.id)
 
   res.json({
     balances,
-    clearance_days: marketplace.clearanceDays(),
+    return_window_days: marketplace.returnWindowDays(),
     minimum_ngn: marketplace.payoutMinNgn(),
   })
 }

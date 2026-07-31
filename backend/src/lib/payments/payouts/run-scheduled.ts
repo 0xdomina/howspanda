@@ -25,7 +25,7 @@ export async function runScheduledPayouts(
   const marketplace =
     container.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
 
-  await marketplace.clearPendingLines()
+  await marketplace.releaseDueLines()
 
   const accounts = await marketplace.listPayoutAccounts(
     {

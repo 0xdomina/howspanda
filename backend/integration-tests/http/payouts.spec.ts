@@ -19,12 +19,12 @@ import {
 
 jest.setTimeout(120 * 1000)
 
-// Deterministic offline mock mode everywhere; clearance 0 and a ₦1 minimum so
-// freshly seeded commission lines are sweepable immediately.
+// Deterministic offline mock mode everywhere; a 0-day fallback release and a
+// ₦1 minimum so freshly seeded commission lines are sweepable immediately.
 process.env.PAYSTACK_SECRET_KEY = "mock"
 process.env.CIRCLE_API_KEY = "mock"
 process.env.CRYPTO_ENABLED = "true"
-process.env.PAYOUT_CLEARANCE_DAYS = "0"
+process.env.ESCROW_FALLBACK_RELEASE_DAYS = "0"
 process.env.PAYOUT_MIN_NGN = "1"
 process.env.PAYOUT_SCHEDULE_ENABLED = "false"
 
@@ -255,7 +255,7 @@ medusaIntegrationTestRunner({
 
         const res = await api.get("/sellers/balance", auth())
         expect(res.status).toEqual(200)
-        // clearance_days=0 → the balance route's clearPendingLines() flips
+        // fallback release 0 → the balance route's releaseDueLines() flips
         // both pending lines to available on the way in
         expect(res.data.balances.ngn).toEqual({
           pending: 0,

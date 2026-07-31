@@ -62,7 +62,7 @@ const preparePayoutStep = createStep(
       )
     }
 
-    await marketplace.clearPendingLines()
+    await marketplace.releaseDueLines()
 
     // negated clawback offset lines are `available` too, so they net out here
     const lines = await marketplace.listCommissionLines(

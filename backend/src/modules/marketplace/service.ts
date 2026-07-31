@@ -5,8 +5,10 @@ import CommissionLine from "./models/commission-line"
 import Payout from "./models/payout"
 import PayoutAccount from "./models/payout-account"
 
-const DEFAULT_CLEARANCE_DAYS = 7
+const DEFAULT_RETURN_WINDOW_DAYS = 3
+const DEFAULT_FALLBACK_RELEASE_DAYS = 30
 const DEFAULT_MIN_PAYOUT_NGN = 5000
+const DAY_MS = 24 * 60 * 60 * 1000
 
 export type CurrencyBalance = {
   pending: number
@@ -26,11 +28,18 @@ class MarketplaceModuleService extends MedusaService({
   Payout,
   PayoutAccount,
 }) {
-  clearanceDays(): number {
-    const parsed = Number(process.env.PAYOUT_CLEARANCE_DAYS)
+  returnWindowDays(): number {
+    const parsed = Number(process.env.ESCROW_RETURN_WINDOW_DAYS)
     return Number.isFinite(parsed) && parsed >= 0
       ? parsed
-      : DEFAULT_CLEARANCE_DAYS
+      : DEFAULT_RETURN_WINDOW_DAYS
+  }
+
+  fallbackReleaseDays(): number {
+    const parsed = Number(process.env.ESCROW_FALLBACK_RELEASE_DAYS)
+    return Number.isFinite(parsed) && parsed >= 0
+      ? parsed
+      : DEFAULT_FALLBACK_RELEASE_DAYS
   }
 
   payoutMinNgn(): number {
@@ -74,33 +83,167 @@ class MarketplaceModuleService extends MedusaService({
   }
 
   /**
-   * Flip `pending` lines older than the clearance window to `available`.
-   * Phase 5 placeholder trigger: time since creation. A later phase replaces
-   * this with delivery-confirmation + return-window clearance.
+   * Lines for a buyer-visible order id: direct match (seller/child order)
+   * first, then children of a multi-seller parent.
    */
-  async clearPendingLines(now: Date = new Date()): Promise<number> {
-    const cutoff = new Date(
-      now.getTime() - this.clearanceDays() * 24 * 60 * 60 * 1000
-    )
+  async resolveLinesForOrder(orderId: string) {
+    const direct = await this.listCommissionLines({ order_id: orderId })
+    if (direct.length) {
+      return direct
+    }
+    return await this.listCommissionLines({ parent_order_id: orderId })
+  }
 
+  /**
+   * Delivery recorded (seller endpoint or core `delivery.created`).
+   * Starts the return window. Idempotent — already-delivered lines skip.
+   */
+  async markOrderDelivered(orderId: string, now: Date = new Date()) {
+    const lines = await this.resolveLinesForOrder(orderId)
+    const updates = lines
+      .filter((line) => line.status === "pending" && !line.delivered_at)
+      .map((line) => ({
+        id: line.id,
+        delivered_at: now,
+        release_due_at: new Date(
+          now.getTime() + this.returnWindowDays() * DAY_MS
+        ),
+      }))
+    if (updates.length) {
+      await this.updateCommissionLines(updates)
+    }
+    return updates.length
+  }
+
+  /**
+   * Explicit buyer confirmation — releases IMMEDIATELY (AliExpress model).
+   * Held lines are skipped: an open return beats a confirmation.
+   */
+  async confirmOrderReceipt(orderId: string, now: Date = new Date()) {
+    const lines = await this.resolveLinesForOrder(orderId)
+    if (!lines.length) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        `No commission line found for order ${orderId}`
+      )
+    }
+    const updates = lines
+      .filter((line) => line.status === "pending" && !line.held_at)
+      .map((line) => ({
+        id: line.id,
+        delivered_at: line.delivered_at ?? now,
+        confirmed_at: now,
+        release_due_at: now,
+        status: "available" as const,
+        available_at: now,
+      }))
+    if (updates.length) {
+      await this.updateCommissionLines(updates)
+    }
+    return await this.resolveLinesForOrder(orderId)
+  }
+
+  /**
+   * Buyer return/complaint (or admin hold). Only pending lines can be held —
+   * released money is clawed back via reverseCommissionForOrder instead.
+   */
+  async holdForReturn(orderId: string, reason: string, now: Date = new Date()) {
+    const lines = await this.resolveLinesForOrder(orderId)
+    if (!lines.length) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        `No commission line found for order ${orderId}`
+      )
+    }
+    const eligible = lines.filter((line) => line.status === "pending")
+    if (!eligible.length) {
+      throw new MedusaError(
+        MedusaError.Types.CONFLICT,
+        `Escrow for order ${orderId} was already released — use the admin reversal flow`
+      )
+    }
+    const toHold = eligible.filter((line) => !line.held_at)
+    if (toHold.length) {
+      await this.updateCommissionLines(
+        toHold.map((line) => ({
+          id: line.id,
+          held_at: now,
+          hold_reason: reason,
+        }))
+      )
+    }
+    return await this.resolveLinesForOrder(orderId)
+  }
+
+  /**
+   * Hold lifted (buyer cancelled the return / admin resolved the dispute).
+   * With releaseNow the funds go available immediately; otherwise the
+   * original release_due_at resumes (cron releases it if already past).
+   */
+  async liftHold(
+    orderId: string,
+    opts: { releaseNow?: boolean } = {},
+    now: Date = new Date()
+  ) {
+    const lines = await this.resolveLinesForOrder(orderId)
+    const held = lines.filter(
+      (line) => line.status === "pending" && line.held_at
+    )
+    if (held.length) {
+      await this.updateCommissionLines(
+        held.map((line) =>
+          opts.releaseNow
+            ? {
+                id: line.id,
+                held_at: null,
+                hold_reason: null,
+                status: "available" as const,
+                available_at: now,
+                release_due_at: now,
+              }
+            : { id: line.id, held_at: null, hold_reason: null }
+        )
+      )
+    }
+    return await this.resolveLinesForOrder(orderId)
+  }
+
+  /**
+   * Escrow release sweep (replaces the Phase 5 time-based clearance):
+   * 1. return window expired, not held           → available
+   * 2. never delivered, older than the fallback
+   *    window, not held (courier/buyer ghosted)  → available
+   */
+  async releaseDueLines(now: Date = new Date()): Promise<number> {
     const due = await this.listCommissionLines(
-      { status: "pending", created_at: { $lte: cutoff } },
+      { status: "pending", held_at: null, release_due_at: { $lte: now } },
       { take: null }
     )
-
-    if (!due.length) {
+    const fallbackCutoff = new Date(
+      now.getTime() - this.fallbackReleaseDays() * DAY_MS
+    )
+    const stale = await this.listCommissionLines(
+      {
+        status: "pending",
+        held_at: null,
+        delivered_at: null,
+        created_at: { $lte: fallbackCutoff },
+      },
+      { take: null }
+    )
+    const seen = new Set(due.map((line) => line.id))
+    const all = [...due, ...stale.filter((line) => !seen.has(line.id))]
+    if (!all.length) {
       return 0
     }
-
     await this.updateCommissionLines(
-      due.map((line) => ({
+      all.map((line) => ({
         id: line.id,
         status: "available" as const,
         available_at: now,
       }))
     )
-
-    return due.length
+    return all.length
   }
 
   /**
