@@ -18,8 +18,16 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     throw new MedusaError(MedusaError.Types.NOT_FOUND, "Store not found")
   }
 
-  const limit = Math.min(Number(req.query.limit ?? 20), 100)
-  const offset = Number(req.query.offset ?? 0)
+  // Public, unauthenticated route — a bad ?limit=abc / negative / float must
+  // not reach the ORM as NaN and 500. Coerce to sane, clamped integers.
+  const rawLimit = Number(req.query.limit ?? 20)
+  const limit = Number.isFinite(rawLimit)
+    ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100)
+    : 20
+  const rawOffset = Number(req.query.offset ?? 0)
+  const offset = Number.isFinite(rawOffset)
+    ? Math.max(Math.trunc(rawOffset), 0)
+    : 0
 
   const reviews = req.scope.resolve<ReviewsModuleService>(REVIEWS_MODULE)
   const [items, count] = await reviews.listAndCountReviews(
