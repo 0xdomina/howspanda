@@ -13,8 +13,10 @@ import { PostCreateReviewSchema } from "../../../../middlewares"
 
 type Body = z.infer<typeof PostCreateReviewSchema>
 
-// One review per delivered order. Ownership = order id + exact email; the
-// delivered gate reads the commission line (Phase 6 rails).
+// One review per delivered seller order. Ownership = order id + exact email;
+// the delivered gate reads the commission line (Phase 6 rails). A multi-seller
+// parent order resolves to several sellers' lines — that's ambiguous to
+// attribute and score, so it must be reviewed per child (seller) order.
 export const POST = async (
   req: MedusaRequest<Body>,
   res: MedusaResponse
@@ -27,7 +29,24 @@ export const POST = async (
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
   const lines = await marketplace.resolveLinesForOrder(orderId)
-  if (!lines.length || !lines.some((l) => l.delivered_at)) {
+  if (!lines.length) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_ALLOWED,
+      "You can review an order once it has been delivered"
+    )
+  }
+
+  // A parent order spanning multiple sellers can't be attributed to one score
+  // or consume a single review slot — send the buyer to the per-seller orders.
+  const sellerIds = new Set(lines.map((l) => l.seller_id))
+  if (sellerIds.size > 1) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "This order contains items from multiple stores — review each store's order individually"
+    )
+  }
+
+  if (!lines.some((l) => l.delivered_at)) {
     throw new MedusaError(
       MedusaError.Types.NOT_ALLOWED,
       "You can review an order once it has been delivered"
