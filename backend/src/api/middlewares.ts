@@ -162,6 +162,32 @@ export const PostReferralClaimSchema = z.object({
   email: z.string().email(),
 })
 
+// Malls (Phase 10)
+export const PostMallCreateSchema = z.object({
+  name: z.string().min(2),
+  description: z.string().max(500).optional(),
+  targetSellers: z.number().int().min(2).optional(),
+  targetBuyers: z.number().int().min(2).optional(),
+  prizeWinnerCount: z.number().int().min(1),
+  prizeDistribution: z.enum(["equal", "random"]),
+  prizePoolNgn: z.number().positive(),
+  durationDays: z.number().int().min(1).max(30).optional(),
+})
+
+export const PostMallJoinSchema = z.object({
+  contributionNgn: z.number().positive(),
+  redeemableId: z.string().min(1).optional(),
+})
+
+export const PostMallJoinBuyerSchema = z.object({
+  buyerEmail: z.string().email(),
+})
+
+export const PostMallPurchaseSchema = z.object({
+  buyerEmail: z.string().email(),
+  orderId: z.string().min(1),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -312,6 +338,39 @@ export default defineMiddlewares({
       matcher: "/store/referrals",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostReferralClaimSchema)],
+    },
+    {
+      // Seller (store owner) mall routes: publishable key + seller bearer both
+      // required (the store namespace enforces the key, we enforce the actor).
+      matcher: "/store/malls",
+      methods: ["GET"],
+      middlewares: [authenticate("seller", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/malls",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("seller", ["session", "bearer"]),
+        validateAndTransformBody(PostMallCreateSchema),
+      ],
+    },
+    {
+      matcher: "/store/malls/:id/join",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("seller", ["session", "bearer"]),
+        validateAndTransformBody(PostMallJoinSchema),
+      ],
+    },
+    {
+      matcher: "/store/malls/:id/join-buyer",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostMallJoinBuyerSchema)],
+    },
+    {
+      matcher: "/store/malls/:id/purchase",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostMallPurchaseSchema)],
     },
   ],
 })

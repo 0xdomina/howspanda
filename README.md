@@ -447,5 +447,47 @@ cap per referrer.
 `docs/superpowers/plans/2026-08-01-phase9-growth.md` +
 `docs/superpowers/specs/2026-08-01-phase9-growth-design.md` lock the design.
 
+## Digital Mall (Phase 10) — gamified marketplace events
+
+The **digital mall** — a time-boxed, gamified marketplace event. Any seller (store
+owner) can create a mall; it stays `pending` until it hits the bonding-curve
+thresholds (default **5 sellers + 10 buyers**, per-mall overridable) and goes
+`active`. Sellers fund a **prize pool** (their ad budget + optional redeemable
+gift). Buyers who purchase from an active mall win **luck-based cash prizes**
+drawn from the pool, paid straight into the **buyer wallet**. Malls expire after
+max 30 days; pools that never launched are refunded proportionally.
+
+- `POST /store/malls` — seller creates a mall (pending).
+- `GET /store/malls` — seller lists malls they created or joined.
+- `POST /store/malls/:id/join` — seller joins a pending mall with a contribution
+  (grows the pool) + optional `redeemableId` gift.
+- `GET /store/malls/active` — browse active malls (publishable key only).
+- `GET /store/malls/:id` — mall details incl. sellers, buyers, prizes.
+- `POST /store/malls/:id/join-buyer` — buyer expresses interest (idempotent).
+- `POST /store/malls/:id/purchase` — record a purchase; on an active mall it
+  runs a luck-based prize draw and credits the winner's buyer wallet.
+- `POST /admin/malls/:id/go-live` — admin force-activates a mall.
+
+Lifecycle: `pending` → `active` (thresholds met) → draws pay winners from the
+pool → `settling`/`expired`/`cancelled` → `closed`. The buyer-wallet module is
+the single withdrawal surface for every buyer-side reward (mall prizes, tip
+credit, buyer-referrer rewards); balances are credited honestly and a fiat/crypto
+withdrawal rail is a documented stub for a later phase.
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /store/malls` | seller | Create a mall (pending) |
+| `GET /store/malls` | seller | List own malls (created or joined) |
+| `POST /store/malls/:id/join` | seller | Join as seller (contribute + optional redeemable) |
+| `GET /store/malls/active` | publishable key | Browse active malls (buyer view) |
+| `GET /store/malls/:id` | publishable key | Mall details (sellers, buyers, prizes) |
+| `POST /store/malls/:id/join-buyer` | publishable key | Join as buyer (express interest) |
+| `POST /store/malls/:id/purchase` | publishable key | Record purchase (triggers prize draw if active) |
+| `POST /admin/malls/:id/go-live` | admin | Force-activate a mall (override thresholds) |
+
+`docs/superpowers/plans/2026-08-01-phase10-campaigns.md` +
+`docs/superpowers/specs/2026-08-01-phase10-campaigns-design.md` lock the design.
+
+
 
 

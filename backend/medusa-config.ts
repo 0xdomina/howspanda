@@ -34,6 +34,12 @@ module.exports = defineConfig({
       resolve: "./src/modules/growth",
     },
     {
+      resolve: "./src/modules/buyer-wallet",
+    },
+    {
+      resolve: "./src/modules/mall",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,
