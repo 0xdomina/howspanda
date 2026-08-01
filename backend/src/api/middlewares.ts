@@ -188,6 +188,36 @@ export const PostMallPurchaseSchema = z.object({
   orderId: z.string().min(1),
 })
 
+// Delivery (Phase 11): email is the identity for couriers/recipients
+export const PostDeliveryJobSchema = z.object({
+  orderId: z.string().min(1).optional(),
+  packageDescription: z.string().min(3),
+  packageWeight: z.string().optional(),
+  pickupAddress: z.string().min(3),
+  destinationAddress: z.string().min(3),
+  destinationPhone: z.string().optional(),
+  postedPrice: z.number().positive(),
+})
+
+export const PostDeliveryOfferSchema = z.object({
+  courierEmail: z.string().email(),
+  offeredPrice: z.number().positive(),
+})
+
+export const PostDeliveryPickupSchema = z.object({
+  courierEmail: z.string().email(),
+})
+
+export const PostDeliveryCancelSchema = z.object({
+  email: z.string().email(),
+  reason: z.string().min(3),
+})
+
+export const PostDeliveryConfirmSchema = z.object({
+  recipientEmail: z.string().email(),
+  courierEmail: z.string().email().optional(),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -371,6 +401,40 @@ export default defineMiddlewares({
       matcher: "/store/malls/:id/purchase",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostMallPurchaseSchema)],
+    },
+    {
+      // Seller (store owner) posts a delivery job from a completed order.
+      matcher: "/store/delivery-jobs",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("seller", ["session", "bearer"]),
+        validateAndTransformBody(PostDeliveryJobSchema),
+      ],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/offers",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryOfferSchema)],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/offers/:offerId/accept",
+      methods: ["POST"],
+      middlewares: [authenticate("seller", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/pickup",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryPickupSchema)],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/cancel",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryCancelSchema)],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/confirm",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryConfirmSchema)],
     },
   ],
 })

@@ -6,9 +6,9 @@
 > this file, then the phase plan referenced by the current phase.
 
 **Status snapshot (as of this file's last update):**
-- Phases 1–10 are **committed and green**: marketplace, AI, payments, payouts, escrow, redeemables, reviews/trust, tipping, growth/referrals, digital mall + buyer-wallet.
-- Integration tests: **11 suites / 119 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
-- Working tree: clean on `master`.
+- Phases 1–11 are **implemented and green**: marketplace, AI, payments, payouts, escrow, redeemables, reviews/trust, tipping, growth/referrals, digital mall + buyer-wallet, **P2P delivery core**.
+- Integration tests: **12 suites / 126 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
+- Phase 11 delivery work is **uncommitted** (new module + routes + `delivery.spec.ts` pending one conventional commit per task).
 - Head commits: `ea648c4` (feat mall), `be66a0e` (docs plan Phase 10).
 
 ---
@@ -33,7 +33,7 @@ A marketplace where **informal sellers and buyers can win**, built on two pillar
 | Phase | Name | Dependency | Goal |
 |---|---|---|---|
 | 10 | Digital Mall + Buyer Wallet | — | **DONE.** bonding-curve events, luck prizes, buyer wallet |
-| 11 | P2P Delivery Core | 10 (wallet), 5 (payouts), 6 (escrow) | Job posting, matching, negotiation, escrow release |
+| 11 | P2P Delivery Core | 10 (wallet), 5 (payouts), 6 (escrow) | Job posting, matching, negotiation, escrow release — **DONE** (routes + `delivery.spec.ts` green) |
 | 12 | In-app Chat + POD verification | 11 | 3-way DM, timeline, in-app QR/OTP codes |
 | 13 | AI Seller Intelligence | 3 (existing AI) | Daily/weekly briefs, marketing helper, grounded recommendations |
 | 14 | Frictionless Onboarding | 2 (marketplace auth) | Phone/email signup, mobile-first listing, progressive KYC |
@@ -112,12 +112,12 @@ post job → browse → offer → accept → picked up → confirm → escrow re
 paths; counter-offer flow. **Full suite must stay green (11 suites + this one).**
 
 ## Acceptance criteria
-- [ ] A store owner can post a delivery job from a completed order in one call.
-- [ ] Any actor can browse open jobs and make an offer or counter-offer.
-- [ ] Only the store owner can accept; accepted price is immutable.
-- [ ] Cancel before pickup refunds; after pickup requires sender approval.
-- [ ] Confirmed delivery releases escrow to the courier's payout path.
-- [ ] `delivery.spec.ts` green; `tsc --noEmit` clean; `medusa build` passes.
+- [x] A store owner can post a delivery job from a completed order in one call.
+- [x] Any actor can browse open jobs and make an offer or counter-offer.
+- [x] Only the store owner can accept; accepted price is immutable.
+- [x] Cancel before pickup refunds; after pickup requires sender approval.
+- [x] Confirmed delivery releases escrow to the courier's payout path.
+- [x] `delivery.spec.ts` green; `tsc --noEmit` clean; `medusa build` passes.
 
 ## Commits (one per task, conventional)
 `feat(delivery): ...` per task (module → service → routes → tests → docs).
