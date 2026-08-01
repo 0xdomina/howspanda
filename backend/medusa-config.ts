@@ -31,6 +31,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/tipping",
     },
     {
+      resolve: "./src/modules/growth",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,

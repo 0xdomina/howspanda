@@ -415,4 +415,37 @@ already-built escrow → payout machinery. No second wallet.
 `docs/superpowers/plans/2026-08-01-phase8-tipping.md` +
 `docs/superpowers/specs/2026-08-01-phase8-tipping-design.md` lock the design.
 
+## Referral & Growth (Phase 9)
+
+The **referral reward engine** — a seller invites a buyer by email and earns a
+reward **only when that buyer's first transaction completes** (escrow released,
+the Phase 6 anti-fraud gate — signups and pending orders never pay). Rewards ride
+the existing settlement + payout rails as 0% commission lines, with a lifetime
+cap per referrer.
+
+- `POST /sellers/referrals` — seller invites a referee email → returns an
+  unguessable `REF-…` share code. Re-inviting the same email is a no-op.
+- `POST /store/referrals` — the referee binds their email to the code
+  (unknown code → 404; code already bound to another email → 409).
+- `GET /sellers/referrals` — **qualifies on read** (trust-score pattern): every
+  `pending` referral is scanned against the referee email's orders; the first
+  order whose commission line became `available` (escrow-released) writes the
+  reward — once, idempotently — and returns the list + lifetime stats.
+- Reward: 0% `available` CommissionLine to the referrer (default ₦2,000,
+  `REFERRAL_SELLER_REWARD_NGN`), capped at lifetime earnings
+  (`REFERRAL_SELLER_LIFETIME_CAP_NGN`, default ₦1,500,000 — roadmap). Past the
+  cap, further referrals qualify with zero reward and a recorded cap reason.
+- **Group buy** (the Pinduoduo team-discount half of this phase) is designed in
+  the phase spec and scoped as a follow-up task.
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /sellers/referrals` | seller | Create a referral (referee email) |
+| `GET /sellers/referrals` | seller | Auto-qualify + list + lifetime earnings |
+| `POST /store/referrals` | publishable key | Referee claims a code with their email |
+
+`docs/superpowers/plans/2026-08-01-phase9-growth.md` +
+`docs/superpowers/specs/2026-08-01-phase9-growth-design.md` lock the design.
+
+
 

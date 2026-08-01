@@ -151,6 +151,16 @@ export const PostSellerTipSchema = z.object({
   note: z.string().max(500).optional(),
 })
 
+// Growth (Phase 9): referrals
+export const PostReferralCreateSchema = z.object({
+  referee_email: z.string().email(),
+})
+
+export const PostReferralClaimSchema = z.object({
+  code: z.string().min(1),
+  email: z.string().email(),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -291,6 +301,16 @@ export default defineMiddlewares({
       matcher: "/sellers/tips",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostSellerTipSchema)],
+    },
+    {
+      matcher: "/sellers/referrals",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostReferralCreateSchema)],
+    },
+    {
+      matcher: "/store/referrals",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostReferralClaimSchema)],
     },
   ],
 })
