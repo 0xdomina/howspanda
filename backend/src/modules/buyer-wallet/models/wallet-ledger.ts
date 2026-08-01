@@ -17,6 +17,7 @@ const WalletLedger = model.define("buyer_wallet_ledger", {
     "withdrawal",
     "adjustment",
     "mall_prize",
+    "delivery_payout",
   ]),
   reference: model.text().nullable(),
 })

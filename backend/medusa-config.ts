@@ -40,6 +40,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/mall",
     },
     {
+      resolve: "./src/modules/delivery",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,

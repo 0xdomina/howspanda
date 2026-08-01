@@ -240,7 +240,8 @@
             "referral",
             "withdrawal",
             "adjustment",
-            "mall_prize"
+            "mall_prize",
+            "delivery_payout"
           ],
           "mappedType": "enum"
         },

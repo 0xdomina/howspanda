@@ -11,6 +11,7 @@ export type WalletLedgerSource =
   | "withdrawal"
   | "adjustment"
   | "mall_prize"
+  | "delivery_payout"
 
 export type CreditInput = {
   buyerEmail: string
