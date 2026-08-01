@@ -384,3 +384,35 @@ consume/undo compensation, and the subscriber (template minting + instant
 release + idempotent replay). Plus the live-proof ritual against the dev
 server in mock mode. Full suite: 7 spec files, 75 tests.
 
+## Two-way Tipping (Phase 8)
+
+Cash gratitude both ways — **buyer → seller** appreciation and **seller → buyer**
+thank-you (cash or an extra product from their catalog). Tips deliberately ride
+the existing settlement + payout rails: every cash tip is a **0% commission**
+`commission_line` that lands in the seller's balance and flows out through the
+already-built escrow → payout machinery. No second wallet.
+
+- **Buyer → seller:** `POST /store/orders/:id/tip` (email ownership gate, Phase 6
+  pattern) records the tip and an *immediately `available`* 0% commission line —
+  the full amount nets to the seller.
+- **Seller → buyer cash:** `POST /sellers/tips` deducts the amount from the
+  seller's available balance (a negative 0% ledger line) and issues a recorded
+  **buyer credit note** (`buyer_credit_code`, e.g. `CR-ABC123`). Redemption of the
+  credit is deferred to a buyer-wallet phase.
+- **Seller → buyer extra-product:** the same endpoint gifting an item
+  (`product_id`/`product_title`) — **no money moves**, just the recorded gift.
+- A seller can only gift cash they actually have available (400 otherwise).
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /store/orders/:id/tip` | publishable key + email | Buyer→seller cash tip |
+| `GET /sellers/tips` | seller | List tips + summary (in/out/product) |
+| `POST /sellers/tips` | seller | Seller→buyer cash or extra-product tip |
+
+> Deferred (documented, not faked): standalone payment capture for a buyer tip and
+> buyer-credit redemption — both pending a customer-account/wallet phase.
+
+`docs/superpowers/plans/2026-08-01-phase8-tipping.md` +
+`docs/superpowers/specs/2026-08-01-phase8-tipping-design.md` lock the design.
+
+

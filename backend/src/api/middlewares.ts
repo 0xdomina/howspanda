@@ -135,6 +135,22 @@ export const PostRemoveReviewSchema = z.object({
   reason: z.string().min(3),
 })
 
+// Tipping (Phase 8)
+export const PostBuyerTipSchema = z.object({
+  email: z.string().email(),
+  amount: z.number().positive(),
+  note: z.string().max(500).optional(),
+})
+
+export const PostSellerTipSchema = z.object({
+  buyer_email: z.string().email(),
+  amount: z.number().positive().optional(),
+  product_id: z.string().min(1).optional(),
+  product_title: z.string().min(1).optional(),
+  order_id: z.string().min(1).optional(),
+  note: z.string().max(500).optional(),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -265,6 +281,16 @@ export default defineMiddlewares({
       matcher: "/hooks/payouts/paystack",
       methods: ["POST"],
       bodyParser: { preserveRawBody: true },
+    },
+    {
+      matcher: "/store/orders/:id/tip",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostBuyerTipSchema)],
+    },
+    {
+      matcher: "/sellers/tips",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostSellerTipSchema)],
     },
   ],
 })
