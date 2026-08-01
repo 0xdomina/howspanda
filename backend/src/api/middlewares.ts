@@ -33,6 +33,14 @@ export const PostAiMarketingSchema = z.object({
   tone: z.string().optional(),
 })
 
+export const PostAiBriefSchema = z.object({
+  period: z.enum(["daily", "weekly"]).default("daily"),
+})
+
+export const PostAiRecommendationsSchema = z.object({
+  period: z.enum(["daily", "weekly"]).default("daily"),
+})
+
 export const PostPayoutAccountSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("bank_account"),
@@ -283,6 +291,16 @@ export default defineMiddlewares({
       matcher: "/sellers/ai/marketing",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostAiMarketingSchema)],
+    },
+    {
+      matcher: "/sellers/ai/brief",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostAiBriefSchema)],
+    },
+    {
+      matcher: "/sellers/ai/recommendations",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostAiRecommendationsSchema)],
     },
     {
       matcher: "/sellers/payout-accounts",

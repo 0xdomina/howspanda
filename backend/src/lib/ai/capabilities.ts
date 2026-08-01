@@ -175,3 +175,64 @@ export async function coachMarketing(input: {
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
   }
 }
+
+// ---------- seller brief (Phase 13) ----------
+
+export async function writeSellerBrief(input: {
+  numbersJson: string
+  opportunitiesJson: string
+}): Promise<CapabilityOutput<string>> {
+  const { text, usage } = await generateText({
+    model: getModel(),
+    system:
+      "[capability:brief] You write a short daily/weekly brief for ONE " +
+      "marketplace seller using ONLY the deterministic numbers and " +
+      "opportunities provided. Restate revenue, margin, the top and " +
+      "underperforming SKUs, and the ranked opportunities. Never invent " +
+      "numbers or add recommendations that are not in the input.",
+    prompt:
+      `Deterministic numbers (JSON):\n${input.numbersJson}\n\n` +
+      `Ranked opportunities (JSON):\n${input.opportunitiesJson}\n\n` +
+      `Write a 4-6 sentence brief.`,
+  })
+
+  return {
+    result: text,
+    usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+  }
+}
+
+// ---------- seller recommendations (Phase 13) ----------
+
+export const RecommendationsResultSchema = z.object({
+  opportunities: z.array(
+    z.object({
+      action: z.string(),
+      sku: z.string().nullable(),
+      explanation: z.string(),
+    })
+  ),
+})
+
+export type RecommendationsResult = z.infer<typeof RecommendationsResultSchema>
+
+export async function explainRecommendations(input: {
+  opportunitiesJson: string
+}): Promise<CapabilityOutput<RecommendationsResult>> {
+  const { object, usage } = await generateObject({
+    model: getModel(),
+    schema: RecommendationsResultSchema,
+    system:
+      "[capability:recommendations] You explain a list of rule-ranked " +
+      "opportunities for ONE marketplace seller. For each opportunity, write " +
+      "ONE short line (max 20 words) explaining why it matters to that " +
+      "specific store. Preserve the action and sku exactly as given; only add " +
+      "the explanation.",
+    prompt: `Opportunities (JSON):\n${input.opportunitiesJson}`,
+  })
+
+  return {
+    result: object,
+    usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+  }
+}

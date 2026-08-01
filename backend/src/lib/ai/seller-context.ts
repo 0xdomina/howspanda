@@ -93,13 +93,15 @@ export async function getSellerOrders(
       "created_at",
       "currency_code",
       "total",
+      "region.name",
       "items.title",
       "items.quantity",
+      "items.total",
     ],
     filters: { id: orderIds },
   })
 
-  return orders
+  return orders.map((o: any) => ({ ...o, region_name: o.region?.name ?? "Unspecified" }))
 }
 
 export async function getSellerCommissionLines(

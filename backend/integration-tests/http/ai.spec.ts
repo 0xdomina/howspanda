@@ -163,6 +163,100 @@ medusaIntegrationTestRunner({
         })
       })
 
+      describe("seller brief (Phase 13)", () => {
+        it("returns a deterministic brief and stores it for instant GET", async () => {
+          const res = await api.post(
+            "/sellers/ai/brief",
+            { period: "daily" },
+            { headers: { Authorization: `Bearer ${tokenA}` } }
+          )
+
+          expect(res.status).toEqual(200)
+          expect(res.data.ok).toBe(true)
+          expect(res.data.capability).toEqual("brief")
+
+          // deterministic numbers are computed in code, echoed back
+          expect(res.data.numbers).toMatchObject({
+            currency_code: "ngn",
+            period: "daily",
+            revenue: 0,
+            commission: 0,
+            net: 0,
+            order_count: 0,
+          })
+
+          // narrative comes from the LLM (mock returns canned prose)
+          expect(typeof res.data.result).toBe("string")
+          expect(res.data.result.length).toBeGreaterThan(0)
+
+          // persisted: GET is instant, no LLM call
+          const stored = await api.get("/sellers/ai/brief", {
+            headers: { Authorization: `Bearer ${tokenA}` },
+          })
+          expect(stored.status).toEqual(200)
+          expect(stored.data.brief).not.toBeNull()
+          expect(stored.data.brief.period).toEqual("daily")
+          expect(stored.data.brief.seller_id).toEqual(res.data.brief.seller_id)
+          expect(stored.data.brief.numbers).toMatchObject({
+            currency_code: "ngn",
+            period: "daily",
+          })
+        })
+
+        it("never shares briefs across sellers (GET is scoped to the caller)", async () => {
+          const posted = await api.post(
+            "/sellers/ai/brief",
+            { period: "weekly" },
+            { headers: { Authorization: `Bearer ${tokenB}` } }
+          )
+          expect(posted.status).toEqual(200)
+
+          const storedA = await api.get("/sellers/ai/brief", {
+            headers: { Authorization: `Bearer ${tokenA}` },
+          })
+          const storedB = await api.get("/sellers/ai/brief", {
+            params: { period: "weekly" },
+            headers: { Authorization: `Bearer ${tokenB}` },
+          })
+
+          // A never stored one in this test — and it must NOT see B's weekly brief
+          expect(storedA.data.brief).toBeNull()
+          expect(storedB.data.brief).not.toBeNull()
+          expect(storedB.data.brief.period).toEqual("weekly")
+        })
+      })
+
+      describe("seller recommendations (Phase 13)", () => {
+        it("returns rule-ranked opportunities scoped to the caller's catalog", async () => {
+          const resA = await api.post(
+            "/sellers/ai/recommendations",
+            { period: "daily" },
+            { headers: { Authorization: `Bearer ${tokenA}` } }
+          )
+          const resB = await api.post(
+            "/sellers/ai/recommendations",
+            { period: "daily" },
+            { headers: { Authorization: `Bearer ${tokenB}` } }
+          )
+
+          expect(resA.status).toEqual(200)
+          expect(resB.status).toEqual(200)
+          expect(resA.data.capability).toEqual("recommendations")
+
+          // each seller's opportunities reference their OWN product only
+          const skusA = JSON.stringify(resA.data.opportunities)
+          const skusB = JSON.stringify(resB.data.opportunities)
+          expect(skusA).toContain("Seller A Secret Scarf")
+          expect(skusA).not.toContain("Seller B Private Lamp")
+          expect(skusB).toContain("Seller B Private Lamp")
+          expect(skusB).not.toContain("Seller A Secret Scarf")
+
+          // LLM explanations come back for every opportunity
+          expect(Array.isArray(resA.data.result.opportunities)).toBe(true)
+          expect(resA.data.result.opportunities.length).toBeGreaterThan(0)
+        })
+      })
+
       describe("provider failure fallback", () => {
         it("returns a friendly 503 and does not bill the seller", async () => {
           process.env.AI_PROVIDER = "mock-fail"

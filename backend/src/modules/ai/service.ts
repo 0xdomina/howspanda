@@ -1,6 +1,7 @@
 import { MedusaService } from "@medusajs/framework/utils"
 import AiUsage from "./models/ai-usage"
 import AiQuota from "./models/ai-quota"
+import AiBrief from "./models/ai-brief"
 
 export class AiQuotaExceededError extends Error {
   constructor(public readonly limit: number) {
@@ -17,7 +18,7 @@ export type QuotaStatus = {
   remaining: number
 }
 
-class AiModuleService extends MedusaService({ AiUsage, AiQuota }) {
+class AiModuleService extends MedusaService({ AiUsage, AiQuota, AiBrief }) {
   protected defaultMonthlyLimit(): number {
     const parsed = parseInt(process.env.AI_FREE_TIER_MONTHLY_LIMIT || "", 10)
     return Number.isFinite(parsed) && parsed > 0

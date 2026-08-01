@@ -45,6 +45,13 @@ const CANNED_OUTPUTS: Record<string, string> = {
   insights: "Mock insight: your best seller this month is the Demo Ankara Tote.",
   accounting:
     "Mock digest: revenue, commission deducted, and net earnings summarized.",
+  brief:
+    "Mock brief: revenue and net summarized from the deterministic numbers.",
+  recommendations: JSON.stringify({
+    opportunities: [
+      { action: "bundle", sku: "A + B", explanation: "Mock explanation for the bundle." },
+    ],
+  }),
 }
 
 // Every capability's system prompt begins with "[capability:<name>]" so the

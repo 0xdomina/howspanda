@@ -6,10 +6,10 @@
 > this file, then the phase plan referenced by the current phase.
 
 **Status snapshot (as of this file's last update):**
-- Phases 1–12 are **implemented and green**: marketplace, AI, payments, payouts, escrow, redeemables, reviews/trust, tipping, growth/referrals, digital mall + buyer-wallet, P2P delivery core, **in-app chat + POD verification**.
-- Integration tests: **12 suites / 134 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
-- Phase 11 is committed; **Phase 12 is uncommitted** (chat + verify routes pending a conventional commit).
-- Head commits: `da272ef` (feat delivery routes Phase 11), `369a2e8` (feat delivery module Phase 11).
+- Phases 1–13 are **implemented and green**: marketplace, AI, payments, payouts, escrow, redeemables, reviews/trust, tipping, growth/referrals, digital mall + buyer-wallet, P2P delivery core, **in-app chat + POD verification**, **AI seller intelligence (briefs + recommendations)**.
+- Integration tests: **12 suites / 137 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
+- Phases 11–12 are committed; **Phase 13 is uncommitted** (AI briefs + recommendations routes pending a conventional commit).
+- Head commits: `0076159` (feat delivery Phase 12 chat/POD), `da272ef` (feat delivery routes Phase 11).
 
 ---
 
@@ -35,7 +35,7 @@ A marketplace where **informal sellers and buyers can win**, built on two pillar
 | 10 | Digital Mall + Buyer Wallet | — | **DONE.** bonding-curve events, luck prizes, buyer wallet |
 | 11 | P2P Delivery Core | 10 (wallet), 5 (payouts), 6 (escrow) | Job posting, matching, negotiation, escrow release — **DONE** (routes + `delivery.spec.ts` green) |
 | 12 | In-app Chat + POD verification | 11 | 3-way DM, timeline, in-app QR/OTP codes — **DONE** (chat + verify routes, party gating, POD payout) |
-| 13 | AI Seller Intelligence | 3 (existing AI) | Daily/weekly briefs, marketing helper, grounded recommendations |
+| 13 | AI Seller Intelligence | 3 (existing AI) | Daily/weekly briefs, marketing helper, grounded recommendations — **DONE** (brief + recommendations routes, scheduled job, `ai.spec.ts` green) |
 | 14 | Frictionless Onboarding | 2 (marketplace auth) | Phone/email signup, mobile-first listing, progressive KYC |
 | 15 | Launch Gate | 11–14 | Live payments, deploy infra, hardening, GA checklist |
 
@@ -187,11 +187,11 @@ budget — codes live inside the app.
   (`AI_PROVIDER=groq|mock|mock-fail`) — no new infra, no per-seller keys.
 
 ## Acceptance criteria
-- [ ] `GET/POST /sellers/ai/brief` returns deterministic numbers + ranked opportunities.
-- [ ] `GET/POST /sellers/ai/recommendations` returns store-specific, rule-ranked actions.
-- [ ] Recommendations are provably scoped to the requesting seller only.
-- [ ] Mock provider returns deterministic canned output (testable offline).
-- [ ] `ai.spec.ts` extended; full suite green.
+- [x] `GET/POST /sellers/ai/brief` returns deterministic numbers + ranked opportunities.
+- [x] `GET/POST /sellers/ai/recommendations` returns store-specific, rule-ranked actions.
+- [x] Recommendations are provably scoped to the requesting seller only.
+- [x] Mock provider returns deterministic canned output (testable offline).
+- [x] `ai.spec.ts` extended; full suite green.
 
 ---
 
