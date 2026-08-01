@@ -242,6 +242,26 @@ export const PostDeliveryVerifySchema = z.object({
   purpose: z.enum(["pickup", "delivery"]),
 })
 
+// KYC (Phase 14): email-identity ladder for couriers and sellers
+export const PostKycRequestSchema = z.object({
+  email: z.string().email(),
+  channel: z.enum(["email", "phone"]),
+  destination: z.string().min(3),
+})
+
+export const PostKycVerifySchema = z.object({
+  email: z.string().email(),
+  channel: z.enum(["email", "phone"]),
+  destination: z.string().min(3),
+  code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
+})
+
+export const PostKycIdentitySchema = z.object({
+  email: z.string().email(),
+  id_type: z.enum(["nin"]),
+  id_number: z.string().min(11).max(11),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -489,6 +509,21 @@ export default defineMiddlewares({
       matcher: "/store/delivery-jobs/:id/verify",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostDeliveryVerifySchema)],
+    },
+    {
+      matcher: "/kyc/request",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostKycRequestSchema)],
+    },
+    {
+      matcher: "/kyc/verify",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostKycVerifySchema)],
+    },
+    {
+      matcher: "/kyc/identity",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostKycIdentitySchema)],
     },
   ],
 })
