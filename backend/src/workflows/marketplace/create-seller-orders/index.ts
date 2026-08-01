@@ -16,6 +16,7 @@ import groupSellerItemsStep, {
 } from "./steps/group-seller-items"
 import createSellerOrdersStep from "./steps/create-seller-orders"
 import createCommissionLinesStep from "./steps/create-commission-lines"
+import transferInventoryReservationsStep from "./steps/transfer-inventory-reservations"
 import sellerOrderLink from "../../../links/seller-order"
 
 type WorkflowInput = {
@@ -89,6 +90,15 @@ const createSellerOrdersWorkflow = createWorkflow(
         parentOrder: order,
         sellersItems,
         ungroupedItemCount,
+      })
+
+      // `completeCartWorkflow` reserved inventory against the PARENT order's
+      // line items; hand those reservations down to the child seller orders
+      // (which Medusa's createOrderWorkflow never reserves) so each seller can
+      // fulfil their own child order. No-op for the single-seller shortcut.
+      transferInventoryReservationsStep({
+        parentOrderId: order.id,
+        sellerOrders,
       })
 
       // The seller<->order links are the idempotency marker for the split

@@ -29,10 +29,12 @@ Checkout uses `POST /store/carts/:id/complete-marketplace`: carts spanning N sel
 produce 1 parent order + N child seller orders, and a pending commission line
 (default 10%, per-seller `commission_rate`) is recorded for each seller order.
 
-> Known gap (deferred to the fulfillment phase): child seller orders are created
-> without their own inventory reservations, so fulfilling items with
-> `manage_inventory: true` from a child order will fail until reservations are
-> transferred from the parent order.
+> Fulfillment + inventory: `completeCartWorkflow` reserves stock against the
+> parent order's line items, so the marketplace workflow transfers those
+> reservations down to each child seller order (`transfer-inventory-reservations`
+> step). Each seller can therefore fulfil their own child order — including
+> `manage_inventory: true` items — without double-reserving. Handled automatically
+> on checkout; no manual reservation setup needed.
 
 ## AI Module (Phase 3) — "one brain, many memories"
 
