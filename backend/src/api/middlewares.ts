@@ -147,6 +147,7 @@ export const PostSellerTipSchema = z.object({
   amount: z.number().positive().optional(),
   product_id: z.string().min(1).optional(),
   product_title: z.string().min(1).optional(),
+  redeemable_code: z.string().min(6).optional(),
   order_id: z.string().min(1).optional(),
   note: z.string().max(500).optional(),
 })

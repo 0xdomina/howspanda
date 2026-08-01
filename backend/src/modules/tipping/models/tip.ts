@@ -23,6 +23,10 @@ const Tip = model.define("tip", {
   // extra-product tips (seller → buyer) record the gifted item
   product_id: model.text().nullable(),
   product_title: model.text().nullable(),
+  // store-instrument tips (seller → buyer): a gifted code from the seller's own
+  // redeemables (gift card / voucher / ticket) addressed to the buyer
+  redeemable_id: model.text().nullable(),
+  redeemable_code: model.text().nullable(),
   note: model.text().nullable(),
   status: model.enum(["available", "reversed"]).default("available"),
   // the marketplace CommissionLine that carries the cash settlement

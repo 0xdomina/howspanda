@@ -9,11 +9,14 @@ export type CreateTipInput = {
   buyerEmail: string
   sellerId: string
   currencyCode?: string
-  /** cash value; null for extra-product tips */
+  /** cash value; null for non-cash tips */
   amount?: number | null
   /** extra-product tips (seller → buyer) */
   productId?: string | null
   productTitle?: string | null
+  /** store-instrument tips (seller → buyer): a gifted redeemable code */
+  redeemableId?: string | null
+  redeemableCode?: string | null
   note?: string | null
   /** the marketplace CommissionLine that carries the cash settlement */
   commissionLineId?: string | null
@@ -40,16 +43,25 @@ class TippingModuleService extends MedusaService({ Tip }) {
       amount,
       productId,
       productTitle,
+      redeemableId,
+      redeemableCode,
       note,
       commissionLineId,
       orderId,
     } = input
 
     const isCash = Number.isFinite(amount) && (amount as number) > 0
-    if (direction === "to_buyer" && !isCash && !productId && !productTitle) {
+    const isProduct = !isCash && (!!productId || !!productTitle)
+    const isInstrument = !isCash && !isProduct && !!redeemableId && !!redeemableCode
+    if (
+      direction === "to_buyer" &&
+      !isCash &&
+      !isProduct &&
+      !isInstrument
+    ) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "A seller tip needs either a cash amount or an extra product"
+        "A seller tip needs a cash amount, an extra product, or a gifted store code"
       )
     }
     if (isCash && !(Number(amount) > 0)) {
@@ -68,6 +80,8 @@ class TippingModuleService extends MedusaService({ Tip }) {
       amount: isCash ? round2(amount as number) : null,
       product_id: productId ?? null,
       product_title: productTitle ?? null,
+      redeemable_id: redeemableId ?? null,
+      redeemable_code: redeemableCode ?? null,
       note: note ?? null,
       status: "available",
       commission_line_id: commissionLineId ?? null,

@@ -7,6 +7,8 @@ import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
 import MarketplaceModuleService from "../../src/modules/marketplace/service"
 import { TIPPING_MODULE } from "../../src/modules/tipping"
 import TippingModuleService from "../../src/modules/tipping/service"
+import { REDEEMABLES_MODULE } from "../../src/modules/redeemables"
+import RedeemablesModuleService from "../../src/modules/redeemables/service"
 
 jest.setTimeout(120 * 1000)
 
@@ -22,6 +24,7 @@ medusaIntegrationTestRunner({
     describe("Tipping — buyer→seller & seller→buyer", () => {
       let marketplace: MarketplaceModuleService
       let tipping: TippingModuleService
+      let redeemables: RedeemablesModuleService
       let token: string
       let sellerId: string
       let storeHeaders: { headers: Record<string, string> }
@@ -71,6 +74,7 @@ medusaIntegrationTestRunner({
       beforeAll(async () => {
         marketplace = getContainer().resolve(MARKETPLACE_MODULE)
         tipping = getContainer().resolve(TIPPING_MODULE)
+        redeemables = getContainer().resolve(REDEEMABLES_MODULE)
 
         const register = await api.post("/auth/seller/emailpass/register", {
           email: "tipping-seller@howsu.local",
@@ -218,6 +222,85 @@ medusaIntegrationTestRunner({
         })
         expect(res.data.summary.in_amount).toBeGreaterThan(0)
         expect(res.data.summary.product_tips).toBeGreaterThan(0)
+      })
+
+      it("seller→buyer tip with an own store code gifts it to the buyer; no money moves", async () => {
+        const before = await availableNgn()
+        const [card] = await redeemables.mintRedeemables({
+          seller_id: sellerId,
+          type: "gift_card",
+          title: "Tip Card",
+          face_value: 5000,
+        })
+
+        const res = await api.post(
+          "/sellers/tips",
+          { buyer_email: "buyer@howsu.local", redeemable_code: card.code },
+          auth()
+        )
+        expect(res.status).toEqual(200)
+        expect(res.data.tip.direction).toEqual("to_buyer")
+        expect(res.data.tip.redeemable_code).toEqual(card.code)
+        expect(res.data.tip.redeemable_id).toEqual(card.id)
+        expect(res.data.tip.amount).toBeNull()
+        expect(res.data.tip.commission_line_id).toBeNull()
+        expect(res.data.tip.buyer_credit_status).toBeNull()
+        // the code is now addressed to the buyer
+        const [updated] = await redeemables.listRedeemables({ id: card.id })
+        expect(updated.issued_to_email).toEqual("buyer@howsu.local")
+        expect(await availableNgn()).toBeCloseTo(before, 2)
+      })
+
+      it("foreign or spent store codes are invisible when tipped (404)", async () => {
+        // register a second seller with its own code
+        const register = await api.post("/auth/seller/emailpass/register", {
+          email: "other-tip-seller@howsu.local",
+          password: "supersecret",
+        })
+        const created = await api.post(
+          "/sellers",
+          {
+            name: "Other Tip Seller",
+            handle: "other-tip-seller",
+            admin: {
+              email: "other-tip-seller@howsu.local",
+              first_name: "Other",
+              last_name: "Seller",
+            },
+          },
+          { headers: { Authorization: `Bearer ${register.data.token}` } }
+        )
+        const [foreign] = await redeemables.mintRedeemables({
+          seller_id: created.data.seller.id,
+          type: "voucher",
+          title: "Foreign Voucher",
+          discount_type: "fixed",
+          discount_value: 1000,
+        })
+
+        await expect(
+          api.post(
+            "/sellers/tips",
+            { buyer_email: "buyer@howsu.local", redeemable_code: foreign.code },
+            auth()
+          )
+        ).rejects.toMatchObject({ response: { status: 404 } })
+
+        // spent code (redeemed) is equally invisible
+        const [spent] = await redeemables.mintRedeemables({
+          seller_id: sellerId,
+          type: "ticket",
+          title: "Spent Ticket",
+          face_value: 2000,
+        })
+        await redeemables.updateRedeemables([{ id: spent.id, status: "redeemed" }])
+        await expect(
+          api.post(
+            "/sellers/tips",
+            { buyer_email: "buyer@howsu.local", redeemable_code: spent.code },
+            auth()
+          )
+        ).rejects.toMatchObject({ response: { status: 404 } })
       })
     })
   },

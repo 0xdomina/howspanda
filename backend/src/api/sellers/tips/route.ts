@@ -11,6 +11,8 @@ import { TIPPING_MODULE } from "../../../modules/tipping"
 import TippingModuleService from "../../../modules/tipping/service"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import type MarketplaceModuleService from "../../../modules/marketplace/service"
+import { REDEEMABLES_MODULE } from "../../../modules/redeemables"
+import type RedeemablesModuleService from "../../../modules/redeemables/service"
 import { PostSellerTipSchema } from "../../middlewares"
 
 type PostBody = z.infer<typeof PostSellerTipSchema>
@@ -47,7 +49,7 @@ export const GET = async (
   res.json({ tips, summary })
 }
 
-// Seller → buyer thank-you (cash or extra product).
+// Seller → buyer thank-you (cash, extra product, or a gifted store code).
 export const POST = async (
   req: AuthenticatedMedusaRequest<PostBody>,
   res: MedusaResponse
@@ -59,10 +61,12 @@ export const POST = async (
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
 
   const isCash = Number.isFinite(body.amount) && (body.amount as number) > 0
-  if (!isCash && !body.product_id && !body.product_title) {
+  const isProduct = !isCash && (!!body.product_id || !!body.product_title)
+  const isInstrument = !isCash && !isProduct && !!body.redeemable_code
+  if (!isCash && !isProduct && !isInstrument) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "A seller tip needs either a cash amount or an extra product"
+      "A seller tip needs a cash amount, an extra product, or a gifted store code"
     )
   }
 
@@ -94,6 +98,35 @@ export const POST = async (
     commissionLineId = line[0]?.id ?? null
   }
 
+  // Gifting one of the seller's own store instruments (gift card / voucher /
+  // ticket): the code's value is addressed to the buyer — no cash moves. Foreign
+  // or spent codes are invisible (404), matching the redeemables convention.
+  let redeemableId: string | null = null
+  let redeemableCode: string | null = null
+  if (isInstrument) {
+    const redeemables = req.scope.resolve<RedeemablesModuleService>(
+      REDEEMABLES_MODULE
+    )
+    const [redeem] = await redeemables.listRedeemables({
+      code: (body.redeemable_code as string).toUpperCase(),
+    })
+    if (
+      !redeem ||
+      redeem.seller_id !== sellerId ||
+      redeem.status !== "active"
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        "Code not found"
+      )
+    }
+    await redeemables.updateRedeemables([
+      { id: redeem.id, issued_to_email: body.buyer_email },
+    ])
+    redeemableId = redeem.id
+    redeemableCode = redeem.code
+  }
+
   const tip = await tipping.createTip({
     direction: "to_buyer",
     orderId: body.order_id,
@@ -102,6 +135,8 @@ export const POST = async (
     amount: isCash ? Number(body.amount) : null,
     productId: body.product_id,
     productTitle: body.product_title,
+    redeemableId,
+    redeemableCode,
     note: body.note,
     commissionLineId,
   })
