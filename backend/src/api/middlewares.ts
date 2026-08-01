@@ -218,6 +218,22 @@ export const PostDeliveryConfirmSchema = z.object({
   courierEmail: z.string().email().optional(),
 })
 
+// Chat + POD verification (Phase 12)
+export const PostDeliveryChatSchema = z.object({
+  senderEmail: z.string().email(),
+  body: z.string().min(1).max(2000),
+})
+
+export const PostDeliveryVerifyGenerateSchema = z.object({
+  courierEmail: z.string().email(),
+})
+
+export const PostDeliveryVerifySchema = z.object({
+  email: z.string().email(),
+  code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
+  purpose: z.enum(["pickup", "delivery"]),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -435,6 +451,26 @@ export default defineMiddlewares({
       matcher: "/store/delivery-jobs/:id/confirm",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostDeliveryConfirmSchema)],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/chat",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryChatSchema)],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/verify/pickup",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/verify/delivery",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/verify",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostDeliveryVerifySchema)],
     },
   ],
 })

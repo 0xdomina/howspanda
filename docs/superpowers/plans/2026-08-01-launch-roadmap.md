@@ -6,10 +6,10 @@
 > this file, then the phase plan referenced by the current phase.
 
 **Status snapshot (as of this file's last update):**
-- Phases 1–11 are **implemented and green**: marketplace, AI, payments, payouts, escrow, redeemables, reviews/trust, tipping, growth/referrals, digital mall + buyer-wallet, **P2P delivery core**.
-- Integration tests: **12 suites / 126 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
-- Phase 11 delivery work is **uncommitted** (new module + routes + `delivery.spec.ts` pending one conventional commit per task).
-- Head commits: `ea648c4` (feat mall), `be66a0e` (docs plan Phase 10).
+- Phases 1–12 are **implemented and green**: marketplace, AI, payments, payouts, escrow, redeemables, reviews/trust, tipping, growth/referrals, digital mall + buyer-wallet, P2P delivery core, **in-app chat + POD verification**.
+- Integration tests: **12 suites / 134 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
+- Phase 11 is committed; **Phase 12 is uncommitted** (chat + verify routes pending a conventional commit).
+- Head commits: `da272ef` (feat delivery routes Phase 11), `369a2e8` (feat delivery module Phase 11).
 
 ---
 
@@ -34,7 +34,7 @@ A marketplace where **informal sellers and buyers can win**, built on two pillar
 |---|---|---|---|
 | 10 | Digital Mall + Buyer Wallet | — | **DONE.** bonding-curve events, luck prizes, buyer wallet |
 | 11 | P2P Delivery Core | 10 (wallet), 5 (payouts), 6 (escrow) | Job posting, matching, negotiation, escrow release — **DONE** (routes + `delivery.spec.ts` green) |
-| 12 | In-app Chat + POD verification | 11 | 3-way DM, timeline, in-app QR/OTP codes |
+| 12 | In-app Chat + POD verification | 11 | 3-way DM, timeline, in-app QR/OTP codes — **DONE** (chat + verify routes, party gating, POD payout) |
 | 13 | AI Seller Intelligence | 3 (existing AI) | Daily/weekly briefs, marketing helper, grounded recommendations |
 | 14 | Frictionless Onboarding | 2 (marketplace auth) | Phone/email signup, mobile-first listing, progressive KYC |
 | 15 | Launch Gate | 11–14 | Live payments, deploy infra, hardening, GA checklist |
@@ -155,11 +155,11 @@ budget — codes live inside the app.
 | `POST` | `/store/delivery-jobs/:id/verify` | recipient/sender | Submit code → confirms pickup/delivery |
 
 ## Acceptance criteria
-- [ ] Accepted job auto-opens a 3-way conversation (sender, courier, recipient).
-- [ ] Messages are persisted and pollable; timeline shows pickup/delivery events.
-- [ ] Pickup and delivery each require an in-app code; only the right party can generate/verify.
-- [ ] Verification events post into the chat timeline.
-- [ ] `delivery.spec.ts` extended (or new `chat.spec.ts`); full suite green.
+- [x] Accepted job auto-opens a 3-way conversation (sender, courier, recipient).
+- [x] Messages are persisted and pollable; timeline shows pickup/delivery events.
+- [x] Pickup and delivery each require an in-app code; only the right party can generate/verify.
+- [x] Verification events post into the chat timeline.
+- [x] `delivery.spec.ts` extended (or new `chat.spec.ts`); full suite green.
 
 ---
 

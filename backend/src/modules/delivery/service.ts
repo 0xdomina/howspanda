@@ -394,6 +394,33 @@ class DeliveryModuleService extends MedusaService({
 
   // ---- Chat (Phase 12) -----------------------------------------------------
 
+  /** A user is a party of a job if their email is on the roster. */
+  private async assertParty(jobId: string, email: string) {
+    const emailNorm = email.trim().toLowerCase()
+    const parties = await this.listDeliveryParties({ job_id: jobId })
+    if (!parties.some((p) => p.email === emailNorm)) {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Only a job party can perform this action"
+      )
+    }
+  }
+
+  /** Only the accepted courier can generate verification codes. */
+  private async assertCourier(jobId: string, email: string) {
+    const couriers = await this.listDeliveryParties({
+      job_id: jobId,
+      role: "courier",
+      email: email.trim().toLowerCase(),
+    })
+    if (!couriers.length) {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Only the courier can generate verification codes"
+      )
+    }
+  }
+
   async sendMessage(input: SendMessageInput & { isSystem?: boolean }) {
     if (!input.body?.trim()) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Message body is required")
@@ -407,6 +434,9 @@ class DeliveryModuleService extends MedusaService({
         "Chat opens once the job is accepted"
       )
     }
+    if (!input.isSystem) {
+      await this.assertParty(input.jobId, input.senderEmail)
+    }
     const message = await this.createDeliveryMessages({
       job_id: input.jobId,
       sender_email: input.senderEmail.trim().toLowerCase(),
@@ -416,7 +446,10 @@ class DeliveryModuleService extends MedusaService({
     return message
   }
 
-  async listMessages(jobId: string) {
+  async listMessages(jobId: string, byEmail?: string) {
+    if (byEmail) {
+      await this.assertParty(jobId, byEmail)
+    }
     return await this.listDeliveryMessages(
       { job_id: jobId },
       { order: { created_at: "ASC" } }
@@ -442,6 +475,7 @@ class DeliveryModuleService extends MedusaService({
         "Delivery code requires the job to be picked up or accepted"
       )
     }
+    await this.assertCourier(jobId, byEmail)
     const code = String(randomInt(0, 1000000)).padStart(6, "0")
     const codeHash = createHash("sha256").update(code).digest("hex")
     await this.createDeliveryVerifications({
@@ -458,8 +492,20 @@ class DeliveryModuleService extends MedusaService({
     return { code, expiresInMs: CODE_LIFETIME_MS }
   }
 
-  async verify(jobId: string, code: string, purpose: "pickup" | "delivery", byEmail: string) {
+  async verify(
+    jobId: string,
+    code: string,
+    purpose: "pickup" | "delivery",
+    byEmail: string
+  ): Promise<{
+    valid: boolean
+    purpose: "pickup" | "delivery"
+    job?: Awaited<ReturnType<DeliveryModuleService["getJob"]>>
+    payout?: number
+    courierEmail?: string | null
+  }> {
     const now = new Date()
+    const byEmailNorm = byEmail.trim().toLowerCase()
     const active = await this.listDeliveryVerifications({
       job_id: jobId,
       purpose,
@@ -472,6 +518,12 @@ class DeliveryModuleService extends MedusaService({
     if (!candidate) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid verification code")
     }
+    if (candidate.generated_by_email === byEmailNorm) {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "The code generator cannot verify their own code"
+      )
+    }
     if (candidate.expires_at < now) {
       await this.updateDeliveryVerifications({ id: candidate.id, status: "expired" })
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Verification code expired")
@@ -481,10 +533,36 @@ class DeliveryModuleService extends MedusaService({
       status: "used",
       used_at: now,
     })
-    if (purpose === "pickup") {
-      await this.markPickedUp(jobId, byEmail)
+    // Presenting a valid code is proof of involvement — register the verifier
+    // as the matching party (sender confirms pickup, recipient confirms delivery).
+    const parties = await this.listDeliveryParties({ job_id: jobId })
+    if (!parties.some((p) => p.email === byEmailNorm)) {
+      await this.ensureParty(
+        jobId,
+        purpose === "pickup" ? "sender" : "recipient",
+        byEmailNorm
+      )
     }
-    return { valid: true, purpose }
+    if (purpose === "pickup") {
+      // The sender confirms pickup with the code the courier showed them; the
+      // job moves in_transit without requiring the verifier to be the courier.
+      const updated = await this.updateDeliveryJobs({
+        id: jobId,
+        status: "in_transit",
+        picked_up_at: now,
+      })
+      await this.sendMessage({
+        jobId,
+        senderEmail: byEmailNorm,
+        body: "Pickup verified with the in-app code — in transit.",
+        isSystem: true,
+      })
+      return { valid: true, purpose, job: updated }
+    }
+    // purpose === "delivery" → recipient confirms with the courier's code;
+    // this releases the agreed price to the courier wallet.
+    const result = await this.confirmDelivery(jobId, byEmailNorm)
+    return { valid: true, purpose, ...result }
   }
 }
 

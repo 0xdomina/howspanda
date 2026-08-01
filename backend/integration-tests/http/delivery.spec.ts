@@ -283,6 +283,217 @@ medusaIntegrationTestRunner({
         )
         expect(byCourier.length).toEqual(2)
       })
+
+      // ---- Phase 12: chat + POD verification -------------------------------
+
+      // Each test runs on a fresh DB snapshot, so the accepted-job setup must
+      // run inside the test that needs it.
+      const createAcceptedJob = async (courierEmail: string) => {
+        const created = await api.post(
+          "/store/delivery-jobs",
+          { ...POST_JOB_BODY, orderId: "order_delivery_chat" },
+          sellerAuth()
+        )
+        const id = created.data.job.id
+        const offer = await api.post(
+          `/store/delivery-jobs/${id}/offers`,
+          { courierEmail, offeredPrice: 4500 },
+          storeHeaders
+        )
+        await api.post(
+          `/store/delivery-jobs/${id}/offers/${offer.data.offer.id}/accept`,
+          {},
+          sellerAuth()
+        )
+        return id
+      }
+
+      it("chat rejects writes before the job is accepted", async () => {
+        const created = await api.post(
+          "/store/delivery-jobs",
+          { ...POST_JOB_BODY, orderId: "order_delivery_chat_open" },
+          sellerAuth()
+        )
+        const id = created.data.job.id
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${id}/chat`,
+            { senderEmail: "delivery-seller@howsu.local", body: "hello?" },
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 400 } })
+      })
+
+      it("parties can send and poll messages after acceptance", async () => {
+        const id = await createAcceptedJob("courier-chat@howsu.local")
+
+        const sent = await api.post(
+          `/store/delivery-jobs/${id}/chat`,
+          { senderEmail: "courier-chat@howsu.local", body: "On my way to pickup" },
+          storeHeaders
+        )
+        expect(sent.status).toEqual(201)
+        expect(sent.data.message.body).toEqual("On my way to pickup")
+        expect(sent.data.message.is_system).toEqual(false)
+
+        const timeline = await api.get(
+          `/store/delivery-jobs/${id}/chat?email=delivery-seller@howsu.local`,
+          storeHeaders
+        )
+        expect(timeline.status).toEqual(200)
+        const bodies = timeline.data.messages.map((m) => m.body)
+        expect(bodies).toContain("On my way to pickup")
+        // system timeline event from acceptance is present
+        expect(bodies.some((b) => b.includes("Offer accepted"))).toEqual(true)
+      })
+
+      it("non-parties cannot read or write chat", async () => {
+        const id = await createAcceptedJob("courier-chat2@howsu.local")
+
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${id}/chat`,
+            { senderEmail: "outsider@howsu.local", body: "spam" },
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 401 } })
+
+        await expect(
+          api.get(
+            `/store/delivery-jobs/${id}/chat?email=outsider@howsu.local`,
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 401 } })
+      })
+
+      it("only the courier can generate a pickup code", async () => {
+        const id = await createAcceptedJob("courier-verify@howsu.local")
+
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${id}/verify/pickup`,
+            { courierEmail: "delivery-seller@howsu.local" },
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 401 } })
+
+        const gen = await api.post(
+          `/store/delivery-jobs/${id}/verify/pickup`,
+          { courierEmail: "courier-verify@howsu.local" },
+          storeHeaders
+        )
+        expect(gen.status).toEqual(201)
+        expect(gen.data.code).toMatch(/^\d{6}$/)
+      })
+
+      it("sender verifies pickup code → job in transit", async () => {
+        const id = await createAcceptedJob("courier-verify2@howsu.local")
+        const gen = await api.post(
+          `/store/delivery-jobs/${id}/verify/pickup`,
+          { courierEmail: "courier-verify2@howsu.local" },
+          storeHeaders
+        )
+        const res = await api.post(
+          `/store/delivery-jobs/${id}/verify`,
+          {
+            email: "delivery-seller@howsu.local",
+            code: gen.data.code,
+            purpose: "pickup",
+          },
+          storeHeaders
+        )
+        expect(res.status).toEqual(200)
+        expect(res.data.valid).toEqual(true)
+        expect(res.data.job.status).toEqual("in_transit")
+      })
+
+      it("the code generator cannot verify their own code", async () => {
+        const id = await createAcceptedJob("courier-verify3@howsu.local")
+        const gen = await api.post(
+          `/store/delivery-jobs/${id}/verify/pickup`,
+          { courierEmail: "courier-verify3@howsu.local" },
+          storeHeaders
+        )
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${id}/verify`,
+            {
+              email: "courier-verify3@howsu.local",
+              code: gen.data.code,
+              purpose: "pickup",
+            },
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 401 } })
+      })
+
+      it("delivery verification releases payout to the courier wallet", async () => {
+        const id = await createAcceptedJob("courier-verify4@howsu.local")
+
+        // courier picks up (existing pickup route) then generates delivery code
+        await api.post(
+          `/store/delivery-jobs/${id}/pickup`,
+          { courierEmail: "courier-verify4@howsu.local" },
+          storeHeaders
+        )
+        const gen = await api.post(
+          `/store/delivery-jobs/${id}/verify/delivery`,
+          { courierEmail: "courier-verify4@howsu.local" },
+          storeHeaders
+        )
+        expect(gen.data.code).toMatch(/^\d{6}$/)
+
+        const before = await buyerWallet.balance("courier-verify4@howsu.local")
+        const res = await api.post(
+          `/store/delivery-jobs/${id}/verify`,
+          {
+            email: "recipient-pod@howsu.local",
+            code: gen.data.code,
+            purpose: "delivery",
+          },
+          storeHeaders
+        )
+        expect(res.status).toEqual(200)
+        expect(res.data.valid).toEqual(true)
+        expect(res.data.job.status).toEqual("delivered")
+        expect(Number(res.data.payout)).toEqual(4500)
+        expect(res.data.courierEmail).toEqual("courier-verify4@howsu.local")
+
+        const after = await buyerWallet.balance("courier-verify4@howsu.local")
+        expect(after - before).toEqual(4500)
+
+        // POD verification posts into the chat timeline
+        const timeline = await api.get(
+          `/store/delivery-jobs/${id}/chat?email=delivery-seller@howsu.local`,
+          storeHeaders
+        )
+        const bodies = timeline.data.messages.map((m) => m.body)
+        expect(bodies.some((b) => b.includes("Delivery confirmed"))).toEqual(true)
+      })
+
+      it("rejects an expired verification code", async () => {
+        const id = await createAcceptedJob("courier-verify5@howsu.local")
+        // generate a code, then force-expire it at the service layer
+        const gen = await delivery.generateVerification(id, "pickup", "courier-verify5@howsu.local")
+        const active = await delivery.listDeliveryVerifications({ job_id: id, purpose: "pickup" })
+        for (const v of active) {
+          await delivery.updateDeliveryVerifications({
+            id: v.id,
+            status: "expired",
+          })
+        }
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${id}/verify`,
+            {
+              email: "delivery-seller@howsu.local",
+              code: gen.code,
+              purpose: "pickup",
+            },
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 400 } })
+      })
     })
   },
 })
