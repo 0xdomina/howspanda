@@ -7,7 +7,7 @@ type MoneyTextProps = {
   minimumFractionDigits?: number
   maximumFractionDigits?: number
   className?: string
-}
+} & Omit<React.HTMLAttributes<HTMLSpanElement>, "className">
 
 /**
  * All money on the platform renders through this component:
@@ -19,9 +19,10 @@ const MoneyText = ({
   minimumFractionDigits,
   maximumFractionDigits,
   className,
+  ...rest
 }: MoneyTextProps) => {
   return (
-    <span className={clx("money", className)}>
+    <span className={clx("money", className)} {...rest}>
       {convertToLocale({
         amount,
         currency_code,

@@ -1,4 +1,5 @@
-import { Text, clx } from "@medusajs/ui"
+import { clx } from "@medusajs/ui"
+import MoneyText from "@modules/common/components/money-text"
 import { VariantPrice } from "types/global"
 
 export default async function PreviewPrice({ price }: { price: VariantPrice }) {
@@ -7,23 +8,26 @@ export default async function PreviewPrice({ price }: { price: VariantPrice }) {
   }
 
   return (
-    <>
+    <span className="flex flex-col items-end gap-0.5">
       {price.price_type === "sale" && (
-        <Text
-          className="line-through text-ui-fg-muted"
+        <MoneyText
+          amount={price.original_price_number}
+          currency_code={price.currency_code}
+          className="text-xs text-ink-muted line-through"
           data-testid="original-price"
-        >
-          {price.original_price}
-        </Text>
+        />
       )}
-      <Text
-        className={clx("text-ui-fg-muted", {
-          "text-ui-fg-interactive": price.price_type === "sale",
-        })}
+      <MoneyText
+        amount={price.calculated_price_number}
+        currency_code={price.currency_code}
+        className={clx(
+          "text-sm font-medium",
+          price.price_type === "sale"
+            ? "text-semantic-danger"
+            : "text-ink"
+        )}
         data-testid="price"
-      >
-        {price.calculated_price}
-      </Text>
-    </>
+      />
+    </span>
   )
 }

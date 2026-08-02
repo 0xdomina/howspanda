@@ -2,6 +2,8 @@ import { clx } from "@medusajs/ui"
 
 import { getProductPrice } from "@lib/util/get-product-price"
 import { HttpTypes } from "@medusajs/types"
+import MoneyText from "@modules/common/components/money-text"
+import MoneySkeleton from "@modules/common/components/money-skeleton"
 
 export default function ProductPrice({
   product,
@@ -18,40 +20,45 @@ export default function ProductPrice({
   const selectedPrice = variant ? variantPrice : cheapestPrice
 
   if (!selectedPrice) {
-    return <div className="block w-32 h-9 bg-gray-100 animate-pulse" />
+    return (
+      <div className="flex flex-col gap-1">
+        <MoneySkeleton width={96} />
+        <MoneySkeleton width={56} />
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col text-ui-fg-base">
+    <div className="flex flex-col gap-1 text-ink">
       <span
-        className={clx("text-xl-semi", {
-          "text-ui-fg-interactive": selectedPrice.price_type === "sale",
-        })}
+        className={clx(
+          "money text-2xl font-medium tracking-tight",
+          selectedPrice.price_type === "sale" && "text-semantic-danger"
+        )}
+        data-testid="product-price"
+        data-value={selectedPrice.calculated_price_number}
       >
         {!variant && "From "}
-        <span
-          data-testid="product-price"
-          data-value={selectedPrice.calculated_price_number}
-        >
-          {selectedPrice.calculated_price}
-        </span>
+        <MoneyText
+          amount={selectedPrice.calculated_price_number}
+          currency_code={selectedPrice.currency_code}
+        />
       </span>
       {selectedPrice.price_type === "sale" && (
-        <>
-          <p>
-            <span className="text-ui-fg-subtle">Original: </span>
-            <span
+        <span className="flex items-center gap-2">
+          <span className="text-sm text-ink-muted">
+            <MoneyText
+              amount={selectedPrice.original_price_number}
+              currency_code={selectedPrice.currency_code}
               className="line-through"
               data-testid="original-product-price"
               data-value={selectedPrice.original_price_number}
-            >
-              {selectedPrice.original_price}
-            </span>
-          </p>
-          <span className="text-ui-fg-interactive">
+            />
+          </span>
+          <span className="text-sm font-medium text-semantic-success">
             -{selectedPrice.percentage_diff}%
           </span>
-        </>
+        </span>
       )}
     </div>
   )
