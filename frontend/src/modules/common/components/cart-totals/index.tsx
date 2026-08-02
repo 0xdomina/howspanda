@@ -1,6 +1,6 @@
 "use client"
 
-import { convertToLocale } from "@lib/util/money"
+import MoneyText from "@modules/common/components/money-text"
 import React from "react"
 
 type CartTotalsProps = {
@@ -15,6 +15,19 @@ type CartTotalsProps = {
   }
 }
 
+const Row = ({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) => (
+  <div className="flex items-center justify-between">
+    <span>{label}</span>
+    <span>{children}</span>
+  </div>
+)
+
 const CartTotals: React.FC<CartTotalsProps> = ({ totals }) => {
   const {
     currency_code,
@@ -27,54 +40,55 @@ const CartTotals: React.FC<CartTotalsProps> = ({ totals }) => {
 
   return (
     <div>
-      <div className="flex flex-col gap-y-2 txt-medium text-ui-fg-subtle ">
-        <div className="flex items-center justify-between">
-          <span>Subtotal (excl. shipping and taxes)</span>
-          <span data-testid="cart-subtotal" data-value={item_subtotal || 0}>
-            {convertToLocale({ amount: item_subtotal ?? 0, currency_code })}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Shipping</span>
-          <span data-testid="cart-shipping" data-value={shipping_subtotal || 0}>
-            {convertToLocale({ amount: shipping_subtotal ?? 0, currency_code })}
-          </span>
-        </div>
+      <div className="flex flex-col gap-y-2 text-sm text-ink-muted">
+        <Row label="Items">
+          <MoneyText
+            amount={item_subtotal ?? 0}
+            currency_code={currency_code}
+            data-testid="cart-subtotal"
+            data-value={item_subtotal || 0}
+          />
+        </Row>
+        <Row label="Shipping">
+          <MoneyText
+            amount={shipping_subtotal ?? 0}
+            currency_code={currency_code}
+            data-testid="cart-shipping"
+            data-value={shipping_subtotal || 0}
+          />
+        </Row>
         {!!discount_subtotal && (
-          <div className="flex items-center justify-between">
-            <span>Discount</span>
-            <span
-              className="text-ui-fg-interactive"
+          <Row label="Discount">
+            <MoneyText
+              amount={discount_subtotal ?? 0}
+              currency_code={currency_code}
+              className="text-semantic-success"
               data-testid="cart-discount"
               data-value={discount_subtotal || 0}
-            >
-              -{" "}
-              {convertToLocale({
-                amount: discount_subtotal ?? 0,
-                currency_code,
-              })}
-            </span>
-          </div>
+            />
+          </Row>
         )}
-        <div className="flex justify-between">
-          <span className="flex gap-x-1 items-center ">Taxes</span>
-          <span data-testid="cart-taxes" data-value={tax_total || 0}>
-            {convertToLocale({ amount: tax_total ?? 0, currency_code })}
-          </span>
-        </div>
+        <Row label="Taxes">
+          <MoneyText
+            amount={tax_total ?? 0}
+            currency_code={currency_code}
+            data-testid="cart-taxes"
+            data-value={tax_total || 0}
+          />
+        </Row>
       </div>
-      <div className="h-px w-full border-b border-gray-200 my-4" />
-      <div className="flex items-center justify-between text-ui-fg-base mb-2 txt-medium ">
-        <span>Total</span>
-        <span
-          className="txt-xlarge-plus"
+      <div className="my-4 h-px w-full border-b border-ink-hairline" />
+      <div className="mb-2 flex items-center justify-between text-ink">
+        <span className="text-sm font-medium">Total</span>
+        <MoneyText
+          amount={total ?? 0}
+          currency_code={currency_code}
+          className="text-xl font-semibold"
           data-testid="cart-total"
           data-value={total || 0}
-        >
-          {convertToLocale({ amount: total ?? 0, currency_code })}
-        </span>
+        />
       </div>
-      <div className="h-px w-full border-b border-gray-200 mt-4" />
+      <div className="mt-4 h-px w-full border-b border-ink-hairline" />
     </div>
   )
 }

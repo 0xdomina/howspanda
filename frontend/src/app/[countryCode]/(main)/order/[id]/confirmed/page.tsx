@@ -4,11 +4,11 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 type Props = {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string; countryCode: string }>
 }
 export const metadata: Metadata = {
   title: "Order Confirmed",
-  description: "You purchase was successful",
+  description: "Your purchase was successful",
 }
 
 export default async function OrderConfirmedPage(props: Props) {
@@ -19,5 +19,5 @@ export default async function OrderConfirmedPage(props: Props) {
     return notFound()
   }
 
-  return <OrderCompletedTemplate order={order} />
+  return <OrderCompletedTemplate order={order} countryCode={params.countryCode} />
 }

@@ -1,4 +1,3 @@
-import { Heading } from "@medusajs/ui"
 import { cookies as nextCookies } from "next/headers"
 
 import CartTotals from "@modules/common/components/cart-totals"
@@ -6,40 +5,58 @@ import Help from "@modules/order/components/help"
 import Items from "@modules/order/components/items"
 import OnboardingCta from "@modules/order/components/onboarding-cta"
 import OrderDetails from "@modules/order/components/order-details"
+import ShareButton from "@modules/common/components/share-button"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
 import { HttpTypes } from "@medusajs/types"
+import { getBaseURL } from "@lib/util/env"
 
 type OrderCompletedTemplateProps = {
   order: HttpTypes.StoreOrder
+  countryCode?: string
 }
 
 export default async function OrderCompletedTemplate({
   order,
+  countryCode = "en",
 }: OrderCompletedTemplateProps) {
   const cookies = await nextCookies()
 
   const isOnboarding = cookies.get("_medusa_onboarding")?.value === "true"
+
+  const shareText = `My order on How's u is confirmed.`
 
   return (
     <div className="py-6 min-h-[calc(100vh-64px)]">
       <div className="content-container flex flex-col justify-center items-center gap-y-10 max-w-4xl h-full w-full">
         {isOnboarding && <OnboardingCta orderId={order.id} />}
         <div
-          className="flex flex-col gap-4 max-w-4xl h-full bg-white w-full py-10"
+          className="flex flex-col gap-4 max-w-4xl h-full bg-paper-surface w-full py-10"
           data-testid="order-complete-container"
         >
-          <Heading
-            level="h1"
-            className="flex flex-col gap-y-3 text-ui-fg-base text-3xl mb-4"
-          >
-            <span>Thank you!</span>
-            <span>Your order was placed successfully.</span>
-          </Heading>
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="font-display text-3xl font-medium tracking-tight text-ink">
+                Order confirmed
+              </h1>
+              <p className="mt-1 text-sm text-ink-muted">
+                {order.email ? `A confirmation was sent to ${order.email}.` : "A confirmation is on its way."}
+              </p>
+            </div>
+            <ShareButton
+              entity="order"
+              entityId={order.id}
+              payload={{
+                url: `${getBaseURL()}/${countryCode}/order/${order.id}/confirmed`,
+                text: shareText,
+                title: "Order confirmed",
+              }}
+            />
+          </div>
           <OrderDetails order={order} />
-          <Heading level="h2" className="flex flex-row text-3xl-regular">
+          <h2 className="font-display text-2xl font-medium tracking-tight text-ink">
             Summary
-          </Heading>
+          </h2>
           <Items order={order} />
           <CartTotals totals={order} />
           <ShippingDetails order={order} />
