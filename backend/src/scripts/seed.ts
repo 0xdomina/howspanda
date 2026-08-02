@@ -22,6 +22,7 @@ import {
   createTaxRegionsWorkflow,
   linkSalesChannelsToApiKeyWorkflow,
   linkSalesChannelsToStockLocationWorkflow,
+  updateRegionsWorkflow,
   updateStoresStep,
   updateStoresWorkflow,
 } from "@medusajs/medusa/core-flows";
@@ -159,6 +160,27 @@ export default async function seedDemoData({ container }: ExecArgs) {
     existingRegions.find((existing) => existing.name === "Nigeria") ??
     createdRegions.find((created) => created.name === "Nigeria")!;
   logger.info("Finished seeding regions.");
+
+  // Ensure the frictionless USDC rail is enabled on the Nigeria region even when
+  // the region already exists from an earlier seed (createRegionsWorkflow only
+  // sets providers at creation time). Idempotent: re-setting the same set is a
+  // no-op.
+  if (nigeriaRegion) {
+    await updateRegionsWorkflow(container).run({
+      input: {
+        selector: { id: nigeriaRegion.id },
+        update: {
+          payment_providers: [
+            "pp_paystack_paystack",
+            "pp_flutterwave_flutterwave",
+            "pp_crypto-usdc_crypto-usdc",
+            "pp_system_default",
+          ],
+        },
+      },
+    });
+  }
+  logger.info("Ensured Nigeria payment providers are enabled.");
 
   logger.info("Seeding tax regions...");
   const taxCountries = [...countries, "ng"];
