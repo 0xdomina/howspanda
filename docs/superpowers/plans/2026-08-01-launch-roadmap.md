@@ -7,9 +7,9 @@
 
 **Status snapshot (as of this file's last update):**
 - Phases 1–13 are **implemented and green**; **Phase 14 is implemented and green**: phone-or-email signup (custom `phone` auth provider), mobile-first listing (photo + price + description), progressive KYC keyed by the signup identifier where the credential itself IS the verified contact and KYC only covers the complementary identifier + identity (OTP seam wired but OFF by default via `KYC_VERIFICATION_ENABLED`), configurable courier gate, seller level on `/sellers/me`.
-- Integration tests: **14 suites / 151 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
-- Phase 14 is **uncommitted** (auth-phone provider, seller phone column, KYC identifier-aware rework, mobile listing, migrations, `onboarding.spec.ts` pending a conventional commit).
-- Head commits: `1ad873d` (feat kyc Phase 14), `25a3d50` (feat ai Phase 13), `0076159` (feat delivery Phase 12 chat/POD).
+- **Phase 15 — Wallet withdrawal rail is implemented and green**: `buyer_withdrawal_account` + `buyer_withdrawal` models/migration, `create-buyer-withdrawal` workflow (idempotency guard → prepare → debit wallet → record → Paystack/Circle rail, with wallet + row compensations), `/store/wallet` routes (balance/ledger GET, accounts GET/POST, withdrawals GET/POST), and the payout webhook + reconcile extended to route `bw_` buyer withdrawals. Covered by `integration-tests/http/wallet.spec.ts` (10 tests).
+- Integration tests: **15 suites / 161 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
+- Head commit: `cc27538` (feat marketplace Phase 14 onboarding). The wallet withdrawal rail + roadmap update are uncommitted.
 
 ---
 
@@ -246,7 +246,12 @@ Convert a great local MVP into something that can take real money and real users
       retries/idempotency, payout accounts real. Crypto (Circle) quotes from a real oracle,
       not the hardcoded placeholder.
 - [ ] **Wallet withdrawal rail**: buyer-wallet balances can actually withdraw via Paystack
-      Transfers (the documented stub becomes real).
+      Transfers. DONE — Phase 15 buyer-wallet withdrawal rail shipped: `buyer_withdrawal_account`
+      + `buyer_withdrawal` models, `create-buyer-withdrawal` workflow (idempotency guard → prepare →
+      debit wallet → record → rail, with wallet/row compensations), `/store/wallet` routes
+      (balance/ledger GET, accounts GET/POST, withdrawals GET/POST), Paystack/Circle rails
+      (Paystack Transfers + crypto settlement), webhook + reconcile extended to route `bw_`
+      withdrawals. Covered by `integration-tests/http/wallet.spec.ts` (10 tests).
 - [ ] **Deploy infra**: backend Dockerfile, hosted Postgres + Redis, CI/CD pipeline,
       environment-secret management. (Currently `docker compose` local only.)
 - [ ] **Security pass**: real JWT/COOKIE secrets, tightened CORS, rate limiting on

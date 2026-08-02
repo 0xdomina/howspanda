@@ -78,6 +78,24 @@ export const PostSellerPayoutSchema = z.object({
   idempotency_key: z.string().optional(),
 })
 
+// Buyer wallet withdrawal (Phase 15): email is the ownership proof, mirroring
+// the store wallet credit routes (mall prizes, delivery payouts).
+export const PostWalletWithdrawalAccountSchema = z.object({
+  buyerEmail: z.string().email(),
+  type: z.enum(["bank_account", "crypto_address"]),
+  bank_code: z.string().min(3).optional(),
+  account_number: z.string().regex(/^\d{10}$/, "NUBAN is 10 digits").optional(),
+  network: z.enum(["base", "solana"]).optional(),
+  address: z.string().min(10).optional(),
+})
+
+export const PostWalletWithdrawalSchema = z.object({
+  buyerEmail: z.string().email(),
+  rail: z.enum(["paystack", "crypto-usdc"]),
+  amount: z.number().positive(),
+  idempotency_key: z.string().optional(),
+})
+
 // Buyer escrow actions (guest checkout): email is the ownership proof
 export const PostConfirmReceiptSchema = z.object({
   email: z.string().email(),
@@ -367,6 +385,16 @@ export default defineMiddlewares({
       matcher: "/sellers/payouts",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostSellerPayoutSchema)],
+    },
+    {
+      matcher: "/store/wallet/withdrawal-accounts",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostWalletWithdrawalAccountSchema)],
+    },
+    {
+      matcher: "/store/wallet/withdrawals",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostWalletWithdrawalSchema)],
     },
     {
       matcher: "/store/orders/:id/confirm-receipt",

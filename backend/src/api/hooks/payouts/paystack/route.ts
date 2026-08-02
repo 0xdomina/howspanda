@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
 import MarketplaceModuleService from "../../../../modules/marketplace/service"
+import { BUYER_WALLET_MODULE } from "../../../../modules/buyer-wallet"
+import BuyerWalletModuleService from "../../../../modules/buyer-wallet/service"
 import { isMockMode } from "../../../../lib/payments/payouts/paystack-transfers"
 
 type TransferWebhookBody = {
@@ -39,10 +41,11 @@ function isValidSignature(
 }
 
 /**
- * Paystack transfer webhook — the transfer reference IS the payout id, so
- * each event maps straight onto a payout transition. Unknown events and
- * unknown references are acked with 200 (never 500 to the gateway);
- * reconcile picks up anything a webhook misses.
+ * Paystack transfer webhook — the transfer reference IS the payout id or the
+ * buyer-withdrawal id (distinguished by the `po_`/`bw_` prefix), so each event
+ * maps straight onto a record transition. Unknown events and unknown
+ * references are acked with 200 (never 500 to the gateway); reconcile picks
+ * up anything a webhook misses.
  */
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   if (!isMockMode()) {
@@ -58,19 +61,34 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const event = String(body.event ?? "")
   const reference = String(body.data?.reference ?? "")
 
-  const marketplace =
-    req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
-
   try {
-    if (event === "transfer.success") {
-      await marketplace.markPayoutPaid(reference)
-    } else if (event === "transfer.failed") {
-      await marketplace.markPayoutFailed(
-        reference,
-        String(body.data?.reason ?? "transfer failed")
+    if (reference.startsWith("bw_")) {
+      const buyerWallet = req.scope.resolve<BuyerWalletModuleService>(
+        BUYER_WALLET_MODULE
       )
-    } else if (event === "transfer.reversed") {
-      await marketplace.markPayoutReversed(reference)
+      if (event === "transfer.success") {
+        await buyerWallet.markBuyerWithdrawalPaid(reference)
+      } else if (event === "transfer.failed") {
+        await buyerWallet.markBuyerWithdrawalFailed(
+          reference,
+          String(body.data?.reason ?? "transfer failed")
+        )
+      } else if (event === "transfer.reversed") {
+        await buyerWallet.markBuyerWithdrawalReversed(reference)
+      }
+    } else {
+      const marketplace =
+        req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
+      if (event === "transfer.success") {
+        await marketplace.markPayoutPaid(reference)
+      } else if (event === "transfer.failed") {
+        await marketplace.markPayoutFailed(
+          reference,
+          String(body.data?.reason ?? "transfer failed")
+        )
+      } else if (event === "transfer.reversed") {
+        await marketplace.markPayoutReversed(reference)
+      }
     }
   } catch {
     // unknown reference or bad state — ack anyway, reconcile will settle it

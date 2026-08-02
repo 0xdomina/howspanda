@@ -1,6 +1,8 @@
 import { MedusaContainer } from "@medusajs/framework/types"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import MarketplaceModuleService from "../../../modules/marketplace/service"
+import { BUYER_WALLET_MODULE } from "../../../modules/buyer-wallet"
+import BuyerWalletModuleService from "../../../modules/buyer-wallet/service"
 import { getCryptoSettlement } from "../crypto"
 import { verifyTransfer } from "./paystack-transfers"
 
@@ -82,6 +84,98 @@ export async function reconcilePayouts(
     summary.checked += 1
     try {
       const updated = await reconcilePayout(container, payout.id)
+      if (updated.status === "paid") {
+        summary.paid += 1
+      } else if (
+        updated.status === "failed" ||
+        updated.status === "reversed"
+      ) {
+        summary.failed += 1
+      }
+    } catch {
+      // rail hiccup — leave it processing, next run retries
+    }
+  }
+
+  return summary
+}
+
+/**
+ * Poll the rail for ONE buyer withdrawal and apply the provider's verdict via
+ * the idempotent transition methods. The provider reference is always the
+ * withdrawal id, so replays can never double-pay.
+ */
+export async function reconcileBuyerWithdrawal(
+  container: MedusaContainer,
+  withdrawalId: string
+) {
+  const buyerWallet =
+    container.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
+  const withdrawal = await buyerWallet.retrieveBuyerWithdrawal(withdrawalId, {
+    relations: ["wallet"],
+  })
+
+  if (withdrawal.status !== "processing") {
+    return withdrawal
+  }
+
+  await buyerWallet.updateBuyerWithdrawals([
+    { id: withdrawal.id, attempts: Number(withdrawal.attempts ?? 0) + 1 },
+  ])
+
+  if (withdrawal.rail === "paystack") {
+    const verification = await verifyTransfer(withdrawal.id)
+    if (verification.status === "success") {
+      await buyerWallet.markBuyerWithdrawalPaid(withdrawal.id)
+    } else if (verification.status === "failed") {
+      await buyerWallet.markBuyerWithdrawalFailed(
+        withdrawal.id,
+        verification.failure_reason ?? "transfer failed"
+      )
+    } else if (verification.status === "reversed") {
+      await buyerWallet.markBuyerWithdrawalReversed(withdrawal.id)
+    }
+  } else {
+    const destination = withdrawal.destination as { network?: string } | null
+    const settlement = getCryptoSettlement(destination?.network)
+    const result = await settlement.checkWithdrawal(withdrawal.id)
+    if (result.status === "confirmed") {
+      await buyerWallet.markBuyerWithdrawalPaid(withdrawal.id)
+    } else if (result.status === "failed") {
+      await buyerWallet.markBuyerWithdrawalFailed(
+        withdrawal.id,
+        "on-chain withdrawal failed"
+      )
+    }
+  }
+
+  return await buyerWallet.retrieveBuyerWithdrawal(withdrawal.id, {
+    relations: ["wallet"],
+  })
+}
+
+/**
+ * Sweep every `processing` buyer withdrawal through reconcileBuyerWithdrawal.
+ * Per-row rail errors are swallowed (the withdrawal stays processing and is
+ * retried next run). Returns the number of rows checked, for logging.
+ */
+export async function reconcileBuyerWithdrawals(
+  container: MedusaContainer
+): Promise<ReconcileSummary> {
+  const buyerWallet =
+    container.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
+
+  const processing = await buyerWallet.listBuyerWithdrawals(
+    { status: "processing" },
+    { take: null }
+  )
+
+  const summary: ReconcileSummary = { checked: 0, paid: 0, failed: 0 }
+
+  for (const withdrawal of processing) {
+    summary.checked += 1
+    try {
+      const updated = await reconcileBuyerWithdrawal(container, withdrawal.id)
       if (updated.status === "paid") {
         summary.paid += 1
       } else if (

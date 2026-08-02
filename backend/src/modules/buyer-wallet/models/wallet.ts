@@ -1,5 +1,6 @@
 import { model } from "@medusajs/framework/utils"
 import WalletLedger from "./wallet-ledger"
+import BuyerWithdrawal from "./buyer-withdrawal"
 
 // A genuine per-buyer (email) balance — the withdrawal surface that unifies the
 // buyer-side rewards across the platform: campaign rewards (Phase 10), buyer
@@ -13,6 +14,9 @@ const Wallet = model.define("buyer_wallet", {
   currency_code: model.text().default("ngn"),
   balance: model.bigNumber().default(0),
   ledger: model.hasMany(() => WalletLedger, {
+    mappedBy: "wallet",
+  }),
+  withdrawals: model.hasMany(() => BuyerWithdrawal, {
     mappedBy: "wallet",
   }),
 })

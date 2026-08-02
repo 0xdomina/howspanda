@@ -1,7 +1,10 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
 import Wallet from "./models/wallet"
 import WalletLedger from "./models/wallet-ledger"
+import BuyerWithdrawal from "./models/buyer-withdrawal"
+import BuyerWithdrawalAccount from "./models/buyer-withdrawal-account"
 
+const DEFAULT_MIN_WITHDRAWAL_NGN = 1000
 const round2 = (n: number) => Math.round(n * 100) / 100
 
 export type WalletLedgerSource =
@@ -25,10 +28,17 @@ export type CreditInput = {
  * Buyer wallet: a genuine per-email balance + append-only ledger. It is the
  * single withdrawal surface for every buyer-side reward on the platform
  * (campaigns, tip credit notes, buyer-referrer rewards). The wallet is created
- * lazily on first credit. Withdrawal to a real fiat/crypto rail is a documented
- * stub for a later phase — balances are credited honestly, never faked.
+ * lazily on first credit. Withdrawal to a real fiat/crypto rail (Paystack
+ * Transfers / Circle) mirrors the seller payout lifecycle: the wallet is
+ * debited at request time, handed to the rail, and the balance is credited
+ * back only if the rail fails or reverses.
  */
-class BuyerWalletModuleService extends MedusaService({ Wallet, WalletLedger }) {
+class BuyerWalletModuleService extends MedusaService({
+  Wallet,
+  WalletLedger,
+  BuyerWithdrawal,
+  BuyerWithdrawalAccount,
+}) {
   /** Get-or-create the wallet for a buyer email. */
   async getOrCreate(buyerEmail: string, currencyCode = "ngn") {
     const email = buyerEmail.trim().toLowerCase()
@@ -123,6 +133,81 @@ class BuyerWalletModuleService extends MedusaService({ Wallet, WalletLedger }) {
       { wallet: wallet.id },
       { order: { created_at: "DESC" } }
     )
+  }
+
+  /** Minimum withdrawal amount, mirroring the seller payout minimum. */
+  withdrawalMinNgn(): number {
+    const parsed = Number(process.env.WALLET_WITHDRAW_MIN_NGN)
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DEFAULT_MIN_WITHDRAWAL_NGN
+  }
+
+  /**
+   * Idempotent withdrawal transitions (webhook + reconcile may race — a repeat
+   * of the same verdict is a no-op). `failed` and `reversed` credit the amount
+   * back into the wallet so the ledger can never disagree with the rows.
+   */
+  async markBuyerWithdrawalPaid(withdrawalId: string) {
+    const withdrawal = await this.retrieveBuyerWithdrawal(withdrawalId)
+    if (withdrawal.status === "paid") {
+      return withdrawal
+    }
+
+    const [updated] = await this.updateBuyerWithdrawals([
+      {
+        id: withdrawalId,
+        status: "paid" as const,
+        paid_at: new Date(),
+      },
+    ])
+    return updated
+  }
+
+  async markBuyerWithdrawalFailed(withdrawalId: string, reason: string) {
+    const withdrawal = await this.retrieveBuyerWithdrawal(withdrawalId, {
+      relations: ["wallet"],
+    })
+    if (withdrawal.status === "failed") {
+      return withdrawal
+    }
+
+    const [updated] = await this.updateBuyerWithdrawals([
+      { id: withdrawalId, status: "failed" as const, failure_reason: reason },
+    ])
+
+    if (withdrawal.status !== "paid") {
+      await this.credit({
+        buyerEmail: withdrawal.wallet.buyer_email,
+        amount: Number(withdrawal.amount),
+        source: "adjustment",
+        reference: withdrawalId,
+      })
+    }
+
+    return updated
+  }
+
+  async markBuyerWithdrawalReversed(withdrawalId: string) {
+    const withdrawal = await this.retrieveBuyerWithdrawal(withdrawalId, {
+      relations: ["wallet"],
+    })
+    if (withdrawal.status === "reversed") {
+      return withdrawal
+    }
+
+    const [updated] = await this.updateBuyerWithdrawals([
+      { id: withdrawalId, status: "reversed" as const },
+    ])
+
+    await this.credit({
+      buyerEmail: withdrawal.wallet.buyer_email,
+      amount: Number(withdrawal.amount),
+      source: "adjustment",
+      reference: withdrawalId,
+    })
+
+    return updated
   }
 }
 
