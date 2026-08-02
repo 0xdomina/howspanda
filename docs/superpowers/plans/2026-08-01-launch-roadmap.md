@@ -8,8 +8,8 @@
 **Status snapshot (as of this file's last update):**
 - Phases 1–13 are **implemented and green**; **Phase 14 is implemented and green**: phone-or-email signup (custom `phone` auth provider), mobile-first listing (photo + price + description), progressive KYC keyed by the signup identifier where the credential itself IS the verified contact and KYC only covers the complementary identifier + identity (OTP seam wired but OFF by default via `KYC_VERIFICATION_ENABLED`), configurable courier gate, seller level on `/sellers/me`.
 - **Phase 15 — Wallet withdrawal rail is implemented and green**: `buyer_withdrawal_account` + `buyer_withdrawal` models/migration, `create-buyer-withdrawal` workflow (idempotency guard → prepare → debit wallet → record → Paystack/Circle rail, with wallet + row compensations), `/store/wallet` routes (balance/ledger GET, accounts GET/POST, withdrawals GET/POST), and the payout webhook + reconcile extended to route `bw_` buyer withdrawals. Covered by `integration-tests/http/wallet.spec.ts` (10 tests).
-- Integration tests: **15 suites / 161 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
-- Head commit: `cc27538` (feat marketplace Phase 14 onboarding). The wallet withdrawal rail + roadmap update are uncommitted.
+- Integration tests: **15 suites / 164 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
+- Head commit: `cc27538` (feat marketplace Phase 14 onboarding). Committed so far this session: `943b78c` (buyer-wallet withdrawal rail). The webhook reliability pass + roadmap update are uncommitted.
 
 ---
 
@@ -244,7 +244,12 @@ Convert a great local MVP into something that can take real money and real users
 ## Blocker checklist (must all be done)
 - [ ] **Real payments**: Paystack (+ Flutterwave) live keys wired, webhooks reliable with
       retries/idempotency, payout accounts real. Crypto (Circle) quotes from a real oracle,
-      not the hardcoded placeholder.
+      not the hardcoded placeholder. Webhook reliability pass DONE — payout webhook now
+      distinguishes transient failures (500 → gateway retries) from permanent ones (unknown
+      event/reference → 200 ack), invalid signatures → 401, every event is structured-logged,
+      and transitions stay idempotent under redelivery. Money-in payment webhooks run through
+      the core delayed-emit + retry path with `WEBHOOK_DELAY_MS`/`WEBHOOK_RETRIES` wired from env.
+      Covered by `wallet.spec.ts` (13 tests, incl. 401/500/redelivery cases).
 - [ ] **Wallet withdrawal rail**: buyer-wallet balances can actually withdraw via Paystack
       Transfers. DONE — Phase 15 buyer-wallet withdrawal rail shipped: `buyer_withdrawal_account`
       + `buyer_withdrawal` models, `create-buyer-withdrawal` workflow (idempotency guard → prepare →

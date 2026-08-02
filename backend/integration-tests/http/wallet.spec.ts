@@ -311,26 +311,6 @@ medusaIntegrationTestRunner({
         expect(await buyerWallet.balance(EMAIL)).toEqual(25_000)
       })
 
-      it("acks unknown webhook events and unknown references without touching state", async () => {
-        const unknownEvent = await api.post(
-          "/hooks/payouts/paystack",
-          { event: "transfer.on_hold", data: { reference: "bw_whatever" } },
-          storeHeaders
-        )
-        expect(unknownEvent.status).toEqual(200)
-
-        const unknownRef = await api.post(
-          "/hooks/payouts/paystack",
-          {
-            event: "transfer.success",
-            data: { reference: "bw_does_not_exist" },
-          },
-          storeHeaders
-        )
-        expect(unknownRef.status).toEqual(200)
-        expect(unknownRef.data.received).toBe(true)
-      })
-
       it("reconciles a processing crypto withdrawal to paid after two polls", async () => {
         const { data } = await api.post(
           "/store/wallet/withdrawals",
@@ -361,6 +341,103 @@ medusaIntegrationTestRunner({
 
         // paid — the debited amount stays out of the balance
         expect(await buyerWallet.balance(EMAIL)).toEqual(20_000) // 25k - 5k
+      })
+
+      it("acks ignored events and unknown references with 200 (permanent)", async () => {
+        const ignored = await api.post(
+          "/hooks/payouts/paystack",
+          { event: "transfer.on_hold", data: { reference: "bw_whatever" } },
+          storeHeaders
+        )
+        expect(ignored.status).toEqual(200)
+        expect(ignored.data.received).toBe(true)
+
+        const unknownRef = await api.post(
+          "/hooks/payouts/paystack",
+          {
+            event: "transfer.success",
+            data: { reference: "bw_does_not_exist" },
+          },
+          storeHeaders
+        )
+        expect(unknownRef.status).toEqual(200)
+        expect(unknownRef.data.received).toBe(true)
+      })
+
+      it("rejects an invalid signature with 401 in live mode", async () => {
+        // mock mode skips signature checks — flip to live for this one test
+        const prev = process.env.PAYSTACK_SECRET_KEY
+        process.env.PAYSTACK_SECRET_KEY = "live-secret"
+        try {
+          await expect(
+            api.post(
+              "/hooks/payouts/paystack",
+              {
+                event: "transfer.success",
+                data: { reference: "bw_whatever" },
+              },
+              storeHeaders
+            )
+          ).rejects.toMatchObject({ response: { status: 401 } })
+        } finally {
+          process.env.PAYSTACK_SECRET_KEY = prev
+        }
+      })
+
+      it("returns 500 on a transient processing failure so the gateway retries", async () => {
+        const spy = jest
+          .spyOn(buyerWallet, "markBuyerWithdrawalPaid")
+          .mockRejectedValue(new Error("db connection lost"))
+
+        try {
+          await expect(
+            api.post(
+              "/hooks/payouts/paystack",
+              {
+                event: "transfer.success",
+                data: { reference: "bw_whatever" },
+              },
+              storeHeaders
+            )
+          ).rejects.toMatchObject({
+            response: { status: 500 },
+          })
+        } finally {
+          spy.mockRestore()
+        }
+      })
+
+      it("redelivered verdicts are idempotent — a second transfer.success is a safe no-op", async () => {
+        const { data } = await api.post(
+          "/store/wallet/withdrawals",
+          {
+            buyerEmail: EMAIL,
+            rail: "paystack",
+            amount: 2_000,
+            idempotency_key: "spec-bw-redeliver",
+          },
+          storeHeaders
+        )
+        const withdrawalId = data.withdrawal.id
+
+        const first = await api.post(
+          "/hooks/payouts/paystack",
+          { event: "transfer.success", data: { reference: withdrawalId } },
+          storeHeaders
+        )
+        expect(first.status).toEqual(200)
+
+        // Paystack redelivers on timeout — the second delivery must be a no-op
+        const second = await api.post(
+          "/hooks/payouts/paystack",
+          { event: "transfer.success", data: { reference: withdrawalId } },
+          storeHeaders
+        )
+        expect(second.status).toEqual(200)
+
+        const paid = await buyerWallet.retrieveBuyerWithdrawal(withdrawalId)
+        expect(paid.status).toEqual("paid")
+        expect(await buyerWallet.balance(EMAIL)).toEqual(23_000) // 25k - 2k
       })
     })
   },

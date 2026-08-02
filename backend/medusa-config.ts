@@ -79,6 +79,12 @@ module.exports = defineConfig({
     {
       resolve: "@medusajs/medusa/payment",
       options: {
+        // Money-in webhook reliability: how long the core route delays the
+        // event before processing and how many delivery attempts it gets.
+        // The subscriber's processPaymentWorkflow is idempotent per session,
+        // so redeliveries are safe.
+        webhook_delay: Number(process.env.WEBHOOK_DELAY_MS ?? 5000),
+        webhook_retries: Number(process.env.WEBHOOK_RETRIES ?? 3),
         providers: [
           {
             resolve: "./src/modules/payment-providers/paystack",
