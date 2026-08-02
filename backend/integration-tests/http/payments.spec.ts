@@ -42,7 +42,7 @@ const initInput = (amount: number, extra: Record<string, any> = {}) =>
  * so it carries no Nigeria region / shipping to complete a real cart here).
  */
 describe("Payments — fee routing", () => {
-  it("ranks fiat cheapest-first and recommends the cheapest FIAT rail at ₦10k", () => {
+  it("ranks cheapest-first and recommends the zero-fee USDC rail at ₦10k", () => {
     // ₦10,000 = 1,000,000 kobo
     const options = rankProviders(1_000_000, [
       PAYSTACK_ID,
@@ -63,13 +63,13 @@ describe("Payments — fee routing", () => {
       25_000
     )
 
-    // crypto is cheapest but never the silent default; the cheapest FIAT rail is
+    // USDC is the frictionless managed-wallet default — cheapest AND recommended.
     const recommended = options.filter((o) => o.recommended)
     expect(recommended).toHaveLength(1)
-    expect(recommended[0].provider_id).toEqual(FLUTTERWAVE_ID)
+    expect(recommended[0].provider_id).toEqual(CRYPTO_USDC_ID)
     expect(
       options.find((o) => o.provider_id === CRYPTO_USDC_ID)!.recommended
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it("lists crypto only when it is among the enabled providers", () => {
