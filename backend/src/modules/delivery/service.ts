@@ -112,6 +112,14 @@ class DeliveryModuleService extends MedusaService({
     return jobs
   }
 
+  /** A store owner's own delivery jobs (seller view), newest first. */
+  async listJobsForSeller(sellerId: string) {
+    return await this.listDeliveryJobs(
+      { seller_id: sellerId },
+      { order: { created_at: "DESC" }, take: 100, relations: ["offers", "parties"] }
+    )
+  }
+
   async getJob(jobId: string) {
     const jobs = await this.listDeliveryJobs(
       { id: jobId },

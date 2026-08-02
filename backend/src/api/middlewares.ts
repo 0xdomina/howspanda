@@ -702,6 +702,11 @@ export default defineMiddlewares({
       ],
     },
     {
+      matcher: "/store/delivery-jobs/mine",
+      methods: ["GET"],
+      middlewares: [authenticate("seller", ["session", "bearer"])],
+    },
+    {
       matcher: "/store/delivery-jobs/:id/offers",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostDeliveryOfferSchema)],
