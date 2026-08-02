@@ -9,13 +9,15 @@ const CODE_LIFETIME_MS = 15 * 60 * 1000
 export type KycLevel = "unverified" | "phone_verified" | "identity_verified"
 
 export type KycProfileView = {
-  email: string
+  email: string | null
   phone: string | null
   level: KycLevel
+  email_verified: boolean
   phone_verified: boolean
   id_type: string | null
   id_tail: string | null
   id_status: string
+  email_verified_at: string | null
   phone_verified_at: string | null
   id_submitted_at: string | null
   id_reviewed_at: string | null
@@ -56,25 +58,76 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
     return process.env.KYC_COURIER_GATE_ENABLED === "true"
   }
 
-  async getOrCreateProfile(email: string) {
-    const normalized = email.trim().toLowerCase()
-    const existing = await this.listKycProfiles(
-      { email: normalized },
-      { take: 1 }
-    )
-    if (existing[0]) {
-      return existing[0]
+  /**
+   * Find or create a KYC profile by email and/or phone. The profile is keyed
+   * by whichever identifier the seller signed up with; the other identifier is
+   * filled in later when it is verified during KYC.
+   */
+  async getOrCreateProfile(input: {
+    email?: string | null
+    phone?: string | null
+  }) {
+    const email = input.email?.trim().toLowerCase() || null
+    const phone = input.phone?.trim() || null
+
+    let existing: {
+      id: string
+      email: string | null
+      phone: string | null
+      email_verified_at: Date | null
+      phone_verified_at: Date | null
+      id_status: string
+    } | null = null
+    if (email) {
+      const byEmail = await this.listKycProfiles({ email }, { take: 1 })
+      existing = byEmail[0] ?? null
     }
-    const created = await this.createKycProfiles({ email: normalized })
-    return created
+    if (!existing && phone) {
+      const byPhone = await this.listKycProfiles({ phone }, { take: 1 })
+      existing = byPhone[0] ?? null
+    }
+    if (existing) {
+      // Merge a newly-provided complementary identifier onto the profile.
+      if (email && !existing.email && email !== existing.email) {
+        return this.updateKycProfiles({ id: existing.id, email })
+      }
+      if (phone && !existing.phone && phone !== existing.phone) {
+        return this.updateKycProfiles({ id: existing.id, phone })
+      }
+      return existing
+    }
+    return this.createKycProfiles({
+      email,
+      phone,
+    })
   }
 
-  async getProfileView(email: string): Promise<KycProfileView | null> {
-    const normalized = email.trim().toLowerCase()
-    const [profile] = await this.listKycProfiles(
-      { email: normalized },
-      { take: 1 }
-    )
+  async getProfileView(input: {
+    email?: string | null
+    phone?: string | null
+  }): Promise<KycProfileView | null> {
+    const email = input.email?.trim().toLowerCase() || null
+    const phone = input.phone?.trim() || null
+
+    let profile: {
+      email: string | null
+      phone: string | null
+      email_verified_at: Date | null
+      phone_verified_at: Date | null
+      id_type: string | null
+      id_tail: string | null
+      id_status: string
+      id_submitted_at: Date | null
+      id_reviewed_at: Date | null
+    } | null = null
+    if (email) {
+      const byEmail = await this.listKycProfiles({ email }, { take: 1 })
+      profile = byEmail[0] ?? null
+    }
+    if (!profile && phone) {
+      const byPhone = await this.listKycProfiles({ phone }, { take: 1 })
+      profile = byPhone[0] ?? null
+    }
     if (!profile) {
       return null
     }
@@ -82,10 +135,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       email: profile.email,
       phone: profile.phone,
       level: computeLevel(profile),
+      email_verified: !!profile.email_verified_at,
       phone_verified: !!profile.phone_verified_at,
       id_type: profile.id_type,
       id_tail: profile.id_tail,
       id_status: profile.id_status,
+      email_verified_at: profile.email_verified_at
+        ? profile.email_verified_at.toISOString()
+        : null,
       phone_verified_at: profile.phone_verified_at
         ? profile.phone_verified_at.toISOString()
         : null,
@@ -104,16 +161,23 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    * box. Returns the raw code ONLY in mock/dev mode so tests can assert on it.
    */
   async requestOtp(input: {
-    email: string
+    email?: string | null
+    phone?: string | null
     channel: "email" | "phone"
     destination: string
   }): Promise<{ code: string | null }> {
-    const normalized = input.email.trim().toLowerCase()
     const code = String(randomInt(0, 1000000)).padStart(6, "0")
 
-    const profile = await this.getOrCreateProfile(normalized)
+    const profile = await this.getOrCreateProfile({
+      email: input.email,
+      phone: input.phone,
+    })
+    // OTPs are keyed by the profile's primary email (the seller's KYC key),
+    // but a phone-first seller has no email yet — key by phone then.
+    const otpKey = profile.email ?? profile.phone ?? ""
+
     await this.createKycOtps({
-      email: normalized,
+      email: otpKey,
       channel: input.channel,
       destination: input.destination.trim(),
       code_hash: createHash("sha256").update(code).digest("hex"),
@@ -130,31 +194,31 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       code,
     })
 
-    if (input.channel === "phone") {
-      await this.updateKycProfiles({
-        id: profile.id,
-        phone: input.destination.trim(),
-      })
-    }
-
     return { code: deliveredCode }
   }
 
   /**
-   * Verify a presented code. Success bumps the ladder (phone_verified);
-   * failures are rejected with a clear message. Codes are single-use.
+   * Verify a presented code. Success bumps the ladder for the verified
+   * identifier (email_verified / phone_verified). The signup identifier is
+   * never re-verified here — KYC only covers the complementary identifier.
+   * Codes are single-use.
    */
   async verifyOtp(input: {
-    email: string
+    email?: string | null
+    phone?: string | null
     channel: "email" | "phone"
     destination: string
     code: string
   }): Promise<{ ok: boolean; profile: KycProfileView }> {
-    const normalized = input.email.trim().toLowerCase()
+    const profile = await this.getOrCreateProfile({
+      email: input.email,
+      phone: input.phone,
+    })
+    const otpKey = profile.email ?? profile.phone ?? ""
 
     const [otp] = await this.listKycOtps(
       {
-        email: normalized,
+        email: otpKey,
         channel: input.channel,
         destination: input.destination.trim(),
         status: "active",
@@ -181,16 +245,27 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       used_at: new Date(),
     })
 
-    const profile = await this.getOrCreateProfile(normalized)
     if (input.channel === "phone") {
       await this.updateKycProfiles({
         id: profile.id,
         phone: input.destination.trim(),
         phone_verified_at: new Date(),
       })
+    } else if (input.channel === "email") {
+      await this.updateKycProfiles({
+        id: profile.id,
+        email: input.destination.trim().toLowerCase(),
+        email_verified_at: new Date(),
+      })
     }
 
-    return { ok: true, profile: (await this.getProfileView(normalized))! }
+    return {
+      ok: true,
+      profile: (await this.getProfileView({
+        email: profile.email,
+        phone: profile.phone,
+      }))!,
+    }
   }
 
   /**
@@ -199,11 +274,11 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    * review (or a provider match) flips them to verified later.
    */
   async submitIdentity(input: {
-    email: string
+    email?: string | null
+    phone?: string | null
     id_type: string
     id_number: string
   }): Promise<{ ok: boolean; profile: KycProfileView }> {
-    const normalized = input.email.trim().toLowerCase()
     if (input.id_type !== "nin") {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
@@ -217,7 +292,10 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       )
     }
 
-    const profile = await this.getOrCreateProfile(normalized)
+    const profile = await this.getOrCreateProfile({
+      email: input.email,
+      phone: input.phone,
+    })
     await this.updateKycProfiles({
       id: profile.id,
       id_type: "nin",
@@ -226,7 +304,13 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       id_submitted_at: new Date(),
     })
 
-    return { ok: true, profile: (await this.getProfileView(normalized))! }
+    return {
+      ok: true,
+      profile: (await this.getProfileView({
+        email: profile.email,
+        phone: profile.phone,
+      }))!,
+    }
   }
 
   /**
@@ -234,11 +318,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    * is where a future NIN provider match would also land.
    */
   async reviewIdentity(input: {
-    email: string
+    email?: string | null
+    phone?: string | null
     decision: "verified" | "rejected"
   }): Promise<{ ok: boolean; profile: KycProfileView }> {
-    const normalized = input.email.trim().toLowerCase()
-    const profile = await this.getOrCreateProfile(normalized)
+    const profile = await this.getOrCreateProfile({
+      email: input.email,
+      phone: input.phone,
+    })
     if (profile.id_status === "none") {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
@@ -250,7 +337,13 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       id_status: input.decision,
       id_reviewed_at: new Date(),
     })
-    return { ok: true, profile: (await this.getProfileView(normalized))! }
+    return {
+      ok: true,
+      profile: (await this.getProfileView({
+        email: profile.email,
+        phone: profile.phone,
+      }))!,
+    }
   }
 
   /**
@@ -258,7 +351,7 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    * the gate is enabled and the courier is not at least phone-verified.
    */
   async assertCourierKyc(email: string): Promise<void> {
-    const profile = await this.getProfileView(email)
+    const profile = await this.getProfileView({ email })
     if (!profile || !profile.phone_verified) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
@@ -266,6 +359,39 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
         "kyc_required"
       )
     }
+  }
+
+  /**
+   * Called when a seller account is created. The identifier they signed up
+   * with (email or phone) is already verified — the login credential proves
+   * ownership — so it is marked verified immediately and KYC never asks for
+   * it again. The complementary identifier is left unverified for KYC.
+   */
+  async seedSignupIdentifier(input: {
+    email?: string | null
+    phone?: string | null
+  }): Promise<KycProfileView> {
+    const profile = await this.getOrCreateProfile({
+      email: input.email,
+      phone: input.phone,
+    })
+    if (input.phone) {
+      await this.updateKycProfiles({
+        id: profile.id,
+        phone: input.phone.trim(),
+        phone_verified_at: profile.phone_verified_at ?? new Date(),
+      })
+    } else if (input.email) {
+      await this.updateKycProfiles({
+        id: profile.id,
+        email: input.email.trim().toLowerCase(),
+        email_verified_at: profile.email_verified_at ?? new Date(),
+      })
+    }
+    return (await this.getProfileView({
+      email: profile.email ?? input.email,
+      phone: profile.phone ?? input.phone,
+    }))!
   }
 }
 

@@ -18,7 +18,7 @@ export const GET = async (
 
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
-    fields: ["id", "first_name", "last_name", "email", "seller.*"],
+    fields: ["id", "first_name", "last_name", "email", "phone", "seller.*"],
     filters: {
       id: [req.auth_context.actor_id],
     },
@@ -31,7 +31,10 @@ export const GET = async (
     )
   }
 
-  const kycProfile = await kyc.getProfileView(sellerAdmin.email)
+  const kycProfile = await kyc.getProfileView({
+    email: sellerAdmin.email,
+    phone: sellerAdmin.phone,
+  })
 
   res.json({
     seller_admin: sellerAdmin,

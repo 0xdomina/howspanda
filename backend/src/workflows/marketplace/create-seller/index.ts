@@ -9,6 +9,7 @@ import {
 } from "@medusajs/medusa/core-flows"
 import createSellerAdminStep from "./steps/create-seller-admin"
 import createSellerStep from "./steps/create-seller"
+import seedSellerKycStep from "./steps/seed-seller-kyc"
 
 export type CreateSellerWorkflowInput = {
   name: string
@@ -16,7 +17,8 @@ export type CreateSellerWorkflowInput = {
   logo?: string
   description?: string
   admin: {
-    email: string
+    email?: string
+    phone?: string
     first_name?: string
     last_name?: string
   }
@@ -49,6 +51,14 @@ const createSellerWorkflow = createWorkflow(
       authIdentityId: input.authIdentityId,
       actorType: "seller",
       value: sellerAdmin.id,
+    })
+
+    // The signup identifier (email or phone) is the seller's verified contact
+    // — the login credential proves ownership — so KYC seeds it as verified
+    // immediately. KYC then only covers the complementary identifier + identity.
+    seedSellerKycStep({
+      email: input.admin.email,
+      phone: input.admin.phone,
     })
 
     // @ts-ignore

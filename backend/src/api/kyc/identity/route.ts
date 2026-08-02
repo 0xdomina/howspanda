@@ -17,6 +17,7 @@ export const POST = async (
 
   const result = await kyc.submitIdentity({
     email: body.email,
+    phone: body.phone,
     id_type: body.id_type,
     id_number: body.id_number,
   })

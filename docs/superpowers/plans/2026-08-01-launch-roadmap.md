@@ -6,10 +6,10 @@
 > this file, then the phase plan referenced by the current phase.
 
 **Status snapshot (as of this file's last update):**
-- Phases 1–13 are **implemented and green**; **Phase 14 KYC ladder is implemented** (couriers + sellers): progressive email-keyed ladder, OTP seam wired but OFF by default (`KYC_VERIFICATION_ENABLED`), configurable courier gate, seller level on `/sellers/me`.
-- Integration tests: **13 suites / 145 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
-- Phase 13 is committed; **Phase 14 KYC is uncommitted** (kyc module + routes pending a conventional commit).
-- Head commits: `25a3d50` (feat ai Phase 13), `0076159` (feat delivery Phase 12 chat/POD).
+- Phases 1–13 are **implemented and green**; **Phase 14 is implemented and green**: phone-or-email signup (custom `phone` auth provider), mobile-first listing (photo + price + description), progressive KYC keyed by the signup identifier where the credential itself IS the verified contact and KYC only covers the complementary identifier + identity (OTP seam wired but OFF by default via `KYC_VERIFICATION_ENABLED`), configurable courier gate, seller level on `/sellers/me`.
+- Integration tests: **14 suites / 151 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
+- Phase 14 is **uncommitted** (auth-phone provider, seller phone column, KYC identifier-aware rework, mobile listing, migrations, `onboarding.spec.ts` pending a conventional commit).
+- Head commits: `1ad873d` (feat kyc Phase 14), `25a3d50` (feat ai Phase 13), `0076159` (feat delivery Phase 12 chat/POD).
 
 ---
 
@@ -36,7 +36,7 @@ A marketplace where **informal sellers and buyers can win**, built on two pillar
 | 11 | P2P Delivery Core | 10 (wallet), 5 (payouts), 6 (escrow) | Job posting, matching, negotiation, escrow release — **DONE** (routes + `delivery.spec.ts` green) |
 | 12 | In-app Chat + POD verification | 11 | 3-way DM, timeline, in-app QR/OTP codes — **DONE** (chat + verify routes, party gating, POD payout) |
 | 13 | AI Seller Intelligence | 3 (existing AI) | Daily/weekly briefs, marketing helper, grounded recommendations — **DONE** (brief + recommendations routes, scheduled job, `ai.spec.ts` green) |
-| 14 | Frictionless Onboarding | 2 (marketplace auth) | Phone/email signup, mobile-first listing, progressive KYC — **KYC ladder + courier gate DONE** (phone signup/listing TODO) |
+| 14 | Frictionless Onboarding | 2 (marketplace auth) | Phone/email signup, mobile-first listing, progressive KYC — **DONE** (phone auth provider, seller phone column, mobile listing schema, identifier-aware KYC, `onboarding.spec.ts` green) |
 | 15 | Launch Gate | 11–14 | Live payments, deploy infra, hardening, GA checklist |
 
 Phases 11 → 12 are strictly sequential. **13, 14 can run in parallel** with 11/12
@@ -202,29 +202,37 @@ Sellers go live with **email-or-phone + password**, then later add bank details 
 and a few product photos. Progressive KYC (NIN etc.) is an unlock later, not a wall.
 
 ## Scope
-- **Phone signup**: extend the auth flow so a phone number can be the login identifier
-  (in-app verification code — same Phase 12 OTP pattern, no SMS cost; or email fallback). **TODO**
-- **Onboarding flow** (`POST /sellers` extend): email/phone + basic profile; payout account
-  setup is first-class but optional until first payout (Phase 5 already has payout accounts). **TODO**
-- **Mobile-first listing**: harden `POST /sellers/products` for photo + price + short
-  description (exists; verify the create-product workflow accepts this minimal shape). **TODO**
-- **Progressive verification ladder** — **DONE** (kyc module): email-keyed ladder
-  `unverified → phone_verified → identity_verified` (`kyc_profile` + `kyc_otp`, OTP via the
-  Phase 12 hash/TTL pattern). Routes: `POST /kyc/request|verify`, `POST /kyc/identity`,
-  `GET /kyc/status`. NIN stored as last-4 tail only. **Verification sending is WIRED BUT OFF**
-  by default — nothing emails/SMSes until `KYC_VERIFICATION_ENABLED=true`; then
-  `KYC_VERIFICATION_CHANNEL=mock|email|whatsapp` (mock returns the code, email=Resend-style,
-  whatsapp=Business Cloud API). Courier gate `KYC_COURIER_GATE_ENABLED` blocks unverified
-  couriers from making delivery offers; seller level surfaced on `GET /sellers/me`.
+- **Phone signup** — **DONE**: custom `phone` auth provider (`backend/src/modules/auth-phone`)
+  registered in `medusa-config` alongside `emailpass`; identity keyed on normalized phone +
+  password (scrypt-kdf). `POST /auth/seller/phone/register` + `POST /auth/seller/phone`.
+- **Onboarding flow** (`POST /sellers` extend) — **DONE**: admin takes email **or** phone
+  (both optional, at least one required), seller_admin gets a nullable `phone` column
+  (partial unique index on non-null emails). KYC profile is seeded with the signup
+  identifier marked verified at creation.
+- **Mobile-first listing** — **DONE**: `POST /sellers/products` accepts
+  title + description + price + photo (+ currency, optional handle/images/status) via
+  `PostSellerMobileProductSchema`; the route maps it onto the full create-product shape
+  (published, default "One Size" option/variant, no inventory tracking). Full admin shape
+  (variants/options) still passes through. Response now includes images/options/prices.
+- **Progressive verification ladder** — **DONE** (kyc module), **identifier-aware**: profiles are
+  keyed by the signup identifier (email **or** phone), and the signup credential itself IS the
+  verified contact — KYC never re-verifies it, only the complementary identifier (email or phone)
+  plus identity details (`email_verified_at` / `phone_verified_at`). Routes:
+  `POST /kyc/request|verify`, `POST /kyc/identity`, `GET /kyc/status?email|phone`. NIN stored as
+  last-4 tail only. **Verification sending is WIRED BUT OFF** by default — nothing
+  emails/SMSes until `KYC_VERIFICATION_ENABLED=true`; then `KYC_VERIFICATION_CHANNEL=mock|email|whatsapp`
+  (mock returns the code, email=Resend-style, whatsapp=Business Cloud API). Courier gate
+  `KYC_COURIER_GATE_ENABLED` blocks unverified couriers from making delivery offers; seller level
+  surfaced on `GET /sellers/me`.
 - **Avoid**: enterprise-style admin panels, forced registration docs.
 
 ## Acceptance criteria
-- [ ] New seller can register with phone or email + password. (email done; phone signup TODO)
-- [ ] Listing = photo + price + description; works mobile-first. (existing product flow; mobile pass TODO)
+- [x] New seller can register with phone or email + password (phone auth provider + onboarding spec).
+- [x] Listing = photo + price + description; works mobile-first (`onboarding.spec.ts`).
 - [x] Payout account setup is possible without blocking account creation.
 - [x] `kyc_level` tracked and surfaced in seller profile (and courier profile via `/kyc/status`).
 - [x] Courier KYC gate exists (off by default) and is covered by tests; marketplace/referrals/auth specs green.
-- [x] Full suite green: **13 suites / 145 tests** (`kyc.spec.ts` added).
+- [x] Full suite green: **14 suites / 151 tests** (`kyc.spec.ts` + `onboarding.spec.ts` added).
 
 ---
 

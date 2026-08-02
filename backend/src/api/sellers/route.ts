@@ -13,11 +13,18 @@ export const PostSellerCreateSchema = z.strictObject({
   handle: z.string(),
   logo: z.string().optional(),
   description: z.string().optional(),
-  admin: z.strictObject({
-    email: z.string().email(),
-    first_name: z.string().optional(),
-    last_name: z.string().optional(),
-  }),
+  admin: z
+    .strictObject({
+      email: z.string().email().optional(),
+      phone: z.string().min(7).optional(),
+      first_name: z.string().optional(),
+      last_name: z.string().optional(),
+    })
+    // A seller signs up with EITHER an email or a phone number; whichever
+    // they used IS their verified identifier (KYC never re-verifies it).
+    .refine((a) => a.email || a.phone, {
+      message: "Provide at least an email or a phone number",
+    }),
 })
 
 type RequestBody = z.infer<typeof PostSellerCreateSchema>

@@ -76,7 +76,16 @@ const createSellerProductWorkflow = createWorkflow(
 
     const { data: products } = useQueryGraphStep({
       entity: "product",
-      fields: ["*", "variants.*"],
+      fields: [
+        "*",
+        "variants.*",
+        "variants.options.*",
+        "variants.prices.*",
+        "variants.prices.currency_code.*",
+        "images.*",
+        "options.*",
+        "options.values.*",
+      ],
       filters: {
         id: createdProducts[0].id,
       },

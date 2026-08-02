@@ -3,13 +3,32 @@ import {
   authenticate,
   validateAndTransformBody,
 } from "@medusajs/framework/http"
-import { AdminCreateProduct } from "@medusajs/medusa/api/admin/products/validators"
 import { z } from "@medusajs/framework/zod"
 import { PostSellerCreateSchema } from "./sellers/route"
 
 export const PostAiListingSchema = z.object({
   notes: z.string().min(3),
   category: z.string().optional(),
+})
+
+// Mobile-first listing: photo + price + short description. The route maps
+// this minimal shape onto the full product create payload (default "One Size"
+// option/variant, published, no inventory tracking). Full admin shape stays
+// supported unchanged (options/variants supplied).
+export const PostSellerMobileProductSchema = z.strictObject({
+  title: z.string().min(1),
+  description: z.string().max(500).optional(),
+  price: z.number().positive().optional(),
+  photo: z.string().url().optional(),
+  currency_code: z
+    .string()
+    .default("ngn")
+    .transform((c) => c.toLowerCase()),
+  status: z.enum(["draft", "published"]).optional(),
+  handle: z.string().optional(),
+  images: z.array(z.object({ url: z.string().url() })).optional(),
+  options: z.array(z.unknown()).optional(),
+  variants: z.array(z.unknown()).optional(),
 })
 
 export const PostAiPricingSchema = z.object({
@@ -242,25 +261,42 @@ export const PostDeliveryVerifySchema = z.object({
   purpose: z.enum(["pickup", "delivery"]),
 })
 
-// KYC (Phase 14): email-identity ladder for couriers and sellers
-export const PostKycRequestSchema = z.object({
-  email: z.string().email(),
-  channel: z.enum(["email", "phone"]),
-  destination: z.string().min(3),
-})
+// KYC (Phase 14): identity ladder keyed by the signup identifier (email OR
+// phone). The signup identifier is already verified; `destination` carries
+// the complementary identifier being verified during KYC.
+export const PostKycRequestSchema = z
+  .object({
+    email: z.string().email().optional(),
+    phone: z.string().min(7).optional(),
+    channel: z.enum(["email", "phone"]),
+    destination: z.string().min(3),
+  })
+  .refine((b) => b.email || b.phone, {
+    message: "Provide at least an email or a phone number",
+  })
 
-export const PostKycVerifySchema = z.object({
-  email: z.string().email(),
-  channel: z.enum(["email", "phone"]),
-  destination: z.string().min(3),
-  code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
-})
+export const PostKycVerifySchema = z
+  .object({
+    email: z.string().email().optional(),
+    phone: z.string().min(7).optional(),
+    channel: z.enum(["email", "phone"]),
+    destination: z.string().min(3),
+    code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
+  })
+  .refine((b) => b.email || b.phone, {
+    message: "Provide at least an email or a phone number",
+  })
 
-export const PostKycIdentitySchema = z.object({
-  email: z.string().email(),
-  id_type: z.enum(["nin"]),
-  id_number: z.string().min(11).max(11),
-})
+export const PostKycIdentitySchema = z
+  .object({
+    email: z.string().email().optional(),
+    phone: z.string().min(7).optional(),
+    id_type: z.enum(["nin"]),
+    id_number: z.string().min(11).max(11),
+  })
+  .refine((b) => b.email || b.phone, {
+    message: "Provide at least an email or a phone number",
+  })
 
 export default defineMiddlewares({
   routes: [
@@ -284,7 +320,7 @@ export default defineMiddlewares({
       matcher: "/sellers/products",
       method: ["POST"],
       middlewares: [
-        validateAndTransformBody(AdminCreateProduct),
+        validateAndTransformBody(PostSellerMobileProductSchema),
       ],
     },
     {

@@ -27,7 +27,7 @@ export const POST = async (
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
-    fields: ["id", "email", "seller.id"],
+    fields: ["id", "email", "phone", "seller.id"],
     filters: { id: [req.auth_context.actor_id] },
   })
   if (!sellerAdmin?.seller?.id) {
@@ -37,7 +37,15 @@ export const POST = async (
     )
   }
   const sellerId = sellerAdmin.seller.id
-  const senderEmail = sellerAdmin.email
+  // Delivery parties are email-keyed, but phone-first sellers have no email —
+  // fall back to the phone number so their sender party is still addressable.
+  const senderEmail = sellerAdmin.email ?? sellerAdmin.phone
+  if (!senderEmail) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Seller has no email or phone on file"
+    )
+  }
 
   const body = req.validatedBody ?? (req.body as PostJobInput)
   const deliveryService = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)

@@ -6,7 +6,8 @@ import MarketplaceModuleService from "../../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
 
 type CreateSellerAdminStepInput = {
-  email: string
+  email?: string
+  phone?: string
   first_name?: string
   last_name?: string
   seller_id: string

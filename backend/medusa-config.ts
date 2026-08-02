@@ -16,6 +16,23 @@ module.exports = defineConfig({
   },
   modules: [
     {
+      // Default auth module with an additional `phone` provider so sellers
+      // can sign in with a phone number + password (emailpass stays as-is).
+      resolve: "@medusajs/medusa/auth",
+      options: {
+        providers: [
+          {
+            resolve: "@medusajs/medusa/auth-emailpass",
+            id: "emailpass",
+          },
+          {
+            resolve: "./src/modules/auth-phone",
+            id: "phone",
+          },
+        ],
+      },
+    },
+    {
       resolve: "./src/modules/marketplace",
     },
     {

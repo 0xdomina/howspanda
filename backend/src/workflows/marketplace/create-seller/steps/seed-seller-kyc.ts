@@ -1,0 +1,42 @@
+import {
+  createStep,
+  StepResponse,
+} from "@medusajs/framework/workflows-sdk"
+import KycModuleService from "../../../../modules/kyc/service"
+import { KYC_MODULE } from "../../../../modules/kyc"
+
+type SeedSellerKycStepInput = {
+  email?: string
+  phone?: string
+}
+
+// The identifier a seller signs up with (email or phone) IS their verified
+// contact — the login credential proves ownership — so it is seeded as
+// verified in KYC immediately. KYC then only verifies the complementary
+// identifier plus identity details (the signup identifier is never
+// re-verified).
+const seedSellerKycStep = createStep(
+  "seed-seller-kyc-step",
+  async (input: SeedSellerKycStepInput, { container }) => {
+    const kyc: KycModuleService = container.resolve(KYC_MODULE)
+    const profile = await kyc.getOrCreateProfile({
+      email: input.email,
+      phone: input.phone,
+    })
+    await kyc.seedSignupIdentifier({
+      email: input.email,
+      phone: input.phone,
+    })
+
+    return new StepResponse(profile.id, profile.id)
+  },
+  async (profileId, { container }) => {
+    if (!profileId) {
+      return
+    }
+    const kyc: KycModuleService = container.resolve(KYC_MODULE)
+    await kyc.deleteKycProfiles(profileId)
+  }
+)
+
+export default seedSellerKycStep
