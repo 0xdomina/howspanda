@@ -1,6 +1,7 @@
 import { cookies as nextCookies } from "next/headers"
 
 import CartTotals from "@modules/common/components/cart-totals"
+import BuyerOrderActions from "@modules/order/components/buyer-actions"
 import Help from "@modules/order/components/help"
 import Items from "@modules/order/components/items"
 import OnboardingCta from "@modules/order/components/onboarding-cta"
@@ -59,6 +60,7 @@ export default async function OrderCompletedTemplate({
           </h2>
           <Items order={order} />
           <CartTotals totals={order} />
+          <BuyerOrderActions orderId={order.id} email={order.email ?? ""} />
           <ShippingDetails order={order} />
           <PaymentDetails order={order} />
           <Help />
