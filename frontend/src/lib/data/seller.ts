@@ -201,6 +201,135 @@ export const listSellerOrders = async (): Promise<any[]> => {
   }
 }
 
+export const markOrderDelivered = async (orderId: string): Promise<string | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return "Not signed in as a seller."
+
+    await sdk.client.fetch(`/sellers/orders/${orderId}/mark-delivered`, {
+      method: "POST",
+      headers,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return null
+  } catch (error: any) {
+    return error.toString()
+  }
+}
+
+export const confirmReturnReceived = async (
+  orderId: string
+): Promise<string | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return "Not signed in as a seller."
+
+    await sdk.client.fetch(`/sellers/orders/${orderId}/return-received`, {
+      method: "POST",
+      headers,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return null
+  } catch (error: any) {
+    return error.toString()
+  }
+}
+
+export const listPayoutAccounts = async (): Promise<any[]> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return []
+
+    return await sdk.client
+      .fetch<{ payout_accounts: any[] }>("/sellers/payout-accounts", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .then(({ payout_accounts }) => payout_accounts ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
+export const createPayoutAccount = async (
+  body: {
+    type: "bank_account"
+    bank_code: string
+    account_name: string
+    account_number: string
+  } | {
+    type: "crypto_address"
+    network: "base" | "solana"
+    address: string
+  }
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch("/sellers/payout-accounts", {
+      method: "POST",
+      headers,
+      body,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error.toString() }
+  }
+}
+
+export const listSellerPayouts = async (): Promise<any[]> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return []
+
+    return await sdk.client
+      .fetch<{ payouts: any[] }>("/sellers/payouts", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .then(({ payouts }) => payouts ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
+export const requestSellerPayout = async (
+  rail: "paystack" | "crypto-usdc"
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch("/sellers/payouts", {
+      method: "POST",
+      headers,
+      body: { rail },
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error.toString() }
+  }
+}
+
 export const retrieveSellerProduct = async (
   id: string
 ): Promise<SellerProduct | null> => {

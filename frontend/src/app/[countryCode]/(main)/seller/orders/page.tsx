@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveSeller, listSellerOrders } from "@lib/data/seller"
-import { convertToLocale } from "@lib/util/money"
+import OrderActions from "@modules/seller/components/order-actions"
 
 export const metadata: Metadata = {
   title: "Your orders",
@@ -44,14 +44,7 @@ export default async function SellerOrdersPage() {
                   {order.items?.length === 1 ? "item" : "items"}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-ink font-mono tabular-nums">
-                  {convertToLocale({
-                    amount: Number(order.total ?? 0),
-                    currency_code: "ngn",
-                  })}
-                </p>
-              </div>
+              <OrderActions order={order} />
             </li>
           ))}
         </ul>

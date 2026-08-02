@@ -11,6 +11,7 @@ import MarketplaceModuleService from "../../../modules/marketplace/service"
 import {
   PaystackTransferError,
   createRecipient,
+  isMockMode,
   resolveAccount,
 } from "../../../lib/payments/payouts/paystack-transfers"
 import { PostPayoutAccountSchema } from "../../middlewares"
@@ -79,16 +80,23 @@ export const POST = async (
   const isDefault = existingOfType.length === 0
 
   if (body.type === "bank_account") {
-    // Resolve the account name first — a failed resolve stores NOTHING.
-    let accountName: string
-    try {
-      const resolved = await resolveAccount(body.account_number, body.bank_code)
-      accountName = resolved.account_name
-    } catch (e) {
-      if (e instanceof PaystackTransferError) {
-        throw new MedusaError(MedusaError.Types.INVALID_DATA, e.message)
+    // The seller supplies the account name; Paystack's resolve still validates
+    // the account in live mode. In mock mode the typed name is authoritative
+    // (resolve would return a generic "MOCK ACCOUNT xxxx" placeholder).
+    let accountName = body.account_name
+    if (!isMockMode()) {
+      try {
+        const resolved = await resolveAccount(
+          body.account_number,
+          body.bank_code
+        )
+        accountName = resolved.account_name
+      } catch (e) {
+        if (e instanceof PaystackTransferError) {
+          throw new MedusaError(MedusaError.Types.INVALID_DATA, e.message)
+        }
+        throw e
       }
-      throw e
     }
 
     const { recipient_code } = await createRecipient({

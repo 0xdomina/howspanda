@@ -7,6 +7,8 @@ import {
   MedusaError,
 } from "@medusajs/framework/utils"
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
+import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
+import type MarketplaceModuleService from "../../../modules/marketplace/service"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -16,7 +18,7 @@ export const GET = async (
 
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
-    fields: ["seller.orders.*"],
+    fields: ["seller.orders.*", "seller.id"],
     filters: {
       id: [req.auth_context.actor_id],
     },
@@ -60,7 +62,36 @@ export const GET = async (
       },
     })
 
+  // Attach the seller's own commission line (escrow state) to each order so
+  // the seller dashboard can show status and actions without a second call.
+  const marketplace =
+    req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
+  const lines = await marketplace.listCommissionLines(
+    { order_id: orderIds, seller_id: sellerAdmin.seller.id },
+    { take: null }
+  )
+  const lineByOrder = new Map(
+    lines.map((line) => [
+      line.order_id,
+      {
+        status: line.status,
+        delivered_at: line.delivered_at,
+        confirmed_at: line.confirmed_at,
+        held_at: line.held_at,
+        hold_reason: line.hold_reason,
+        release_due_at: line.release_due_at,
+        net_amount: Number(line.net_amount),
+        currency_code: line.currency_code,
+      },
+    ])
+  )
+
+  const orderRows = Array.isArray(orders) ? orders : orders.rows
+
   res.json({
-    orders,
+    orders: orderRows.map((order) => ({
+      ...order,
+      escrow: lineByOrder.get(order.id) ?? null,
+    })),
   })
 }

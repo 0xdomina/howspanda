@@ -169,6 +169,7 @@ export const PostPayoutAccountSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("bank_account"),
     bank_code: z.string().min(3),
+    account_name: z.string().min(2),
     account_number: z.string().regex(/^\d{10}$/, "NUBAN is 10 digits"),
   }),
   z.object({
