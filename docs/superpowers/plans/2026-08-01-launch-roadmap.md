@@ -6,10 +6,12 @@
 > this file, then the phase plan referenced by the current phase.
 
 **Status snapshot (as of this file's last update):**
-- Phases 1–13 are **implemented and green**; **Phase 14 is implemented and green**: phone-or-email signup (custom `phone` auth provider), mobile-first listing (photo + price + description), progressive KYC keyed by the signup identifier where the credential itself IS the verified contact and KYC only covers the complementary identifier + identity (OTP seam wired but OFF by default via `KYC_VERIFICATION_ENABLED`), configurable courier gate, seller level on `/sellers/me`.
-- **Phase 15 — Wallet withdrawal rail is implemented and green**: `buyer_withdrawal_account` + `buyer_withdrawal` models/migration, `create-buyer-withdrawal` workflow (idempotency guard → prepare → debit wallet → record → Paystack/Circle rail, with wallet + row compensations), `/store/wallet` routes (balance/ledger GET, accounts GET/POST, withdrawals GET/POST), and the payout webhook + reconcile extended to route `bw_` buyer withdrawals. Covered by `integration-tests/http/wallet.spec.ts` (10 tests).
-- Integration tests: **15 suites / 164 tests pass**. `tsc --noEmit` clean. `medusa build` passes.
-- Head commit: `cc27538` (feat marketplace Phase 14 onboarding). Committed so far this session: `943b78c` (buyer-wallet withdrawal rail). The webhook reliability pass + roadmap update are uncommitted.
+- Phases 1–14 are **implemented and green**; Phase 14 ships phone-or-email signup (custom `phone` auth provider), mobile-first listing (photo + price + description), progressive KYC, configurable courier gate, seller level on `/sellers/me`.
+- **Phase 15 — Wallet withdrawal rail is implemented and green**: `buyer_withdrawal_account` + `buyer_withdrawal` models/migration, `create-buyer-withdrawal` workflow (idempotency guard → prepare → debit wallet → record → Paystack/Circle rail, with wallet + row compensations), `/store/wallet` routes (balance/ledger GET, accounts GET/POST, withdrawals GET/POST), payout webhook + reconcile extended to `bw_` buyer withdrawals (`wallet.spec.ts`, 10 tests). Webhook reliability (transient/permanent, 401, structured logging) also covered.
+- **Phase 16 — Frontend UI/UX + USDC rail is implemented**: full storefront design system (warm paper tokens, Fraunces/Instrument Sans/JetBrains Mono, money math, one-tap share system, action-first refunds) applied across nav/footer/checkout/account/catalog/cart/product/home. Verified: backend HTTP 200, storefront renders brand + seeded products, `next build` compiled 117/117 pages.
+- **Stripe removed; managed-wallet USDC is the primary payment rail**: all `@stripe/*` deps + `StripeCardContainer` / `StripePaymentButton` / `stripe-wrapper.tsx` removed. Checkout now uses one instant "Place order" button via `crypto-usdc` — a **frictionless managed-wallet USDC rail** (Circle developer-controlled wallets; the buyer never handles a wallet, seed phrase, or private key). USDC is the zero-fee auto-recommended default on the Nigeria region; Paystack/Flutterwave remain secondary fiat options. Frontend provider draw, `fees.ts` routing, `payments.spec.ts`, and the seed (idempotently enables the rail) all updated.
+- Integration tests: **15 suites / 164 tests pass** + revised fee-routing unit asserts USDC is recommended. `tsc --noEmit` clean on backend and frontend (pre-existing starter errors aside). `medusa build` and `next build` pass.
+- Head commit: `10257d4`. Committed this session: `e5b6ec3`…`398f70b` (Phase 16 UIUX), `247ca83` (remove Stripe / USDC-first), `813b234` (test), `10257d4` (seed).
 
 ---
 
@@ -242,25 +244,13 @@ and a few product photos. Progressive KYC (NIN etc.) is an unlock later, not a w
 Convert a great local MVP into something that can take real money and real users.
 
 ## Blocker checklist (must all be done)
-- [ ] **Real payments**: Paystack (+ Flutterwave) live keys wired, webhooks reliable with
-      retries/idempotency, payout accounts real. Crypto (Circle) quotes from a real oracle,
-      not the hardcoded placeholder. Webhook reliability pass DONE — payout webhook now
-      distinguishes transient failures (500 → gateway retries) from permanent ones (unknown
-      event/reference → 200 ack), invalid signatures → 401, every event is structured-logged,
-      and transitions stay idempotent under redelivery. Money-in payment webhooks run through
-      the core delayed-emit + retry path with `WEBHOOK_DELAY_MS`/`WEBHOOK_RETRIES` wired from env.
-      Covered by `wallet.spec.ts` (13 tests, incl. 401/500/redelivery cases).
-- [ ] **Wallet withdrawal rail**: buyer-wallet balances can actually withdraw via Paystack
-      Transfers. DONE — Phase 15 buyer-wallet withdrawal rail shipped: `buyer_withdrawal_account`
-      + `buyer_withdrawal` models, `create-buyer-withdrawal` workflow (idempotency guard → prepare →
-      debit wallet → record → rail, with wallet/row compensations), `/store/wallet` routes
-      (balance/ledger GET, accounts GET/POST, withdrawals GET/POST), Paystack/Circle rails
-      (Paystack Transfers + crypto settlement), webhook + reconcile extended to route `bw_`
-      withdrawals. Covered by `integration-tests/http/wallet.spec.ts` (10 tests).
+- [ ] **Real payments — USDC-first decision landed**: Stripe is **removed** (all `@stripe/*` deps and Stripe-specific components deleted). The primary rail is `crypto-usdc` — a frictionless **managed-wallet USDC** path (Circle developer-controlled wallets; buyer needs no wallet, seed phrase, or private key). It is the zero-fee auto-recommended default on the Nigeria region; Paystack/Flutterwave remain secondary fiat options. What remains is LIVE credentials only you can provide: real `CIRCLE_API_KEY`/`CIRCLE_ENTITY_SECRET`/`CIRCLE_WALLET_SET_ID` (currently `mock`) and a real USDC price oracle replacing the hardcoded `CRYPTO_NGN_PER_USDC` placeholder. Webhook reliability behavior for money-in and money-out is covered by core delayed-emit/retry plus `wallet.spec.ts` (401/500/redelivery cases). **Needs human action: add live Circle keys + oracle.**
+- [ ] **Wallet withdrawal rail**: buyer-wallet balances can actually withdraw via Paystack Transfers / Circle. DONE — Phase 15 buyer-wallet withdrawal rail shipped: `buyer_withdrawal_account` + `buyer_withdrawal` models, `create-buyer-withdrawal` workflow (idempotency guard → prepare → debit wallet → record → rail, with wallet/row compensations), `/store/wallet` routes (balance/ledger GET, accounts GET/POST, withdrawals GET/POST), Paystack/Circle rails, webhook + reconcile extended to route `bw_` withdrawals. Covered by `integration-tests/http/wallet.spec.ts` (10 tests). **Needs human: live payout account/keys.**
 - [ ] **Deploy infra**: backend Dockerfile, hosted Postgres + Redis, CI/CD pipeline,
-      environment-secret management. (Currently `docker compose` local only.)
+      environment-secret management. (Currently `docker compose` local only.) **Needs human: hosting + secrets.**
 - [ ] **Security pass**: real JWT/COOKIE secrets, tightened CORS, rate limiting on
-      auth/checkout/referrals/OTP, admin RBAC review, no secrets in repo.
+      auth/checkout/referrals/OTP, admin RBAC review, no secrets in repo. **Rate limiting + fail-fast secrets already shipped (Phase 15); needs human: real secrets in prod.**
+- [ ] **Observability**: structured prod logging, error tracking, payment webhook monitoring.
 - [ ] **Observability**: structured prod logging, error tracking, payment webhook monitoring.
 - [ ] **Legal/financial**: T&Cs, payout terms, escrow/refund policy, money-handling
       compliance for NGN movement.
