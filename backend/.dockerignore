@@ -1,0 +1,17 @@
+node_modules
+.medusa
+dist
+.nuxt
+.git
+.gitignore
+*\.env*
+!.env.example
+.dockerignore
+
+docker-compose*.yml
+integration-tests
+unit-tests
+Dockerfile*
+.git/
+.github/
+medusa-config.js

@@ -1,0 +1,85 @@
+name: howsu-prod
+
+# Production deployment for How's u.
+#
+# Load secrets from a committed .env.deploy file (NEVER commit real keys):
+#   cp .env.deploy.example .env.deploy
+#   docker compose --env-file .env.deploy up -d --build
+#
+# The app entry point is the frontend (port 8080). The backend (9000) is only
+# reachable inside the compose network unless published for admin/debug.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-howsu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.deploy}
+      POSTGRES_DB: ${POSTGRES_DB:-howsu}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-howsu} -d ${POSTGRES_DB:-howsu}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [howsu]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env.deploy}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [howsu]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      MEDUSA_BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://localhost:9000}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.deploy}
+      COOKIE_SECRET: ${COOKIE_SECRET:?set COOKIE_SECRET in .env.deploy}
+      DATABASE_URL: postgres://${POSTGRES_USER:-howsu}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-howsu}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      STORE_CORS: ${STORE_CORS:-http://localhost:8080}
+      ADMIN_CORS: ${ADMIN_CORS:-http://localhost:9000,http://localhost:7001}
+      AUTH_CORS: ${AUTH_CORS:-http://localhost:8080}
+      CIRCLE_API_KEY: ${CIRCLE_API_KEY:-mock}
+      CIRCLE_ENTITY_SECRET: ${CIRCLE_ENTITY_SECRET:-}
+      CIRCLE_WALLET_SET_ID: ${CIRCLE_WALLET_SET_ID:-}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-mock}
+    networks: [howsu]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY:?set NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY in .env.deploy}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8080}
+        NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-ng}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      MEDUSA_BACKEND_URL: http://backend:9000
+    ports:
+      - "${PORT:-8080}:8000"
+    networks: [howsu]
+
+volumes:
+  pgdata:
+
+networks:
+  howsu:
+    driver: bridge
