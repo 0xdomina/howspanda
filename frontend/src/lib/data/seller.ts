@@ -33,11 +33,20 @@ type SellerProduct = {
   thumbnail?: string | null
   status?: string
   images?: { url: string }[]
+  options?: { title?: string; values?: { value?: string }[] }[]
   variants?: {
     id: string
     title: string
     options?: { value?: string }[]
-    prices?: { currency_code: string; amount: number }[]
+    prices?: { id?: string; currency_code: string; amount: number }[]
+    inventory_items?: {
+      inventory_item_id?: string
+      location_levels?: {
+        id?: string
+        location_id?: string
+        stocked_quantity?: number
+      }[]
+    }[]
   }[]
 }
 
@@ -189,6 +198,52 @@ export const listSellerOrders = async (): Promise<any[]> => {
       .catch(() => [])
   } catch {
     return []
+  }
+}
+
+export const retrieveSellerProduct = async (
+  id: string
+): Promise<SellerProduct | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    const products = await listSellerProducts()
+    return products.find((p) => p.id === id) ?? null
+  } catch {
+    return null
+  }
+}
+
+export const updateSellerProduct = async (
+  id: string,
+  update: {
+    title?: string
+    description?: string
+    photo?: string
+    variants?: {
+      id: string
+      price?: number
+      stock?: number
+    }[]
+  }
+) => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return "Not signed in as a seller."
+
+    await sdk.client.fetch(`/sellers/products/${id}`, {
+      method: "PATCH",
+      headers,
+      body: update,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return null
+  } catch (error: any) {
+    return error.toString()
   }
 }
 

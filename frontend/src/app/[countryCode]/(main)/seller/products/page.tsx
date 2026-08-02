@@ -73,6 +73,13 @@ export default async function SellerProductsPage() {
                   <p className="text-ink font-mono tabular-nums">
                     {convertToLocale({ amount: cheapest, currency_code: currency })}
                   </p>
+                  <LocalizedClientLink
+                    href={`/seller/products/${product.id}`}
+                    className="text-sm text-ink-muted underline underline-offset-4 hover:text-ink"
+                    data-testid={`edit-product-${product.handle ?? product.id}`}
+                  >
+                    Edit
+                  </LocalizedClientLink>
                 </div>
               </li>
             )

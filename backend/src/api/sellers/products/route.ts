@@ -114,7 +114,41 @@ export const GET = async (
     )
   }
 
+  // Resolve current stock per inventory item (the link table only exposes
+  // `inventory_item_id`; levels live on the inventory_item entity).
+  const products = sellerAdmin.seller.products ?? []
+  const inventoryItemIds = [
+    ...new Set(
+      products.flatMap((product: any) =>
+        product.variants?.flatMap(
+          (v: any) => v.inventory_items?.map((i: any) => i.inventory_item_id) ?? []
+        ) ?? []
+      )
+    ),
+  ]
+
+  let levelsByItem: Record<string, any[]> = {}
+  if (inventoryItemIds.length) {
+    const { data: items } = await query.graph({
+      entity: "inventory_item",
+      fields: ["id", "location_levels.*"],
+      filters: { id: inventoryItemIds },
+    })
+    levelsByItem = items.reduce((acc: Record<string, any[]>, item: any) => {
+      acc[item.id] = item.location_levels ?? []
+      return acc
+    }, {})
+  }
+
+  for (const product of products as any[]) {
+    for (const variant of product.variants ?? []) {
+      for (const link of variant.inventory_items ?? []) {
+        link.location_levels = levelsByItem[link.inventory_item_id] ?? []
+      }
+    }
+  }
+
   res.json({
-    products: sellerAdmin.seller.products ?? [],
+    products,
   })
 }

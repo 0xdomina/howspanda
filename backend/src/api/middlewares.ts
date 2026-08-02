@@ -117,6 +117,25 @@ export const PostSellerMobileProductSchema = z.strictObject({
     .optional(),
 })
 
+// Update an existing seller product: base fields + per-variant price/stock.
+// Variants are matched by id (already created); price/stock are both optional
+// so a seller can reprice or restock independently.
+export const PatchSellerMobileProductSchema = z.strictObject({
+  title: z.string().min(1).optional(),
+  description: z.string().max(500).optional(),
+  photo: z.string().url().optional(),
+  status: z.enum(["draft", "published", "archived"]).optional(),
+  variants: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        price: z.number().positive().optional(),
+        stock: z.number().int().min(0).optional(),
+      })
+    )
+    .optional(),
+})
+
 export const PostAiPricingSchema = z.object({
   title: z.string().min(2),
   category: z.string().optional(),
@@ -433,6 +452,13 @@ export default defineMiddlewares({
       method: ["POST"],
       middlewares: [
         validateAndTransformBody(PostSellerMobileProductSchema),
+      ],
+    },
+    {
+      matcher: "/sellers/products/:id",
+      method: ["PATCH"],
+      middlewares: [
+        validateAndTransformBody(PatchSellerMobileProductSchema),
       ],
     },
     {
