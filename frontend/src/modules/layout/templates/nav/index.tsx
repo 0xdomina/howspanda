@@ -39,6 +39,13 @@ export default async function Nav() {
             <div className="hidden small:flex items-center gap-x-6 h-full">
               <LocalizedClientLink
                 className="hover:text-ink"
+                href="/seller"
+                data-testid="nav-sell-link"
+              >
+                Sell
+              </LocalizedClientLink>
+              <LocalizedClientLink
+                className="hover:text-ink"
                 href="/account"
                 data-testid="nav-account-link"
               >
