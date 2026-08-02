@@ -70,12 +70,17 @@ export const PostAiListingSchema = z.object({
 // Mobile-first listing: photo + price + short description. The route maps
 // this minimal shape onto the full product create payload (default "One Size"
 // option/variant, published, no inventory tracking). Full admin shape stays
-// supported unchanged (options/variants supplied).
+// supported unchanged (options/variants supplied). Each variant may carry an
+// optional `stock` (quantity to sell); the workflow turns it into a real
+// inventory level at the store's default location.
 export const PostSellerMobileProductSchema = z.strictObject({
   title: z.string().min(1),
   description: z.string().max(500).optional(),
   price: z.number().positive().optional(),
   photo: z.string().url().optional(),
+  // Quantity to sell for a single-option product (maps onto the default
+  // "One Size" variant's inventory level).
+  stock: z.number().int().min(0).optional(),
   currency_code: z
     .string()
     .default("ngn")
@@ -83,8 +88,33 @@ export const PostSellerMobileProductSchema = z.strictObject({
   status: z.enum(["draft", "published"]).optional(),
   handle: z.string().optional(),
   images: z.array(z.object({ url: z.string().url() })).optional(),
-  options: z.array(z.unknown()).optional(),
-  variants: z.array(z.unknown()).optional(),
+  options: z
+    .array(
+      z.object({
+        title: z.string().min(1),
+        values: z.array(z.string().min(1)).min(1),
+      })
+    )
+    .optional(),
+  variants: z
+    .array(
+      z.object({
+        title: z.string().optional(),
+        options: z.record(z.string(), z.string()).optional(),
+        prices: z
+          .array(
+            z.object({
+              currency_code: z.string(),
+              amount: z.number(),
+            })
+          )
+          .optional(),
+        sku: z.string().optional(),
+        stock: z.number().int().min(0).optional(),
+        manage_inventory: z.boolean().optional(),
+      })
+    )
+    .optional(),
 })
 
 export const PostAiPricingSchema = z.object({

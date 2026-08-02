@@ -203,20 +203,38 @@ export const createSellerProduct = async (
     const title = formData.get("title") as string
     const description = formData.get("description") as string
     const photo = formData.get("photo") as string
-    const price = Number(formData.get("price"))
+    const priceRaw = formData.get("price")
+    const price = priceRaw !== "" && priceRaw != null ? Number(priceRaw) : undefined
+    const stockRaw = formData.get("stock")
+    const stock =
+      stockRaw !== "" && stockRaw != null ? Number(stockRaw) : undefined
+    const variantsJson = formData.get("variants_json") as string
     const currency_code = "ngn"
+
+    const variants = variantsJson ? JSON.parse(variantsJson) : null
 
     await sdk.client.fetch("/sellers/products", {
       method: "POST",
       headers,
-      body: {
-        title,
-        description,
-        photo: photo || undefined,
-        price,
-        currency_code,
-        status: "published",
-      },
+      body: variants
+        ? {
+            title,
+            description,
+            photo: photo || undefined,
+            currency_code,
+            status: "published",
+            options: variants.options,
+            variants: variants.variants,
+          }
+        : {
+            title,
+            description,
+            photo: photo || undefined,
+            price,
+            stock,
+            currency_code,
+            status: "published",
+          },
     })
 
     const tag = await getSellerCacheTag("seller")
