@@ -19,10 +19,9 @@ export const CRYPTO_USDC_ID = "pp_crypto-usdc_crypto-usdc"
 export type FeeModel = {
   label: string
   /**
-   * Eligible to be the auto-recommended default. Only fiat rails qualify:
-   * crypto has a zero platform fee but requires the buyer to hold USDC and do
-   * an on-chain transfer, so it's always listed/selectable but never the silent
-   * default.
+   * Eligible to be the auto-recommended default. USDC is the frictionless
+   * managed-wallet rail (buyer never handles a wallet/seed phrase), so it is
+   * now the primary recommended default. Fiat rails remain available.
    */
   autoRecommend: boolean
   /** compute the provider fee in minor units for a given amount (minor units) */
@@ -49,8 +48,8 @@ export const FEE_TABLE: Record<string, FeeModel> = {
     fee: (amount) => Math.min(Math.round(amount * 0.014), 2000 * NAIRA), // cap ₦2,000
   },
   [CRYPTO_USDC_ID]: {
-    label: "Crypto (USDC)",
-    autoRecommend: false, // listed + selectable, but never the silent default
+    label: "Pay with USDC",
+    autoRecommend: true, // frictionless managed-wallet rail — primary default
     fee: () => 0, // no platform fee; gas is abstracted by the settlement layer
   },
 }
@@ -65,9 +64,10 @@ export type ProviderOption = {
 
 /**
  * Rank the fee-eligible, enabled providers ascending by effective fee. The
- * cheapest FIAT rail is flagged `recommended` (the storefront preselects it);
- * crypto is listed and selectable but never the silent default. The buyer may
- * still pick any option. Ties break deterministically by provider id.
+ * cheapest auto-recommend-eligible rail is flagged `recommended` (the
+ * storefront preselects it). USDC (managed-wallet, frictionless) is the primary
+ * recommended default since it is fee-eligible and zero-fee; fiat rails are
+ * also eligible. Ties break deterministically by provider id.
  */
 export function rankProviders(
   amountMinor: number,
@@ -87,8 +87,8 @@ export function rankProviders(
     })
     .sort((a, b) => a.fee - b.fee || a.provider_id.localeCompare(b.provider_id))
 
-  // Recommend the cheapest auto-recommend-eligible (fiat) option; since the
-  // list is fee-sorted, the first eligible one is the cheapest fiat rail.
+  // Recommend the cheapest auto-recommend-eligible option; since the list is
+  // fee-sorted, the first eligible one is the cheapest recommended rail.
   const recommended = options.find(
     (o) => FEE_TABLE[o.provider_id]?.autoRecommend
   )
