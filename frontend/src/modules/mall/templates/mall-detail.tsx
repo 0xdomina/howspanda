@@ -20,8 +20,55 @@ const statusLabel: Record<string, string> = {
   closed: "Closed",
 }
 
-const MallDetailClient = ({ mall, detail }: { mall: any; detail: any }) => {
-  const [email, setEmail] = useState("")
+const GoodCard = ({ good }: { good: any }) => {
+  const price = good.variants?.length
+    ? Math.min(
+        ...good.variants
+          .map((v: any) => v.prices?.[0]?.amount ?? Infinity)
+          .filter(Number.isFinite)
+      )
+    : null
+  return (
+    <LocalizedClientLink
+      href={good.handle ? `/products/${good.handle}` : "#"}
+      className="group rounded-large border border-ink-hairline bg-paper-surface p-3 transition hover:border-ink"
+    >
+      <div className="aspect-square overflow-hidden rounded-medium bg-ink/5">
+        {good.thumbnail ? (
+          <img
+            src={good.thumbnail}
+            alt={good.title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-3xl text-ink/20">
+            {good.title?.[0]?.toUpperCase() ?? "?"}
+          </div>
+        )}
+      </div>
+      <p className="mt-2 truncate text-sm text-ink group-hover:text-ink-muted">
+        {good.title}
+      </p>
+      {price != null && price !== Infinity && (
+        <p className="mt-0.5 font-mono tabular-nums text-sm text-ink">
+          {ngn(price / 100)}
+        </p>
+      )}
+    </LocalizedClientLink>
+  )
+}
+
+const MallDetailClient = ({
+  mall,
+  detail,
+  goods = [],
+  customerEmail,
+}: {
+  mall: any
+  detail: any
+  goods?: any[]
+  customerEmail?: string | null
+}) => {
   const [orderId, setOrderId] = useState("")
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -30,17 +77,21 @@ const MallDetailClient = ({ mall, detail }: { mall: any; detail: any }) => {
   const sellers = detail?.sellers ?? []
   const prizes = detail?.prizes ?? []
 
+  const alreadyJoined = customerEmail
+    ? buyers.some((b: any) => b.buyer_email === customerEmail)
+    : false
+
   const join = () => {
     setMessage(null)
-    if (!email.includes("@")) {
-      setMessage("Enter your email to join this mall.")
+    if (!customerEmail) {
+      setMessage("Sign in to your account to join this mall.")
       return
     }
     startTransition(async () => {
-      const res = await joinMallAsBuyer(mall.id, email.trim())
+      const res = await joinMallAsBuyer(mall.id, customerEmail)
       setMessage(
         res.success
-          ? "You're in! Your email is registered for this mall."
+          ? "You're in! Purchases now count toward prize draws."
           : res.error
       )
     })
@@ -48,12 +99,20 @@ const MallDetailClient = ({ mall, detail }: { mall: any; detail: any }) => {
 
   const purchase = () => {
     setMessage(null)
-    if (!email.includes("@") || !orderId.trim()) {
-      setMessage("Enter your email and the order id to record a purchase.")
+    if (!customerEmail) {
+      setMessage("Sign in to your account to record a purchase.")
+      return
+    }
+    if (!orderId.trim()) {
+      setMessage("Enter the order id to record a purchase.")
       return
     }
     startTransition(async () => {
-      const res = await recordMallPurchase(mall.id, email.trim(), orderId.trim())
+      const res = await recordMallPurchase(
+        mall.id,
+        customerEmail,
+        orderId.trim()
+      )
       if (!res.success) {
         setMessage(res.error)
       } else if (res.won) {
@@ -124,6 +183,23 @@ const MallDetailClient = ({ mall, detail }: { mall: any; detail: any }) => {
             </div>
           </div>
 
+          {goods.length > 0 && (
+            <div className="mt-6">
+              <h3 className="font-display text-lg font-medium text-ink">
+                Goods from participating stores
+              </h3>
+              <p className="mt-1 text-xs text-ink-muted">
+                Every store in this mall lists its goods here. Shop directly
+                from any of them.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-3 small:grid-cols-4">
+                {goods.map((g: any) => (
+                  <GoodCard key={g.id} good={g} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {sellers.length > 0 && (
             <div className="mt-6 rounded-large border border-ink-hairline bg-paper-surface p-4">
               <h3 className="font-display text-lg font-medium text-ink">
@@ -149,24 +225,39 @@ const MallDetailClient = ({ mall, detail }: { mall: any; detail: any }) => {
         <div className="w-full small:max-w-sm space-y-4">
           <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
             <h3 className="font-display text-lg font-medium text-ink">Join</h3>
-            <p className="mt-1 text-xs text-ink-muted">
-              Register your email so purchases count toward prize draws.
-            </p>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Your email"
-              className="mt-3 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-            />
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={join}
-              className="mt-2 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-            >
-              {isPending ? "Joining…" : "Join this mall"}
-            </button>
+            {!customerEmail ? (
+              <>
+                <p className="mt-1 text-xs text-ink-muted">
+                  Sign in to your account to join this mall in one click.
+                </p>
+                <LocalizedClientLink
+                  href="/account"
+                  className="mt-3 block w-full rounded-medium bg-ink px-3 py-2 text-center text-sm font-medium text-white hover:bg-ink/90"
+                >
+                  Sign in to join
+                </LocalizedClientLink>
+              </>
+            ) : alreadyJoined ? (
+              <p className="mt-2 text-sm text-ink-muted">
+                You're a member of this mall. Every purchase counts toward the
+                prize draws.
+              </p>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-ink-muted">
+                  Joining as <span className="font-medium text-ink">{customerEmail}</span>.
+                  One click — no extra details needed.
+                </p>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={join}
+                  className="mt-3 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+                >
+                  {isPending ? "Joining…" : "Join this mall"}
+                </button>
+              </>
+            )}
           </div>
 
           {mall.status === "active" && (
@@ -186,7 +277,7 @@ const MallDetailClient = ({ mall, detail }: { mall: any; detail: any }) => {
               />
               <button
                 type="button"
-                disabled={isPending}
+                disabled={isPending || !customerEmail}
                 onClick={purchase}
                 className="mt-2 w-full rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
               >

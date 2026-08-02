@@ -11,21 +11,26 @@ const ngn = (v: number | string | undefined) =>
     maximumFractionDigits: 0,
   }).format(Number(v ?? 0))
 
-const MallCard = ({ mall }: { mall: any }) => {
-  const [email, setEmail] = useState("")
+const MallCard = ({
+  mall,
+  customerEmail,
+}: {
+  mall: any
+  customerEmail: string | null
+}) => {
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const join = () => {
     setMessage(null)
-    if (!email.includes("@")) {
-      setMessage("Enter your email to join this mall.")
+    if (!customerEmail) {
+      setMessage("Sign in to your account to join this mall.")
       return
     }
     startTransition(async () => {
-      const res = await joinMallAsBuyer(mall.id, email.trim())
+      const res = await joinMallAsBuyer(mall.id, customerEmail)
       setMessage(
-        res.success ? "You're in! Your email is registered for this mall." : res.error
+        res.success ? "You're in! Purchases now count toward prize draws." : res.error
       )
     })
   }
@@ -86,21 +91,23 @@ const MallCard = ({ mall }: { mall: any }) => {
 
       {mall.status === "pending" || mall.status === "active" ? (
         <div className="mt-4">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Your email"
-            className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-          />
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={join}
-            className="mt-2 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-          >
-            {isPending ? "Joining…" : "Join this mall"}
-          </button>
+          {customerEmail ? (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={join}
+              className="w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+            >
+              {isPending ? "Joining…" : "Join this mall"}
+            </button>
+          ) : (
+            <LocalizedClientLink
+              href="/account"
+              className="block w-full rounded-medium border border-ink-strong px-3 py-2 text-center text-sm font-medium text-ink hover:bg-ink hover:text-white"
+            >
+              Sign in to join
+            </LocalizedClientLink>
+          )}
           {message && <p className="mt-2 text-xs text-ink-muted">{message}</p>}
         </div>
       ) : (
@@ -110,7 +117,13 @@ const MallCard = ({ mall }: { mall: any }) => {
   )
 }
 
-const MallsClient = ({ malls }: { malls: any[] }) => {
+const MallsClient = ({
+  malls,
+  customerEmail,
+}: {
+  malls: any[]
+  customerEmail: string | null
+}) => {
   return (
     <div data-testid="malls-page" className="content-container flex-1 small:py-12">
       <div className="py-8">
@@ -118,8 +131,9 @@ const MallsClient = ({ malls }: { malls: any[] }) => {
           Malls
         </h1>
         <p className="mt-2 max-w-xl text-sm text-ink-muted">
-          Community sales events. Join a mall with your email, shop its sellers,
-          and every purchase enters you in a prize draw funded by the sellers.
+          Community sales events. Join with one click, shop goods from the
+          participating stores, and every purchase enters you in a prize draw
+          funded by the sellers.
         </p>
       </div>
 
@@ -133,7 +147,7 @@ const MallsClient = ({ malls }: { malls: any[] }) => {
       ) : (
         <div className="grid grid-cols-1 gap-4 small:grid-cols-2">
           {malls.map((mall) => (
-            <MallCard key={mall.id} mall={mall} />
+            <MallCard key={mall.id} mall={mall} customerEmail={customerEmail} />
           ))}
         </div>
       )}

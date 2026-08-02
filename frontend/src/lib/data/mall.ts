@@ -79,6 +79,20 @@ export const retrieveMall = async (id: string): Promise<Mall | null> => {
   }
 }
 
+export const listMallGoods = async (id: string): Promise<any[]> => {
+  try {
+    return await sdk.client
+      .fetch<{ goods: any[] }>(`/store/malls/${id}/goods`, {
+        method: "GET",
+        cache: "no-store",
+      })
+      .then(({ goods }) => goods ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
 export const joinMallAsBuyer = async (
   mallId: string,
   buyerEmail: string
