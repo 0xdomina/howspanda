@@ -6,9 +6,11 @@ import ProductOnboardingCta from "@modules/products/components/product-onboardin
 import ProductTabs from "@modules/products/components/product-tabs"
 import RelatedProducts from "@modules/products/components/related-products"
 import ProductInfo from "@modules/products/templates/product-info"
+import ShareButton from "@modules/common/components/share-button"
 import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-related-products"
 import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
+import { getBaseURL } from "@lib/util/env"
 
 import ProductActionsWrapper from "./product-actions-wrapper"
 
@@ -36,7 +38,20 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
         data-testid="product-container"
       >
         <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-6">
-          <ProductInfo product={product} />
+          <div className="flex items-start justify-between gap-4">
+            <ProductInfo product={product} />
+            <ShareButton
+              entity="product"
+              entityId={product.id}
+              payload={{
+                url: `${getBaseURL()}/${countryCode}/products/${product.handle}`,
+                text: `${product.title} on How's u`,
+                title: product.title,
+                image: product.thumbnail ?? undefined,
+                hashtags: product.collection ? [product.collection.handle] : [],
+              }}
+            />
+          </div>
           <ProductTabs product={product} />
         </div>
         <div className="block w-full relative">

@@ -34,6 +34,29 @@ module.exports = {
           80: "#1F2937",
           90: "#111827",
         },
+        paper: {
+          DEFAULT: "#FBFBF8",
+          surface: "#FFFFFF",
+          tinted: "#F4F2EC",
+          dark: "#0E0D0B",
+          "dark-hairline": "#2A2825",
+          "dark-text": "#F2EFE9",
+        },
+        ink: {
+          DEFAULT: "#211F1A",
+          muted: "#6B675F",
+          hairline: "#E7E4DC",
+        },
+        brand: {
+          DEFAULT: "#E35D2A",
+          inverse: "#FFFFFF",
+        },
+        semantic: {
+          success: "#2E7D4F",
+          danger: "#C43D2E",
+          warning: "#B7791F",
+          info: "#2B6CB0",
+        },
       },
       borderRadius: {
         none: "0px",
@@ -41,6 +64,10 @@ module.exports = {
         base: "4px",
         rounded: "8px",
         large: "16px",
+        "2large": "24px",
+        card: "16px",
+        control: "10px",
+        modal: "24px",
         circle: "9999px",
       },
       maxWidth: {
@@ -60,15 +87,40 @@ module.exports = {
       },
       fontFamily: {
         sans: [
-          "Inter",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "Segoe UI",
-          "Roboto",
-          "Helvetica Neue",
-          "Ubuntu",
+          "var(--font-sans)",
+          "ui-sans-serif",
+          "system-ui",
           "sans-serif",
         ],
+        display: [
+          "var(--font-display)",
+          "Georgia",
+          "serif",
+        ],
+        mono: [
+          "var(--font-mono)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "monospace",
+        ],
+      },
+      boxShadow: {
+        float: "0 4px 16px rgba(33, 31, 26, 0.08)",
+        modal: "0 16px 48px rgba(33, 31, 26, 0.18)",
+      },
+      transitionTimingFunction: {
+        standard: "cubic-bezier(0.4, 0, 0.2, 1)",
+        enter: "cubic-bezier(0, 0, 0.2, 1)",
+        exit: "cubic-bezier(0.4, 0, 1, 1)",
+        spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      },
+      transitionDuration: {
+        instant: "50ms",
+        fast: "150ms",
+        moderate: "300ms",
+        slow: "500ms",
+        deliberate: "800ms",
       },
       keyframes: {
         ring: {

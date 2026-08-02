@@ -4,6 +4,7 @@ import { listProducts } from "@lib/data/products"
 import { getRegion, listRegions } from "@lib/data/regions"
 import ProductTemplate from "@modules/products/templates"
 import { HttpTypes } from "@medusajs/types"
+import { getBaseURL } from "@lib/util/env"
 
 type Props = {
   params: Promise<{ countryCode: string; handle: string }>
@@ -57,16 +58,16 @@ function getImagesForVariant(
   selectedVariantId?: string
 ) {
   if (!selectedVariantId || !product.variants) {
-    return product.images
+    return product.images ?? []
   }
 
-  const variant = product.variants!.find((v) => v.id === selectedVariantId)
-  if (!variant || !variant.images.length) {
-    return product.images
+  const variant = product.variants.find((v) => v.id === selectedVariantId)
+  if (!variant || !variant.images?.length) {
+    return product.images ?? []
   }
 
   const imageIdsMap = new Map(variant.images.map((i) => [i.id, true]))
-  return product.images!.filter((i) => imageIdsMap.has(i.id))
+  return (product.images ?? []).filter((i) => imageIdsMap.has(i.id))
 }
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
@@ -87,13 +88,25 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     notFound()
   }
 
+  const url = `${getBaseURL()}/${params.countryCode}/products/${handle}`
+
   return {
-    title: `${product.title} | Medusa Store`,
-    description: `${product.title}`,
+    title: `${product.title} | How's u`,
+    description: product.description ?? product.title,
+    alternates: { canonical: url },
     openGraph: {
-      title: `${product.title} | Medusa Store`,
-      description: `${product.title}`,
+      title: `${product.title} | How's u`,
+      description: product.description ?? product.title,
+      url,
       images: product.thumbnail ? [product.thumbnail] : [],
+      type: "website",
+      siteName: "How's u",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.title,
+      description: product.description ?? product.title,
+      images: product.thumbnail ? [product.thumbnail] : undefined,
     },
   }
 }

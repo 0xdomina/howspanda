@@ -2,6 +2,41 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@layer base {
+  * {
+    border-color: theme("colors.ink.hairline");
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-feature-settings: "ss01", "cv01";
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+:root {
+  --button-inverted: #e35d2a;
+  --button-inverted-hover: #cf5020;
+  --button-inverted-pressed: #b84619;
+  --button-inverted-gradient: #e35d2a;
+  --button-inverted-hover-gradient: #cf5020;
+  --button-inverted-pressed-gradient: #b84619;
+}
+
 @layer utilities {
   /* Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
@@ -46,6 +81,18 @@
   input[type="search"]::-webkit-search-results-button,
   input[type="search"]::-webkit-search-results-decoration {
     -webkit-appearance: none;
+  }
+}
+
+@layer components {
+  .money {
+    font-family: theme("fontFamily.mono");
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.04em];
   }
 }
 
