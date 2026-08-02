@@ -2,6 +2,25 @@ import { loadEnv, defineConfig } from '@medusajs/framework/utils'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
+// Fail fast in production rather than silently running on the dev defaults —
+// signing auth tokens with a known value is a critical exposure. Dev/test keep
+// the lenient fallbacks so local work and the integration harness are untouched.
+const isProduction = process.env.NODE_ENV === 'production'
+const DEV_JWT = 'supersecret'
+const DEV_COOKIE = 'supersecret'
+if (isProduction) {
+  if ((process.env.JWT_SECRET || DEV_JWT) === DEV_JWT) {
+    throw new Error(
+      'JWT_SECRET must be set to a non-default value when NODE_ENV=production'
+    )
+  }
+  if ((process.env.COOKIE_SECRET || DEV_COOKIE) === DEV_COOKIE) {
+    throw new Error(
+      'COOKIE_SECRET must be set to a non-default value when NODE_ENV=production'
+    )
+  }
+}
+
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
@@ -10,8 +29,8 @@ module.exports = defineConfig({
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
       authCors: process.env.AUTH_CORS!,
-      jwtSecret: process.env.JWT_SECRET || "supersecret",
-      cookieSecret: process.env.COOKIE_SECRET || "supersecret",
+      jwtSecret: process.env.JWT_SECRET || DEV_JWT,
+      cookieSecret: process.env.COOKIE_SECRET || DEV_COOKIE,
     }
   },
   modules: [

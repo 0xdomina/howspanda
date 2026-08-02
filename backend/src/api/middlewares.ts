@@ -4,7 +4,63 @@ import {
   validateAndTransformBody,
 } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
+import { rateLimit } from "../lib/security/rate-limit"
 import { PostSellerCreateSchema } from "./sellers/route"
+
+// Abuse-throttling for sensitive routes. Keyed by identity where the request
+// body already carries the actor's email (so NAT'd users behind one IP are not
+// throttled together); otherwise keyed by IP. See lib/security/rate-limit.ts.
+const OTP_RATE_LIMIT = rateLimit({
+  name: "otp",
+  limit: 20,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const b = req.body as { email?: string; phone?: string } | undefined
+    return b?.email || b?.phone
+  },
+})
+const REFERRAL_RATE_LIMIT = rateLimit({
+  name: "referral",
+  limit: 30,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const b = req.body as { email?: string } | undefined
+    return b?.email
+  },
+})
+const WALLET_RATE_LIMIT = rateLimit({
+  name: "wallet",
+  limit: 20,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const b = req.body as { buyerEmail?: string } | undefined
+    return b?.buyerEmail
+  },
+})
+const CHECKOUT_RATE_LIMIT = rateLimit({
+  name: "checkout",
+  limit: 60,
+  windowMs: 15 * 60 * 1000,
+})
+const ADMIN_RATE_LIMIT = rateLimit({
+  name: "admin",
+  limit: 120,
+  windowMs: 60 * 1000,
+})
+// Credential endpoints (login/register/update/reset) are the brute-force
+// surface; key by the identifier in the body when present, else IP. MFA/session
+// routes are exempt — they're part of the normal authenticated flow.
+const AUTH_RATE_LIMIT = rateLimit({
+  name: "auth",
+  limit: 20,
+  windowMs: 15 * 60 * 1000,
+  keyOf: (req) => {
+    const b = req.body as
+      | { email?: string; phone?: string; identifier?: string }
+      | undefined
+    return b?.email || b?.phone || b?.identifier
+  },
+})
 
 export const PostAiListingSchema = z.object({
   notes: z.string().min(3),
@@ -319,6 +375,14 @@ export const PostKycIdentitySchema = z
 export default defineMiddlewares({
   routes: [
     {
+      // Credential auth endpoints (login, register, update, reset-password) are
+      // throttled per identity/IP. Uses the dynamic provider path so MFA, session
+      // and token-refresh routes (normal flow, high frequency) are untouched.
+      matcher: /^\/auth\/[^/]+\/[^/]+$/,
+      method: ["POST"],
+      middlewares: [AUTH_RATE_LIMIT],
+    },
+    {
       matcher: "/sellers",
       method: ["POST"],
       middlewares: [
@@ -389,12 +453,18 @@ export default defineMiddlewares({
     {
       matcher: "/store/wallet/withdrawal-accounts",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostWalletWithdrawalAccountSchema)],
+      middlewares: [
+        WALLET_RATE_LIMIT,
+        validateAndTransformBody(PostWalletWithdrawalAccountSchema),
+      ],
     },
     {
       matcher: "/store/wallet/withdrawals",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostWalletWithdrawalSchema)],
+      middlewares: [
+        WALLET_RATE_LIMIT,
+        validateAndTransformBody(PostWalletWithdrawalSchema),
+      ],
     },
     {
       matcher: "/store/orders/:id/confirm-receipt",
@@ -414,12 +484,18 @@ export default defineMiddlewares({
     {
       matcher: "/admin/escrow/hold",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostEscrowHoldSchema)],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostEscrowHoldSchema),
+      ],
     },
     {
       matcher: "/admin/escrow/release",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostEscrowReleaseSchema)],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostEscrowReleaseSchema),
+      ],
     },
     {
       matcher: "/sellers/redeemables",
@@ -435,6 +511,11 @@ export default defineMiddlewares({
       matcher: "/store/carts/:id/apply-redeemable",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostApplyRedeemableSchema)],
+    },
+    {
+      matcher: "/store/carts/:id/complete-marketplace",
+      methods: ["POST"],
+      middlewares: [CHECKOUT_RATE_LIMIT],
     },
     {
       matcher: "/store/orders/:id/review",
@@ -459,7 +540,41 @@ export default defineMiddlewares({
     {
       matcher: "/admin/reviews/:id/remove",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostRemoveReviewSchema)],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostRemoveReviewSchema),
+      ],
+    },
+    {
+      // Remaining custom admin routes have no body schema; throttle them only.
+      matcher: "/admin/custom",
+      methods: ["POST"],
+      middlewares: [ADMIN_RATE_LIMIT],
+    },
+    {
+      matcher: "/admin/commissions/reverse",
+      methods: ["POST"],
+      middlewares: [ADMIN_RATE_LIMIT],
+    },
+    {
+      matcher: "/admin/malls/:id/go-live",
+      methods: ["POST"],
+      middlewares: [ADMIN_RATE_LIMIT],
+    },
+    {
+      matcher: "/admin/payouts",
+      methods: ["POST", "GET"],
+      middlewares: [ADMIN_RATE_LIMIT],
+    },
+    {
+      matcher: "/admin/payouts/run",
+      methods: ["POST"],
+      middlewares: [ADMIN_RATE_LIMIT],
+    },
+    {
+      matcher: "/admin/payouts/:id/reconcile",
+      methods: ["POST"],
+      middlewares: [ADMIN_RATE_LIMIT],
     },
     {
       // Paystack signs the exact raw bytes — keep them for the HMAC check
@@ -485,7 +600,7 @@ export default defineMiddlewares({
     {
       matcher: "/store/referrals",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostReferralClaimSchema)],
+      middlewares: [REFERRAL_RATE_LIMIT, validateAndTransformBody(PostReferralClaimSchema)],
     },
     {
       // Seller (store owner) mall routes: publishable key + seller bearer both
@@ -577,17 +692,17 @@ export default defineMiddlewares({
     {
       matcher: "/kyc/request",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostKycRequestSchema)],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycRequestSchema)],
     },
     {
       matcher: "/kyc/verify",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostKycVerifySchema)],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycVerifySchema)],
     },
     {
       matcher: "/kyc/identity",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostKycIdentitySchema)],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycIdentitySchema)],
     },
   ],
 })
