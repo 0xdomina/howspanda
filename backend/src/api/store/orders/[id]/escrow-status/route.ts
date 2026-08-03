@@ -11,7 +11,7 @@ import { assertOrderEmail } from "../../../../../lib/escrow/order-access"
 // ownership proof (same gate as every buyer action).
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const email = (req.query.email as string) ?? ""
-  await assertOrderEmail(req.scope, req.params.id, email)
+  await assertOrderEmail(req.scope, req.params.id, email, req)
 
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)

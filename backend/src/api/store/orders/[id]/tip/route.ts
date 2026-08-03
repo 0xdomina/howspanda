@@ -9,10 +9,11 @@ import type MarketplaceModuleService from "../../../../../modules/marketplace/se
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
 import { assertOrderEmail } from "../../../../../lib/escrow/order-access"
 
-// Buyer → seller cash gratuity. Email is the ownership proof (Phase 6 gate).
-// Settlement is written here into the marketplace ledger as a 0%-commission,
-// immediately-`available` CommissionLine so the tip flows into the seller's
-// balance and out through the existing payout rails.
+// Buyer → seller cash gratuity. Guests prove ownership with order id + email;
+// authenticated customers are additionally bound to the order email (Phase 6
+// gate, hardened in order-access). Settlement is written here into the
+// marketplace ledger as a 0%-commission, immediately-`available` CommissionLine
+// so the tip flows into the seller's balance and out through the payout rails.
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const { email, amount, note } = req.validatedBody as {
     email: string
@@ -20,7 +21,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     note?: string
   }
   const orderId = req.params.id
-  await assertOrderEmail(req.scope, orderId, email)
+  const access = await assertOrderEmail(req.scope, orderId, email, req)
 
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
@@ -54,7 +55,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const tip = await tipping.createTip({
     direction: "to_seller",
     orderId,
-    buyerEmail: email,
+    buyerEmail: access.email,
     sellerId,
     currencyCode: currency,
     amount,

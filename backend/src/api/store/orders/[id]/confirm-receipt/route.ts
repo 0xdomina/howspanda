@@ -6,7 +6,7 @@ import { assertOrderEmail } from "../../../../../lib/escrow/order-access"
 // Buyer says "I received it" → escrow releases to the seller immediately.
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const { email } = req.validatedBody as { email: string }
-  await assertOrderEmail(req.scope, req.params.id, email)
+  await assertOrderEmail(req.scope, req.params.id, email, req)
 
   const marketplace: MarketplaceModuleService =
     req.scope.resolve(MARKETPLACE_MODULE)

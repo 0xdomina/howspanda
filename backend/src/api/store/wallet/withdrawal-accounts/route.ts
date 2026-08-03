@@ -1,5 +1,6 @@
 import { MedusaError } from "@medusajs/framework/utils"
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { MedusaResponse } from "@medusajs/framework/http"
+import { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import BuyerWalletModuleService from "../../../../modules/buyer-wallet/service"
 import { BUYER_WALLET_MODULE } from "../../../../modules/buyer-wallet"
 import {
@@ -9,6 +10,7 @@ import {
 } from "../../../../lib/payments/payouts/paystack-transfers"
 import { PostWalletWithdrawalAccountSchema } from "../../../middlewares"
 import { z } from "@medusajs/framework/zod"
+import { resolveCustomerEmail } from "../../../../lib/escrow/resolve-customer-email"
 
 type PostWalletWithdrawalAccountBody = z.infer<
   typeof PostWalletWithdrawalAccountSchema
@@ -19,14 +21,11 @@ type PostWalletWithdrawalAccountBody = z.infer<
 const BASE_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
-export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-  const email = String(req.query.email ?? "")
-  if (!email) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      "email query param is required"
-    )
-  }
+export const GET = async (
+  req: AuthenticatedMedusaRequest,
+  res: MedusaResponse
+) => {
+  const email = await resolveCustomerEmail(req)
 
   const buyerWallet =
     req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
@@ -40,13 +39,13 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 }
 
 export const POST = async (
-  req: MedusaRequest<PostWalletWithdrawalAccountBody>,
+  req: AuthenticatedMedusaRequest<PostWalletWithdrawalAccountBody>,
   res: MedusaResponse
 ) => {
   const buyerWallet =
     req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
   const body = req.validatedBody
-  const email = body.buyerEmail.trim().toLowerCase()
+  const email = await resolveCustomerEmail(req)
 
   if (body.type === "bank_account") {
     if (!body.bank_code || !body.account_number) {

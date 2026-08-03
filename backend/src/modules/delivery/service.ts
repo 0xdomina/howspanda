@@ -176,7 +176,11 @@ class DeliveryModuleService extends MedusaService({
         return { ...j, pickup_distance_km: d.pickup, destination_distance_km: d.destination }
       })
     }
-    return filtered
+    // Public courier browse must not leak the recipient's phone number.
+    return (filtered as any[]).map((j) => {
+      const { destination_phone, ...job } = j
+      return job
+    })
   }
 
   /** A store owner's own delivery jobs (seller view), newest first. */
@@ -320,13 +324,22 @@ class DeliveryModuleService extends MedusaService({
         "Job must be accepted before pickup"
       )
     }
-    const courierParty = await this.listDeliveryParties({
-      job_id: jobId,
-      role: "courier",
-      email: courierEmail,
+    // M3: only the ACCEPTED courier may mark pickup — any courier was previously
+    // a party (they made an offer) so a rejected courier could flip the job to
+    // in_transit.
+    const acceptedOffer = await this.listDeliveryOffers({
+      id: job.accepted_offer_id,
     })
-    if (!courierParty.length) {
-      throw new MedusaError(MedusaError.Types.UNAUTHORIZED, "Only the courier can mark pickup")
+    const acceptedCourier = acceptedOffer[0]?.courier_email
+    if (
+      !acceptedCourier ||
+      acceptedCourier.trim().toLowerCase() !==
+        courierEmail.trim().toLowerCase()
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Only the accepted courier can mark pickup"
+      )
     }
     const updated = await this.updateDeliveryJobs({
       id: jobId,
@@ -346,6 +359,10 @@ class DeliveryModuleService extends MedusaService({
    * Recipient confirms delivery → the agreed price is released to the courier
    * wallet (the caller's wallet service credits `delivery_payout`). Returns the
    * amount released so the route can credit it.
+   *
+   * Hardening: the confirming caller MUST already be a party (recipient or
+   * courier) on the job. Previously any caller could supply any email and
+   * release the payout (money-loss vector) — that escape hatch is removed.
    */
   async confirmDelivery(jobId: string, recipientEmail: string, courierEmail?: string) {
     const job = await this.getJob(jobId)
@@ -355,20 +372,18 @@ class DeliveryModuleService extends MedusaService({
         "Job is not deliverable"
       )
     }
-    const recipientParty = await this.listDeliveryParties({
-      job_id: jobId,
-      role: "recipient",
-      email: recipientEmail,
-    })
-    if (!recipientParty.length && !(job.seller_id)) {
-      // Recipient identity is email-based; accept the confirmation when the
-      // party exists OR when the job was manually posted without a recipient
-      // party yet (register on confirm).
-      await this.ensureParty(jobId, "recipient", recipientEmail)
-    } else if (!recipientParty.length && job.seller_id) {
-      // Seller-posted jobs need an existing recipient party OR the courier may
-      // not be confirming as the recipient. Register if the confirm comes from
-      // a courier-email (the courier confirms POD on behalf of the recipient).
+    // The caller must already be on the job roster — never register them on
+    // the spot (that allowed payout release by anyone).
+    const parties = await this.listDeliveryParties({ job_id: jobId })
+    const confirmEmail = (recipientEmail || courierEmail || "").trim().toLowerCase()
+    const isParty =
+      parties.some((p) => p.email === confirmEmail) &&
+      confirmEmail !== ""
+    if (!isParty) {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Only a job party can confirm delivery"
+      )
     }
 
     const offers = await this.listDeliveryOffers({ id: job.accepted_offer_id })
@@ -384,7 +399,7 @@ class DeliveryModuleService extends MedusaService({
     })
     await this.sendMessage({
       jobId,
-      senderEmail: recipientEmail || courierEmail || "",
+      senderEmail: confirmEmail,
       body: "Delivery confirmed — payment released to the courier.",
       isSystem: true,
     })
@@ -403,11 +418,20 @@ class DeliveryModuleService extends MedusaService({
         "Job is already terminal"
       )
     }
-    const senderParty = await this.listDeliveryParties({
+    // M2: only a party on the job roster may cancel (previously any caller
+    // could kill a rival's accepted job — griefing / suppressing payouts).
+    const party = await this.listDeliveryParties({
       job_id: jobId,
-      role: "sender",
       email: byEmail,
     })
+    if (!party.length) {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Only a job party can cancel this job"
+      )
+    }
+    const senderParty = party.filter((p) => p.role === "sender")
+
     const isSender = senderParty.length > 0
 
     if (job.status === "in_transit" && !isSender) {

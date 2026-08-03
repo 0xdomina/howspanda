@@ -1,4 +1,4 @@
-import { MedusaError } from "@medusajs/framework/utils"
+import { MedusaError, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import MallModuleService from "../../../../../modules/mall/service"
 import BuyerWalletModuleService from "../../../../../modules/buyer-wallet/service"
@@ -13,6 +13,25 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       "buyerEmail and orderId are required"
+    )
+  }
+
+  // H1: a mall prize must only be awarded for a real order that belongs to
+  // this buyer. An unauth caller could otherwise spam fabricated order ids
+  // with fresh emails until a win rolled and drain the prize pool.
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: [order] } = await query.graph({
+    entity: "order",
+    fields: ["id", "email"],
+    filters: { id: body.orderId },
+  })
+  if (
+    !order ||
+    (order.email ?? "").toLowerCase() !== body.buyerEmail.trim().toLowerCase()
+  ) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_FOUND,
+      "Order not found for this buyer"
     )
   }
 

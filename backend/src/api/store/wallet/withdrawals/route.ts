@@ -1,22 +1,20 @@
 import { randomUUID } from "node:crypto"
-import { MedusaError } from "@medusajs/framework/utils"
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { MedusaResponse } from "@medusajs/framework/http"
+import { AuthenticatedMedusaRequest } from "@medusajs/framework/http"
 import BuyerWalletModuleService from "../../../../modules/buyer-wallet/service"
 import { BUYER_WALLET_MODULE } from "../../../../modules/buyer-wallet"
 import createBuyerWithdrawalWorkflow from "../../../../workflows/buyer-wallet/create-withdrawal"
 import { PostWalletWithdrawalSchema } from "../../../middlewares"
 import { z } from "@medusajs/framework/zod"
+import { resolveCustomerEmail } from "../../../../lib/escrow/resolve-customer-email"
 
 type PostWalletWithdrawalBody = z.infer<typeof PostWalletWithdrawalSchema>
 
-export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-  const email = String(req.query.email ?? "")
-  if (!email) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      "email query param is required"
-    )
-  }
+export const GET = async (
+  req: AuthenticatedMedusaRequest,
+  res: MedusaResponse
+) => {
+  const email = await resolveCustomerEmail(req)
 
   const buyerWallet =
     req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
@@ -33,13 +31,13 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 }
 
 export const POST = async (
-  req: MedusaRequest<PostWalletWithdrawalBody>,
+  req: AuthenticatedMedusaRequest<PostWalletWithdrawalBody>,
   res: MedusaResponse
 ) => {
   const buyerWallet =
     req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
   const body = req.validatedBody
-  const email = body.buyerEmail.trim().toLowerCase()
+  const email = await resolveCustomerEmail(req)
 
   // Replaying the same idempotency_key returns the SAME withdrawal — the
   // workflow's guard short-circuits before any step touches the ledger.

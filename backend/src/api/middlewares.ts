@@ -2,6 +2,7 @@ import {
   defineMiddlewares,
   authenticate,
   validateAndTransformBody,
+  AuthenticatedMedusaRequest,
 } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
 import { rateLimit } from "../lib/security/rate-limit"
@@ -33,14 +34,34 @@ const WALLET_RATE_LIMIT = rateLimit({
   limit: 20,
   windowMs: 60 * 60 * 1000,
   keyOf: (req) => {
-    const b = req.body as { buyerEmail?: string } | undefined
-    return b?.buyerEmail
-  },
-})
+    // Wallet routes require customer auth; key by the actor, not the body.
+    const authed = req as AuthenticatedMedusaRequest
+    return (authed.auth_context?.actor_id as string) ?? undefined
+  },})
 const CHECKOUT_RATE_LIMIT = rateLimit({
   name: "checkout",
   limit: 60,
   windowMs: 15 * 60 * 1000,
+})
+const MALL_RATE_LIMIT = rateLimit({
+  name: "mall",
+  limit: 30,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const b = req.body as { buyerEmail?: string } | undefined
+    return b?.buyerEmail
+  },
+})
+const DELIVERY_RATE_LIMIT = rateLimit({
+  name: "delivery",
+  limit: 20,
+  windowMs: 10 * 60 * 1000,
+  keyOf: (req) => {
+    const b = req.body as
+      | { email?: string; courierEmail?: string; recipientEmail?: string }
+      | undefined
+    return b?.email || b?.courierEmail || b?.recipientEmail
+  },
 })
 const ADMIN_RATE_LIMIT = rateLimit({
   name: "admin",
@@ -184,10 +205,10 @@ export const PostSellerPayoutSchema = z.object({
   idempotency_key: z.string().optional(),
 })
 
-// Buyer wallet withdrawal (Phase 15): email is the ownership proof, mirroring
-// the store wallet credit routes (mall prizes, delivery payouts).
+// Buyer wallet withdrawal (Phase 15): ownership comes from the customer JWT
+// actor (see store/wallet routes) — the body email is ignored/legacy.
 export const PostWalletWithdrawalAccountSchema = z.object({
-  buyerEmail: z.string().email(),
+  buyerEmail: z.string().email().optional(),
   type: z.enum(["bank_account", "crypto_address"]),
   bank_code: z.string().min(3).optional(),
   account_number: z.string().regex(/^\d{10}$/, "NUBAN is 10 digits").optional(),
@@ -196,7 +217,7 @@ export const PostWalletWithdrawalAccountSchema = z.object({
 })
 
 export const PostWalletWithdrawalSchema = z.object({
-  buyerEmail: z.string().email(),
+  buyerEmail: z.string().email().optional(),
   rail: z.enum(["paystack", "crypto-usdc"]),
   amount: z.number().positive(),
   idempotency_key: z.string().optional(),
@@ -508,12 +529,24 @@ export default defineMiddlewares({
       middlewares: [validateAndTransformBody(PostSellerPayoutSchema)],
     },
     {
+      matcher: "/store/wallet",
+      middlewares: [authenticate("customer", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/wallet/withdrawal-accounts",
+      middlewares: [authenticate("customer", ["session", "bearer"])],
+    },
+    {
       matcher: "/store/wallet/withdrawal-accounts",
       methods: ["POST"],
       middlewares: [
         WALLET_RATE_LIMIT,
         validateAndTransformBody(PostWalletWithdrawalAccountSchema),
       ],
+    },
+    {
+      matcher: "/store/wallet/withdrawals",
+      middlewares: [authenticate("customer", ["session", "bearer"])],
     },
     {
       matcher: "/store/wallet/withdrawals",
@@ -524,19 +557,62 @@ export default defineMiddlewares({
       ],
     },
     {
+      matcher: "/store/orders/:id/escrow-status",
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
       matcher: "/store/orders/:id/confirm-receipt",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostConfirmReceiptSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(PostConfirmReceiptSchema),
+      ],
     },
     {
       matcher: "/store/orders/:id/request-return",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostRequestReturnSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(PostRequestReturnSchema),
+      ],
     },
     {
       matcher: "/store/orders/:id/cancel-return",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostCancelReturnSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(PostCancelReturnSchema),
+      ],
+    },
+    {
+      matcher: "/store/orders/:id/review",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(PostCreateReviewSchema),
+      ],
+    },
+    {
+      matcher: "/store/orders/:id/tip",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(PostBuyerTipSchema),
+      ],
     },
     {
       matcher: "/admin/escrow/hold",
@@ -575,19 +651,24 @@ export default defineMiddlewares({
       middlewares: [CHECKOUT_RATE_LIMIT],
     },
     {
-      matcher: "/store/orders/:id/review",
-      methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostCreateReviewSchema)],
-    },
-    {
       matcher: "/store/reviews/:id",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostEditReviewSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(PostEditReviewSchema),
+      ],
     },
     {
       matcher: "/store/reviews/:id",
       methods: ["DELETE"],
-      middlewares: [validateAndTransformBody(DeleteReviewSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(DeleteReviewSchema),
+      ],
     },
     {
       matcher: "/sellers/reviews/:id/reply",
@@ -640,11 +721,6 @@ export default defineMiddlewares({
       bodyParser: { preserveRawBody: true },
     },
     {
-      matcher: "/store/orders/:id/tip",
-      methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostBuyerTipSchema)],
-    },
-    {
       matcher: "/sellers/tips",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostSellerTipSchema)],
@@ -657,7 +733,13 @@ export default defineMiddlewares({
     {
       matcher: "/store/referrals",
       methods: ["POST"],
-      middlewares: [REFERRAL_RATE_LIMIT, validateAndTransformBody(PostReferralClaimSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        REFERRAL_RATE_LIMIT,
+        validateAndTransformBody(PostReferralClaimSchema),
+      ],
     },
     {
       // Seller (store owner) mall routes: publishable key + seller bearer both
@@ -685,12 +767,12 @@ export default defineMiddlewares({
     {
       matcher: "/store/malls/:id/join-buyer",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostMallJoinBuyerSchema)],
+      middlewares: [MALL_RATE_LIMIT, validateAndTransformBody(PostMallJoinBuyerSchema)],
     },
     {
       matcher: "/store/malls/:id/purchase",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostMallPurchaseSchema)],
+      middlewares: [MALL_RATE_LIMIT, validateAndTransformBody(PostMallPurchaseSchema)],
     },
     {
       // Seller (store owner) posts a delivery job from a completed order.
@@ -719,37 +801,37 @@ export default defineMiddlewares({
     {
       matcher: "/store/delivery-jobs/:id/pickup",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryPickupSchema)],
+      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryPickupSchema)],
     },
     {
       matcher: "/store/delivery-jobs/:id/cancel",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryCancelSchema)],
+      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryCancelSchema)],
     },
     {
       matcher: "/store/delivery-jobs/:id/confirm",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryConfirmSchema)],
+      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryConfirmSchema)],
     },
     {
       matcher: "/store/delivery-jobs/:id/chat",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryChatSchema)],
+      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryChatSchema)],
     },
     {
       matcher: "/store/delivery-jobs/:id/verify/pickup",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
+      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
     },
     {
       matcher: "/store/delivery-jobs/:id/verify/delivery",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
+      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
     },
     {
       matcher: "/store/delivery-jobs/:id/verify",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryVerifySchema)],
+      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryVerifySchema)],
     },
     {
       matcher: "/kyc/request",

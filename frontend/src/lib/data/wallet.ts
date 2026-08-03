@@ -1,6 +1,7 @@
 "use server"
 
 import { sdk } from "@lib/config"
+import { getAuthHeaders } from "./cookies"
 
 export type WalletLedger = {
   id: string
@@ -41,19 +42,21 @@ export type WalletSummary = {
   ledger: WalletLedger[]
 }
 
-// The store wallet routes are keyed by the guest-checkout email — the same
-// identity the wallet uses. Ownership is proven by passing it as a query param.
+// The store wallet routes resolve ownership from the authenticated customer
+// JWT actor — the caller only needs to be logged in (email is kept as a
+// display convenience and is not trusted server-side).
 export const getBuyerWallet = async (
-  email: string
+  _email: string
 ): Promise<WalletSummary | null> => {
   try {
+    const headers = await getAuthHeaders()
     const res = await sdk.client.fetch<{
       balance: number
       minimum_ngn: number
       ledger: WalletLedger[]
     }>("/store/wallet", {
       method: "GET",
-      query: { email },
+      headers,
       cache: "no-store",
     })
     return { balance: res.balance ?? 0, minimum_ngn: res.minimum_ngn ?? 0, ledger: res.ledger ?? [] }
@@ -63,13 +66,14 @@ export const getBuyerWallet = async (
 }
 
 export const listWithdrawalAccounts = async (
-  email: string
+  _email: string
 ): Promise<WithdrawalAccount[]> => {
   try {
+    const headers = await getAuthHeaders()
     return await sdk.client
       .fetch<{ withdrawal_accounts: WithdrawalAccount[] }>(
         "/store/wallet/withdrawal-accounts",
-        { method: "GET", query: { email }, cache: "no-store" }
+        { method: "GET", headers, cache: "no-store" }
       )
       .then(({ withdrawal_accounts }) => withdrawal_accounts ?? [])
       .catch(() => [])
@@ -79,7 +83,7 @@ export const listWithdrawalAccounts = async (
 }
 
 export const addWithdrawalAccount = async (
-  email: string,
+  _email: string,
   body: {
     type: "bank_account"
     bank_code: string
@@ -91,9 +95,11 @@ export const addWithdrawalAccount = async (
   }
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
     await sdk.client.fetch("/store/wallet/withdrawal-accounts", {
       method: "POST",
-      body: { buyerEmail: email, ...body },
+      headers,
+      body,
     })
     return { success: true, error: null }
   } catch (error: any) {
@@ -102,13 +108,14 @@ export const addWithdrawalAccount = async (
 }
 
 export const listWithdrawals = async (
-  email: string
+  _email: string
 ): Promise<BuyerWithdrawal[]> => {
   try {
+    const headers = await getAuthHeaders()
     return await sdk.client
       .fetch<{ withdrawals: BuyerWithdrawal[] }>("/store/wallet/withdrawals", {
         method: "GET",
-        query: { email },
+        headers,
         cache: "no-store",
       })
       .then(({ withdrawals }) => withdrawals ?? [])
@@ -119,14 +126,16 @@ export const listWithdrawals = async (
 }
 
 export const createWithdrawal = async (
-  email: string,
+  _email: string,
   rail: "paystack" | "crypto-usdc",
   amount: number
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
     await sdk.client.fetch("/store/wallet/withdrawals", {
       method: "POST",
-      body: { buyerEmail: email, rail, amount },
+      headers,
+      body: { rail, amount },
     })
     return { success: true, error: null }
   } catch (error: any) {

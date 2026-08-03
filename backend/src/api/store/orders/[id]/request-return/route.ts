@@ -11,7 +11,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     email: string
     reason: string
   }
-  await assertOrderEmail(req.scope, req.params.id, email)
+  await assertOrderEmail(req.scope, req.params.id, email, req)
 
   if (await isOrderNonReturnable(req.scope, req.params.id)) {
     throw new MedusaError(

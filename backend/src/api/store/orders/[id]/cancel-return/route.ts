@@ -7,7 +7,7 @@ import { assertOrderEmail } from "../../../../../lib/escrow/order-access"
 // schedule resumes (the hourly job releases if the window already passed).
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const { email } = req.validatedBody as { email: string }
-  await assertOrderEmail(req.scope, req.params.id, email)
+  await assertOrderEmail(req.scope, req.params.id, email, req)
 
   const marketplace: MarketplaceModuleService =
     req.scope.resolve(MARKETPLACE_MODULE)

@@ -24,7 +24,7 @@ export const POST = async (
   const orderId = req.params.id
   const { email, rating, comment, product_ratings } = req.validatedBody
 
-  await assertOrderEmail(req.scope, orderId, email)
+  const access = await assertOrderEmail(req.scope, orderId, email, req)
 
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
@@ -68,7 +68,7 @@ export const POST = async (
   const review = await reviews.createReview({
     seller_id: lines[0].seller_id as string,
     order_id: orderId,
-    buyer_email: email,
+    buyer_email: access.email,
     rating,
     comment,
     product_ratings,
