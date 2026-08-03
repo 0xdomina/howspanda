@@ -387,6 +387,137 @@ export const createSellerReferral = async (
   }
 }
 
+export type SellerRedeemable = {
+  id: string
+  type: "gift_card" | "voucher" | "ticket"
+  code: string
+  status?: string
+  currency_code?: string
+  title?: string
+  face_value?: number | string | null
+  balance?: number | string | null
+  discount_type?: string | null
+  discount_value?: number | null
+  price?: number | string | null
+  expires_at?: string | null
+  issued_to_email?: string | null
+  created_at?: string
+}
+
+export const listSellerRedeemables = async (
+  filters: { type?: string; status?: string } = {}
+): Promise<SellerRedeemable[]> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return []
+
+    const query: Record<string, string> = {}
+    if (filters.type) query.type = filters.type
+    if (filters.status) query.status = filters.status
+
+    return await sdk.client
+      .fetch<{ redeemables: SellerRedeemable[] }>("/sellers/redeemables", {
+        method: "GET",
+        headers,
+        query,
+        cache: "no-store",
+      })
+      .then(({ redeemables }) => redeemables ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
+export const createSellerRedeemable = async (
+  body: {
+    type: "gift_card" | "voucher" | "ticket"
+    title: string
+    face_value?: number
+    discount_type?: "fixed" | "percent"
+    discount_value?: number
+    price?: number
+    expires_at?: string
+    quantity?: number
+    issued_to_email?: string
+  }
+): Promise<{ success: boolean; error: string | null; code?: string }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    const res = await sdk.client.fetch<{ redeemables: SellerRedeemable[] }>(
+      "/sellers/redeemables",
+      {
+        method: "POST",
+        headers,
+        body: {
+          type: body.type,
+          title: body.title,
+          face_value: body.face_value,
+          discount_type: body.discount_type,
+          discount_value: body.discount_value,
+          price: body.price,
+          expires_at: body.expires_at || undefined,
+          quantity: body.quantity,
+          issued_to_email: body.issued_to_email || undefined,
+        },
+      }
+    )
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return { success: true, error: null, code: res.redeemables?.[0]?.code }
+  } catch (error: any) {
+    return { success: false, error: error.toString() }
+  }
+}
+
+export const cancelSellerRedeemable = async (
+  id: string
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch(`/sellers/redeemables/${id}/cancel`, {
+      method: "POST",
+      headers,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error.toString() }
+  }
+}
+
+export const redeemInStore = async (
+  code: string,
+  amount?: number
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch("/sellers/redeemables/redeem", {
+      method: "POST",
+      headers,
+      body: { code, amount },
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error.toString() }
+  }
+}
+
 export const retrieveSellerProduct = async (
   id: string
 ): Promise<SellerProduct | null> => {
