@@ -17,7 +17,7 @@ const Hero = () => {
               Start shopping
             </span>
           </LocalizedClientLink>
-          <LocalizedClientLink href="/account">
+          <LocalizedClientLink href="/seller">
             <span className="inline-flex items-center rounded-full border border-ink-hairline bg-paper-surface px-6 py-3 text-sm font-medium text-ink transition-colors duration-fast hover:bg-paper-tinted">
               Start selling
             </span>

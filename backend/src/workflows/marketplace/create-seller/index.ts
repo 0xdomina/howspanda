@@ -28,12 +28,26 @@ export type CreateSellerWorkflowInput = {
 const createSellerWorkflow = createWorkflow(
   "create-seller",
   function (input: CreateSellerWorkflowInput) {
-    const seller = createSellerStep({
-      name: input.name,
-      handle: input.handle,
-      logo: input.logo,
-      description: input.description,
+    const sellerInput = transform({ input }, ({ input }) => {
+      // The store link is optional — derive a handle from the store name so a
+      // seller never has to think about slugs.
+      const rawName = (input.name || "").trim()
+      const baseHandle = input.handle
+        ? input.handle.trim().toLowerCase()
+        : rawName
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 40) || `store-${Date.now().toString(36)}`
+      return {
+        name: input.name,
+        handle: baseHandle,
+        logo: input.logo,
+        description: input.description,
+      }
     })
+
+    const seller = createSellerStep(sellerInput)
 
     const sellerAdminData = transform({
       input,

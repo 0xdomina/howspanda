@@ -338,12 +338,70 @@ const RequestPayout = ({
   )
 }
 
+const CommissionsCard = ({ commissions }: { commissions: any }) => {
+  const summary = commissions?.summary
+  const rate = Number(commissions?.commission_rate ?? 0)
+
+  if (!summary || Object.keys(summary).length === 0) {
+    return (
+      <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+        <h3 className="font-display text-lg font-medium text-ink">
+          Commissions
+        </h3>
+        <p className="mt-2 text-sm text-ink-muted">
+          No sales yet. Commissions are charged on every completed order.
+          {rate > 0 && <> Your commission rate is {rate * 100}%.</>}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-display text-lg font-medium text-ink">
+          Commissions
+        </h3>
+        {rate > 0 && (
+          <span className="rounded-full bg-ink/5 px-2.5 py-0.5 text-xs text-ink-muted">
+            {rate * 100}% rate
+          </span>
+        )}
+      </div>
+      <ul className="space-y-3">
+        {Object.entries(summary as Record<string, any>).map(
+          ([currency, s]) => (
+            <li
+              key={currency}
+              className="flex items-center justify-between gap-4 rounded-medium border border-ink-hairline p-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-ink">
+                  Gross: {money(s.gross, currency)}
+                </p>
+                <p className="text-xs text-ink-muted">
+                  Commission: {money(s.commission, currency)}
+                </p>
+              </div>
+              <p className="font-mono tabular-nums text-sm text-ink">
+                Net: {money(s.net, currency)}
+              </p>
+            </li>
+          )
+        )}
+      </ul>
+    </div>
+  )
+}
+
 const SellerMoneyClient = ({
   balance,
+  commissions,
   payoutAccounts,
   payouts,
 }: {
   balance: any
+  commissions: any
   payoutAccounts: any[]
   payouts: any[]
 }) => {
@@ -374,6 +432,8 @@ const SellerMoneyClient = ({
           </div>
         ))}
       </div>
+
+      <CommissionsCard commissions={commissions} />
 
       <div className="grid grid-cols-1 gap-6 small:grid-cols-2">
         <RequestPayout balance={balance} payoutAccounts={payoutAccounts} />

@@ -37,6 +37,8 @@ module.exports = defineConfig({
     {
       // Default auth module with an additional `phone` provider so sellers
       // can sign in with a phone number + password (emailpass stays as-is).
+      // Google OAuth is free and ships with Medusa; it only activates once
+      // GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are configured.
       resolve: "@medusajs/medusa/auth",
       options: {
         providers: [
@@ -48,6 +50,21 @@ module.exports = defineConfig({
             resolve: "./src/modules/auth-phone",
             id: "phone",
           },
+          ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+            ? [
+                {
+                  resolve: "@medusajs/medusa/auth-google",
+                  id: "google",
+                  options: {
+                    clientId: process.env.GOOGLE_CLIENT_ID,
+                    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                    callbackUrl:
+                      process.env.GOOGLE_CALLBACK_URL ||
+                      `${process.env.BACKEND_URL ?? "http://localhost:9000"}/auth/customer/google/callback`,
+                  },
+                },
+              ]
+            : []),
         ],
       },
     },

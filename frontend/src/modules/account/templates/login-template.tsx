@@ -1,5 +1,6 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 
 import Register from "@modules/account/components/register"
@@ -11,7 +12,12 @@ export enum LOGIN_VIEW {
 }
 
 const LoginTemplate = () => {
-  const [currentView, setCurrentView] = useState("sign-in")
+  const searchParams = useSearchParams()
+  const [currentView, setCurrentView] = useState(
+    searchParams.get("mode") === "register"
+      ? LOGIN_VIEW.REGISTER
+      : LOGIN_VIEW.SIGN_IN
+  )
 
   return (
     <div className="w-full flex justify-start px-8 py-8">

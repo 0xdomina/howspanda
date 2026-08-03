@@ -740,3 +740,188 @@ export const createSellerProduct = async (
     return { success: false, error: error.toString() }
   }
 }
+
+// --- Reviews (seller inbox) ----------------------------------------------
+
+export type SellerReview = {
+  id: string
+  order_id?: string
+  buyer_email?: string
+  rating: number
+  comment?: string | null
+  status?: string
+  reply_body?: string | null
+  replied_at?: string | null
+  created_at?: string
+  product_ratings?: { product_id?: string; rating?: number }[]
+}
+
+export const listSellerReviews = async (params?: {
+  rating?: number
+  replied?: boolean
+}): Promise<SellerReview[]> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return []
+
+    const query: Record<string, string> = {}
+    if (params?.rating) query.rating = String(params.rating)
+    if (params?.replied != null) query.replied = String(params.replied)
+
+    return await sdk.client
+      .fetch<{ reviews: SellerReview[] }>("/sellers/reviews", {
+        method: "GET",
+        headers,
+        query,
+        cache: "no-store",
+      })
+      .then(({ reviews }) => reviews ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
+export const replyToReview = async (
+  reviewId: string,
+  body: string
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch(`/sellers/reviews/${reviewId}/reply`, {
+      method: "POST",
+      headers,
+      body: { body },
+    })
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString() }
+  }
+}
+
+// --- Commissions ---------------------------------------------------------
+
+export type CommissionLine = {
+  id?: string
+  order_id?: string
+  currency_code?: string
+  order_total?: number
+  rate?: number
+  commission_amount?: number
+  net_amount?: number
+  status?: string
+  available_at?: string | null
+  created_at?: string
+}
+
+export const retrieveSellerCommissions = async (): Promise<{
+  commission_rate?: number
+  summary?: Record<string, { gross: number; commission: number; net: number }>
+  commission_lines?: CommissionLine[]
+} | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    return await sdk.client
+      .fetch<{
+        commission_rate?: number
+        summary?: Record<string, { gross: number; commission: number; net: number }>
+        commission_lines?: CommissionLine[]
+      }>("/sellers/commissions", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
+// --- Tips -----------------------------------------------------------------
+
+export type SellerTip = {
+  id: string
+  direction?: string
+  order_id?: string | null
+  buyer_email?: string | null
+  seller_id?: string | null
+  amount?: number | null
+  product_id?: string | null
+  product_title?: string | null
+  redeemable_code?: string | null
+  note?: string | null
+  created_at?: string
+}
+
+export const listSellerTips = async (): Promise<{
+  tips: SellerTip[]
+  summary: { given?: number; received?: number; net?: number }
+} | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    return await sdk.client
+      .fetch<{ tips: SellerTip[]; summary: any }>("/sellers/tips", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .then((r) => ({ tips: r.tips ?? [], summary: r.summary ?? {} }))
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
+export const giveSellerTip = async (body: {
+  order_id?: string
+  buyer_email?: string
+  amount?: number
+  note?: string
+}): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch("/sellers/tips", {
+      method: "POST",
+      headers,
+      body,
+    })
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString() }
+  }
+}
+
+// --- Trust score ----------------------------------------------------------
+
+export type SellerTrustScore = {
+  score: number | null
+  tier: string
+  review_count: number
+  avg_rating: number
+  breakdown?: { key: string; weight: number; value: number }[]
+}
+
+export const retrieveSellerTrustScore = async (): Promise<SellerTrustScore | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    return await sdk.client
+      .fetch<SellerTrustScore>("/sellers/trust-score", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}

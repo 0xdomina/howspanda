@@ -37,12 +37,6 @@ const SellerRegister = ({ setCurrentView }: Props) => {
             data-testid="seller-name-input"
           />
           <Input
-            label="Store link"
-            name="handle"
-            autoComplete="off"
-            data-testid="seller-handle-input"
-          />
-          <Input
             label="First name"
             name="first_name"
             required

@@ -9,6 +9,7 @@ import User from "@modules/common/icons/user"
 import MapPin from "@modules/common/icons/map-pin"
 import Package from "@modules/common/icons/package"
 import Wallet from "@modules/common/icons/wallet"
+import ShieldCheck from "@modules/common/icons/shield-check"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { HttpTypes } from "@medusajs/types"
 import { signout } from "@lib/data/customer"
@@ -103,6 +104,19 @@ const AccountNav = ({
                   </LocalizedClientLink>
                 </li>
                 <li>
+                  <LocalizedClientLink
+                    href="/account/verification"
+                    className="flex items-center justify-between py-4 border-b border-ink-hairline px-8"
+                    data-testid="verification-link"
+                  >
+                    <div className="flex items-center gap-x-2">
+                      <ShieldCheck size={20} />
+                      <span>Verification</span>
+                    </div>
+                    <ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                <li>
                   <button
                     type="button"
                     className="flex items-center justify-between py-4 border-b border-ink-hairline px-8 w-full"
@@ -171,6 +185,15 @@ const AccountNav = ({
                   data-testid="wallet-link"
                 >
                   Wallet
+                </AccountNavLink>
+              </li>
+              <li>
+                <AccountNavLink
+                  href="/account/verification"
+                  route={route!}
+                  data-testid="verification-link"
+                >
+                  Verification
                 </AccountNavLink>
               </li>
               <li className="text-ink-muted">
