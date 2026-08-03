@@ -12,10 +12,15 @@ import { DELIVERY_MODULE } from "../../../modules/delivery"
 import type { PostJobInput } from "../../../modules/delivery/service"
 
 // Anyone with a publishable key can browse open jobs (courier view).
+// Supports ?city=... text filter and ?lat=..&lng=..&radiusKm=.. near-me search.
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const city = (req.query?.city as string) || undefined
+  const lat = req.query?.lat !== undefined ? Number(req.query.lat) : undefined
+  const lng = req.query?.lng !== undefined ? Number(req.query.lng) : undefined
+  const radiusKm =
+    req.query?.radiusKm !== undefined ? Number(req.query.radiusKm) : undefined
   const deliveryService = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)
-  const jobs = await deliveryService.listOpenJobs({ city })
+  const jobs = await deliveryService.listOpenJobs({ city, lat, lng, radiusKm })
   res.json({ jobs })
 }
 

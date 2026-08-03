@@ -13,6 +13,12 @@ export type DeliveryJob = {
   pickup_address: string
   destination_address: string
   destination_phone?: string | null
+  pickup_lat?: number | null
+  pickup_lng?: number | null
+  destination_lat?: number | null
+  destination_lng?: number | null
+  pickup_distance_km?: number | null
+  destination_distance_km?: number | null
   posted_price: number | string
   status: string
   accepted_offer_id?: string | null
@@ -44,14 +50,62 @@ const hasAuth = (headers: AuthHeaders): headers is { authorization: string } =>
 
 // --- public / courier side (publishable key) ---
 
-export const listOpenDeliveryJobs = async (
+export type GeocodeResult = {
+  lat: number
+  lng: number
+  displayName: string
+  city?: string | null
+  country?: string | null
+}
+
+/** Forward geocode an address via Nominatim (public route). */
+export const geocodeAddress = async (
+  address: string
+): Promise<GeocodeResult | null> => {
+  try {
+    return await sdk.client
+      .fetch<{ result: GeocodeResult }>("/store/geo/geocode", {
+        method: "GET",
+        query: { address },
+        cache: "no-store",
+      })
+      .then(({ result }) => result)
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
+/** Reverse geocode coordinates into an address via Nominatim (public route). */
+export const reverseGeocode = async (
+  lat: number,
+  lng: number
+): Promise<GeocodeResult | null> => {
+  try {
+    return await sdk.client
+      .fetch<{ result: GeocodeResult }>("/store/geo/reverse", {
+        method: "GET",
+        query: { lat, lng },
+        cache: "no-store",
+      })
+      .then(({ result }) => result)
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
+export const listOpenDeliveryJobs = async (params?: {
   city?: string
-): Promise<DeliveryJob[]> => {
+  lat?: number
+  lng?: number
+  radiusKm?: number
+}): Promise<DeliveryJob[]> => {
   try {
     return await sdk.client
       .fetch<{ jobs: DeliveryJob[] }>("/store/delivery-jobs", {
         method: "GET",
-        query: city ? { city } : undefined,
+        query: params,
         cache: "no-store",
       })
       .then(({ jobs }) => jobs ?? [])

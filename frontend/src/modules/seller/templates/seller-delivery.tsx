@@ -1,7 +1,7 @@
 "use client"
 
-import { useTransition, useState } from "react"
-import { postDeliveryJob, acceptOffer } from "@lib/data/delivery"
+import { useEffect, useRef, useTransition, useState } from "react"
+import { postDeliveryJob, acceptOffer, geocodeAddress } from "@lib/data/delivery"
 
 const ngn = (v: number | string | undefined) =>
   new Intl.NumberFormat("en-NG", {
@@ -35,6 +35,44 @@ const PostJobForm = ({
   const [postedPrice, setPostedPrice] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Live geocode preview: verifies an address resolves before the seller posts.
+  const [pickupGeo, setPickupGeo] = useState<
+    { status: "idle" | "checking" | "ok" | "fail"; label?: string } | null
+  >(null)
+  const [destGeo, setDestGeo] = useState<
+    { status: "idle" | "checking" | "ok" | "fail"; label?: string } | null
+  >(null)
+  const pickupTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const destTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const checkGeo = async (
+    value: string,
+    set: (g: { status: "idle" | "checking" | "ok" | "fail"; label?: string }) => void,
+    timer: React.MutableRefObject<ReturnType<typeof setTimeout> | null>
+  ) => {
+    if (timer.current) clearTimeout(timer.current)
+    if (value.trim().length < 4) {
+      set({ status: "idle" })
+      return
+    }
+    set({ status: "checking" })
+    timer.current = setTimeout(async () => {
+      const result = await geocodeAddress(value.trim())
+      set(
+        result
+          ? { status: "ok", label: `${result.city ?? ""}, ${result.country ?? ""}`.trim() }
+          : { status: "fail" }
+      )
+    }, 600)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (pickupTimer.current) clearTimeout(pickupTimer.current)
+      if (destTimer.current) clearTimeout(destTimer.current)
+    }
+  }, [])
 
   const submit = () => {
     setError(null)
@@ -133,20 +171,60 @@ const PostJobForm = ({
           <input
             type="text"
             value={pickupAddress}
-            onChange={(e) => setPickupAddress(e.target.value)}
+            onChange={(e) => {
+              setPickupAddress(e.target.value)
+              checkGeo(e.target.value, setPickupGeo, pickupTimer)
+            }}
             placeholder="Lagos, Nigeria"
             className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
           />
+          {pickupGeo && pickupGeo.status !== "idle" && (
+            <p
+              className={`mt-1 text-xs ${
+                pickupGeo.status === "ok"
+                  ? "text-emerald-600"
+                  : pickupGeo.status === "fail"
+                  ? "text-rose-600"
+                  : "text-ink-muted"
+              }`}
+            >
+              {pickupGeo.status === "checking" && "Checking location…"}
+              {pickupGeo.status === "ok" &&
+                `Located: ${pickupGeo.label ?? "verified"}`}
+              {pickupGeo.status === "fail" &&
+                "Couldn't locate this address — make it more specific."}
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs text-ink-muted">Destination address</label>
           <input
             type="text"
             value={destinationAddress}
-            onChange={(e) => setDestinationAddress(e.target.value)}
+            onChange={(e) => {
+              setDestinationAddress(e.target.value)
+              checkGeo(e.target.value, setDestGeo, destTimer)
+            }}
             placeholder="Abuja, Nigeria"
             className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
           />
+          {destGeo && destGeo.status !== "idle" && (
+            <p
+              className={`mt-1 text-xs ${
+                destGeo.status === "ok"
+                  ? "text-emerald-600"
+                  : destGeo.status === "fail"
+                  ? "text-rose-600"
+                  : "text-ink-muted"
+              }`}
+            >
+              {destGeo.status === "checking" && "Checking location…"}
+              {destGeo.status === "ok" &&
+                `Located: ${destGeo.label ?? "verified"}`}
+              {destGeo.status === "fail" &&
+                "Couldn't locate this address — make it more specific."}
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs text-ink-muted">Recipient phone (optional)</label>

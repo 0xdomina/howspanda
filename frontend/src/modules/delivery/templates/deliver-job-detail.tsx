@@ -2,6 +2,7 @@
 
 import { useTransition, useState } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import RouteMap from "@modules/delivery/components/route-map"
 import {
   makeOffer,
   markPickedUp,
@@ -218,6 +219,36 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
                 </p>
               )}
             </div>
+            {job.pickup_lat != null &&
+              job.pickup_lng != null &&
+              job.destination_lat != null &&
+              job.destination_lng != null && (
+                <div className="mt-4">
+                  <RouteMap
+                    points={[
+                      {
+                        lat: Number(job.pickup_lat),
+                        lng: Number(job.pickup_lng),
+                        label: "Pickup",
+                        kind: "pickup",
+                      },
+                      {
+                        lat: Number(job.destination_lat),
+                        lng: Number(job.destination_lng),
+                        label: "Destination",
+                        kind: "destination",
+                      },
+                    ]}
+                    height={300}
+                  />
+                  {job.pickup_distance_km != null && (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Pickup is {job.pickup_distance_km.toFixed(1)} km from your
+                      search location.
+                    </p>
+                  )}
+                </div>
+              )}
           </div>
 
           {offers.length > 0 && (

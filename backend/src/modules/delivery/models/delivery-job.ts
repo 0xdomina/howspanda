@@ -31,6 +31,12 @@ const DeliveryJob = model.define("delivery_job", {
   pickup_address: model.text(),
   destination_address: model.text(),
   destination_phone: model.text().nullable(),
+  // Resolved coordinates (geocoded via Nominatim at post time) — the location
+  // accuracy layer powering near-me/radius search and map display.
+  pickup_lat: model.float().nullable(),
+  pickup_lng: model.float().nullable(),
+  destination_lat: model.float().nullable(),
+  destination_lng: model.float().nullable(),
   // Posted price (sender's opening offer); final locked price lives on the
   // accepted offer.
   posted_price: model.bigNumber(),

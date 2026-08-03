@@ -1,5 +1,6 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
 import { createHash, randomInt } from "node:crypto"
+import { geocodeAddress, haversineKm } from "../../lib/geo/geocode"
 import DeliveryJob from "./models/delivery-job"
 import DeliveryOffer from "./models/delivery-offer"
 import DeliveryParty from "./models/delivery-party"
@@ -62,6 +63,22 @@ class DeliveryModuleService extends MedusaService({
         "postedPrice must be a positive number"
       )
     }
+    // Location accuracy: both endpoints must resolve to real coordinates or the
+    // job is rejected — a courier can never be routed to an unlocatable address.
+    const pickup = await geocodeAddress(input.pickupAddress)
+    const destination = await geocodeAddress(input.destinationAddress)
+    if (!pickup) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Could not locate pickup address: "${input.pickupAddress}". Please use a more specific address.`
+      )
+    }
+    if (!destination) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Could not locate destination address: "${input.destinationAddress}". Please use a more specific address.`
+      )
+    }
     const job = await this.createDeliveryJobs({
       order_id: input.orderId ?? null,
       seller_id: input.sellerId ?? null,
@@ -70,6 +87,10 @@ class DeliveryModuleService extends MedusaService({
       pickup_address: input.pickupAddress,
       destination_address: input.destinationAddress,
       destination_phone: input.destinationPhone ?? null,
+      pickup_lat: pickup.lat,
+      pickup_lng: pickup.lng,
+      destination_lat: destination.lat,
+      destination_lng: destination.lng,
       posted_price: round2(input.postedPrice),
       status: "open",
     })
@@ -95,21 +116,67 @@ class DeliveryModuleService extends MedusaService({
     })
   }
 
-  /** Anyone can browse open jobs. */
-  async listOpenJobs(filters: { city?: string } = {}) {
+  /**
+   * Anyone can browse open jobs. Optional `city` filter (substring match on
+   * either address) and/or `lat`/`lng`/`radiusKm` (near-me: only jobs whose
+   * pickup point falls within `radiusKm` of the given point, straight-line).
+   * When a reference point is supplied each job is annotated with
+   * `pickup_distance_km` and `destination_distance_km`.
+   */
+  async listOpenJobs(
+    filters: {
+      city?: string
+      lat?: number
+      lng?: number
+      radiusKm?: number
+    } = {}
+  ) {
     const jobs = await this.listDeliveryJobs(
       { status: ["open", "negotiating"] as JobStatus[] },
       { order: { created_at: "DESC" }, take: 100 }
     )
+    let filtered = jobs
     if (filters.city) {
       const needle = filters.city.toLowerCase()
-      return jobs.filter(
+      filtered = filtered.filter(
         (j) =>
           j.pickup_address.toLowerCase().includes(needle) ||
           j.destination_address.toLowerCase().includes(needle)
       )
     }
-    return jobs
+    const hasPoint =
+      Number.isFinite(filters.lat) &&
+      Number.isFinite(filters.lng)
+    if (hasPoint) {
+      const point = { lat: filters.lat as number, lng: filters.lng as number }
+      const radius = Number.isFinite(filters.radiusKm)
+        ? (filters.radiusKm as number)
+        : 25 // default: within 25 km
+      filtered = filtered.filter((j) => {
+        if (!Number.isFinite(j.pickup_lat) || !Number.isFinite(j.pickup_lng)) {
+          return false
+        }
+        return haversineKm(point, {
+          lat: j.pickup_lat as number,
+          lng: j.pickup_lng as number,
+        }) <= radius
+      })
+    }
+    if (hasPoint) {
+      const point = { lat: filters.lat as number, lng: filters.lng as number }
+      filtered = (filtered as any[]).map((j) => {
+        const d = {
+          pickup: Number.isFinite(j.pickup_lat) && Number.isFinite(j.pickup_lng)
+            ? haversineKm(point, { lat: j.pickup_lat as number, lng: j.pickup_lng as number })
+            : null,
+          destination: Number.isFinite(j.destination_lat) && Number.isFinite(j.destination_lng)
+            ? haversineKm(point, { lat: j.destination_lat as number, lng: j.destination_lng as number })
+            : null,
+        }
+        return { ...j, pickup_distance_km: d.pickup, destination_distance_km: d.destination }
+      })
+    }
+    return filtered
   }
 
   /** A store owner's own delivery jobs (seller view), newest first. */

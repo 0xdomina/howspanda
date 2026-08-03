@@ -2,7 +2,11 @@
 
 import { useTransition, useState } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { listOpenDeliveryJobs, makeOffer } from "@lib/data/delivery"
+import {
+  listOpenDeliveryJobs,
+  makeOffer,
+  reverseGeocode,
+} from "@lib/data/delivery"
 
 const ngn = (v: number | string | undefined) =>
   new Intl.NumberFormat("en-NG", {
@@ -10,6 +14,9 @@ const ngn = (v: number | string | undefined) =>
     currency: "NGN",
     maximumFractionDigits: 0,
   }).format(Number(v ?? 0))
+
+const km = (v: number | null | undefined) =>
+  Number.isFinite(v) ? `${v!.toFixed(1)} km` : null
 
 const statusLabel: Record<string, string> = {
   open: "Open for offers",
@@ -93,6 +100,11 @@ const JobCard = ({ job }: { job: any }) => (
     {job.package_weight && (
       <p className="mt-1 text-xs text-ink-muted">Weight: {job.package_weight}</p>
     )}
+    {job.pickup_distance_km != null && (
+      <p className="mt-1.5 inline-flex w-fit items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+        {km(job.pickup_distance_km)} from you
+      </p>
+    )}
     <div className="mt-3 space-y-2 rounded-medium bg-ink/5 p-3 text-sm">
       <p className="text-ink">
         <span className="text-ink-muted">Pickup:</span> {job.pickup_address}
@@ -115,14 +127,63 @@ const JobCard = ({ job }: { job: any }) => (
 
 const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
   const [city, setCity] = useState("")
+  const [radiusKm, setRadiusKm] = useState(25)
+  const [loc, setLoc] = useState<{ lat: number; lng: number } | null>(null)
+  const [locLabel, setLocLabel] = useState<string | null>(null)
+  const [locBusy, setLocBusy] = useState(false)
   const [filtered, setFiltered] = useState(jobs)
   const [isPending, startTransition] = useTransition()
 
-  const applyFilter = () => {
+  const refresh = (params?: {
+    city?: string
+    lat?: number
+    lng?: number
+    radiusKm?: number
+  }) => {
     startTransition(async () => {
-      const result = await listOpenDeliveryJobs(city.trim() || undefined)
+      const result = await listOpenDeliveryJobs(params)
       setFiltered(result)
     })
+  }
+
+  const applyFilter = () => {
+    refresh({
+      city: city.trim() || undefined,
+      lat: loc?.lat,
+      lng: loc?.lng,
+      radiusKm: loc ? radiusKm : undefined,
+    })
+  }
+
+  const useMyLocation = () => {
+    setLocBusy(true)
+    if (!("geolocation" in navigator)) {
+      setLocBusy(false)
+      setLocLabel("Geolocation is not available in this browser.")
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords
+        setLoc({ lat, lng })
+        const rev = await reverseGeocode(lat, lng)
+        setLocLabel(
+          rev ? `${rev.city ?? rev.displayName}` : `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+        )
+        setLocBusy(false)
+        refresh({ lat, lng, radiusKm, city: city.trim() || undefined })
+      },
+      () => {
+        setLocBusy(false)
+        setLocLabel("Location permission denied.")
+      }
+    )
+  }
+
+  const clearLocation = () => {
+    setLoc(null)
+    setLocLabel(null)
+    refresh({ city: city.trim() || undefined })
   }
 
   return (
@@ -145,6 +206,26 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
           placeholder="Filter by city"
           className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink small:max-w-xs"
         />
+        <select
+          value={radiusKm}
+          onChange={(e) => setRadiusKm(Number(e.target.value))}
+          disabled={!loc}
+          className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink disabled:opacity-50 small:w-auto"
+        >
+          <option value={5}>Within 5 km</option>
+          <option value={10}>Within 10 km</option>
+          <option value={25}>Within 25 km</option>
+          <option value={50}>Within 50 km</option>
+          <option value={100}>Within 100 km</option>
+        </select>
+        <button
+          type="button"
+          disabled={isPending || locBusy}
+          onClick={useMyLocation}
+          className="rounded-medium border border-ink-strong px-4 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+        >
+          {locBusy ? "Locating…" : loc ? "Refresh near me" : "Use my location"}
+        </button>
         <button
           type="button"
           disabled={isPending}
@@ -154,6 +235,26 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
           {isPending ? "Searching…" : "Search"}
         </button>
       </div>
+
+      {(locLabel || loc) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-medium bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {loc && (
+            <span className="font-medium">
+              Near {locLabel} · {radiusKm} km
+            </span>
+          )}
+          {!loc && locLabel && <span>{locLabel}</span>}
+          {loc && (
+            <button
+              type="button"
+              onClick={clearLocation}
+              className="text-xs font-medium text-emerald-700 underline hover:text-emerald-900"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="rounded-large border border-dashed py-16 text-center">
