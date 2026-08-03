@@ -21,6 +21,7 @@ const SellerNav = () => {
     { href: "/seller/money", label: "Money" },
     { href: "/seller/malls", label: "Malls" },
     { href: "/seller/delivery", label: "Delivery" },
+    { href: "/seller/referrals", label: "Referrals" },
   ]
 
   return (

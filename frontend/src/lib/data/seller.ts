@@ -330,6 +330,63 @@ export const requestSellerPayout = async (
   }
 }
 
+export type SellerReferral = {
+  id: string
+  code: string
+  referrer_role?: string
+  referee_email?: string | null
+  status?: string
+  reward_amount?: number | string | null
+  currency_code?: string
+  capped_reason?: string | null
+  qualified_at?: string | null
+  created_at?: string
+}
+
+export const listSellerReferrals = async (): Promise<{
+  referrals: SellerReferral[]
+  stats: { count: number; qualified_count: number; lifetime_earned: number }
+} | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    return await sdk.client
+      .fetch<{
+        referrals: SellerReferral[]
+        stats: { count: number; qualified_count: number; lifetime_earned: number }
+      }>("/sellers/referrals", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
+export const createSellerReferral = async (
+  refereeEmail: string
+): Promise<{ success: boolean; error: string | null; code?: string }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Not signed in as a seller." }
+
+    const res = await sdk.client.fetch<{ referral: SellerReferral }>(
+      "/sellers/referrals",
+      { method: "POST", headers, body: { referee_email: refereeEmail } }
+    )
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag)
+
+    return { success: true, error: null, code: res.referral?.code }
+  } catch (error: any) {
+    return { success: false, error: error.toString() }
+  }
+}
+
 export const retrieveSellerProduct = async (
   id: string
 ): Promise<SellerProduct | null> => {
