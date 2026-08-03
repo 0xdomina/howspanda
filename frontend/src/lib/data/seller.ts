@@ -518,6 +518,129 @@ export const redeemInStore = async (
   }
 }
 
+// ── AI seller tools ──────────────────────────────────────────────────────
+
+export type AiQuota = {
+  used: number
+  limit: number
+  remaining: number
+}
+
+export const getSellerAiQuota = async (): Promise<AiQuota | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    return await sdk.client
+      .fetch<{ quota: AiQuota }>("/sellers/ai/quota", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .then(({ quota }) => quota)
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
+export const getSellerBrief = async (period: "daily" | "weekly") => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    return await sdk.client
+      .fetch<{ ok: boolean; brief: any }>("/sellers/ai/brief", {
+        method: "GET",
+        headers,
+        query: { period },
+        cache: "no-store",
+      })
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
+type AiResponse<T> = {
+  ok: boolean
+  result?: T
+  quota?: AiQuota
+  extra?: any
+  message?: string
+  code?: string
+}
+
+const runAi = async <T>(
+  path: string,
+  body: Record<string, unknown> | undefined
+): Promise<AiResponse<T> & { success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers))
+      return { success: false, error: "Not signed in as a seller.", ok: false }
+
+    const res = await sdk.client.fetch<AiResponse<T>>(path, {
+      method: "POST",
+      headers,
+      body,
+    })
+    return { ...res, success: true, error: null }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message ?? error?.toString?.() ?? String(error),
+      ok: false,
+    }
+  }
+}
+
+export const generateSellerBrief = async (period: "daily" | "weekly") =>
+  runAi<{ narrative?: string } & Record<string, unknown>>(
+    "/sellers/ai/brief",
+    { period }
+  )
+
+export const generateRecommendations = async (period: "daily" | "weekly") =>
+  runAi<{
+    opportunities: { action: string; sku: string | null; explanation: string }[]
+  }>("/sellers/ai/recommendations", { period })
+
+export const askAiInsights = async (question: string) =>
+  runAi<string>("/sellers/ai/insights", { question })
+
+export const runAiMarketing = async (goal?: string, tone?: string) =>
+  runAi<{
+    brand_voice: string
+    promo_ideas: string[]
+    bundle_suggestions: string[]
+  }>("/sellers/ai/marketing", { goal, tone })
+
+export const runAiPricing = async (body: {
+  title: string
+  category?: string
+  cost?: number
+  currency_code?: string
+}) =>
+  runAi<{
+    suggested_price: number
+    floor_price: number
+    ceiling_price: number
+    reasoning: string
+  }>("/sellers/ai/pricing", body)
+
+export const runAiListing = async (notes: string, category?: string) =>
+  runAi<{
+    title: string
+    description: string
+    tags: string[]
+    seo_title: string
+    seo_description: string
+  }>("/sellers/ai/listing", { notes, category })
+
+export const runAiAccounting = async () =>
+  runAi<Record<string, unknown>>("/sellers/ai/accounting", {})
+
 export const retrieveSellerProduct = async (
   id: string
 ): Promise<SellerProduct | null> => {

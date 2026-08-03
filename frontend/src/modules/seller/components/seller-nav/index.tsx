@@ -23,6 +23,7 @@ const SellerNav = () => {
     { href: "/seller/delivery", label: "Delivery" },
     { href: "/seller/referrals", label: "Referrals" },
     { href: "/seller/redeemables", label: "Redeemables" },
+    { href: "/seller/ai", label: "AI tools" },
   ]
 
   return (
