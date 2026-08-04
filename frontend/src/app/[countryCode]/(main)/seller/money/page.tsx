@@ -8,6 +8,7 @@ import {
   listPayoutAccounts,
   listSellerPayouts,
 } from "@lib/data/seller"
+import { getPaymentRails } from "@lib/data/payment-rails"
 import SellerMoneyClient from "@modules/seller/templates/seller-money"
 
 export const metadata: Metadata = {
@@ -21,10 +22,14 @@ export default async function SellerMoneyPage() {
   const commissions = await retrieveSellerCommissions().catch(() => null)
   const payoutAccounts = await listPayoutAccounts().catch(() => [])
   const payouts = await listSellerPayouts().catch(() => [])
+  const rails = await getPaymentRails().catch(() => [])
 
   if (!seller) {
     notFound()
   }
+
+  // Only surface payout rails that are toggled ON (admin-runtime switch).
+  const enabledRails = rails.filter((r) => r.enabled).map((r) => r.key)
 
   return (
     <SellerMoneyClient
@@ -32,6 +37,7 @@ export default async function SellerMoneyPage() {
       commissions={commissions}
       payoutAccounts={payoutAccounts}
       payouts={payouts}
+      enabledRails={enabledRails}
     />
   )
 }

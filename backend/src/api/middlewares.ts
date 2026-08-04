@@ -68,6 +68,26 @@ const ADMIN_RATE_LIMIT = rateLimit({
   limit: 120,
   windowMs: 60 * 1000,
 })
+// Follow/unfollow and giveaway claims are per-customer actor-keyed (abuse
+// throttling without locking a NAT'd household together).
+const FOLLOW_RATE_LIMIT = rateLimit({
+  name: "follow",
+  limit: 60,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const authed = req as AuthenticatedMedusaRequest
+    return (authed.auth_context?.actor_id as string) ?? undefined
+  },
+})
+const CLAIM_RATE_LIMIT = rateLimit({
+  name: "claim",
+  limit: 20,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const authed = req as AuthenticatedMedusaRequest
+    return (authed.auth_context?.actor_id as string) ?? undefined
+  },
+})
 // Credential endpoints (login/register/update/reset) are the brute-force
 // surface; key by the identifier in the body when present, else IP. MFA/session
 // routes are exempt — they're part of the normal authenticated flow.
@@ -195,7 +215,7 @@ export const PostPayoutAccountSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("crypto_address"),
-    network: z.enum(["base", "solana"]),
+    network: z.enum(["base", "solana", "arc"]),
     address: z.string().min(10),
   }),
 ])
@@ -212,7 +232,7 @@ export const PostWalletWithdrawalAccountSchema = z.object({
   type: z.enum(["bank_account", "crypto_address"]),
   bank_code: z.string().min(3).optional(),
   account_number: z.string().regex(/^\d{10}$/, "NUBAN is 10 digits").optional(),
-  network: z.enum(["base", "solana"]).optional(),
+  network: z.enum(["base", "solana", "arc"]).optional(),
   address: z.string().min(10).optional(),
 })
 
@@ -456,6 +476,38 @@ export const PostAuthOtpAssertSchema = z.object({
   email: z.string().email(),
   proof: z.string().min(10),
 })
+
+// Payment rails (runtime toggle). `enabled` is the only mutable field — the
+// mode (mock/test/live) is always derived from env keys and reported read-only.
+export const PatchPaymentRailSchema = z.object({
+  enabled: z.boolean(),
+})
+
+// Store broadcasts (followers). Body is additionally privacy-scanned in the
+// service (emails/phones rejected) so contact never leaks off-platform.
+export const PostBroadcastSchema = z
+  .object({
+    type: z.enum(["general", "product", "offer", "voucher", "giveaway"]),
+    title: z.string().min(1).max(80),
+    body: z.string().min(1).max(2000),
+    product_id: z.string().optional(),
+    voucher: z
+      .object({
+        discount_type: z.enum(["fixed", "percent"]),
+        discount_value: z.number().positive(),
+        expires_in_days: z.number().int().min(1).max(90).optional(),
+      })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "voucher" && !data.voucher) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["voucher"],
+        message: "Voucher broadcasts need discount details",
+      })
+    }
+  })
 
 export const PostKycIdentitySchema = z
   .object({
@@ -892,6 +944,62 @@ export default defineMiddlewares({
       matcher: "/auth/otp/assert",
       methods: ["POST"],
       middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpAssertSchema)],
+    },
+    {
+      matcher: "/admin/payment-rails",
+      methods: ["GET"],
+      middlewares: [ADMIN_RATE_LIMIT],
+    },
+    {
+      matcher: "/admin/payment-rails/:key",
+      methods: ["PATCH"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PatchPaymentRailSchema),
+      ],
+    },
+    {
+      // Public storefront (profile + follower count). Auth optional so a signed-
+      // in buyer gets `followed_by_viewer` without blocking anonymous browsing.
+      matcher: "/store/sellers/:handle",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
+      matcher: "/store/sellers/:handle/follow",
+      methods: ["POST", "DELETE"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        FOLLOW_RATE_LIMIT,
+      ],
+    },
+    {
+      matcher: "/store/notifications",
+      methods: ["GET"],
+      middlewares: [authenticate("customer", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/notifications/:id/read",
+      methods: ["POST"],
+      middlewares: [authenticate("customer", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/broadcasts/:id/claim",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        CLAIM_RATE_LIMIT,
+      ],
+    },
+    {
+      // Seller broadcasts: auth comes from the /sellers/* matcher above.
+      matcher: "/sellers/broadcasts",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostBroadcastSchema)],
     },
   ],
 })

@@ -6,7 +6,7 @@
  * blockchain map. No route or payment-provider changes required.
  */
 
-export type CryptoNetwork = "base" | "solana" // extensible: bsc, somnia, arc
+export type CryptoNetwork = "base" | "solana" | "arc" // extensible: bsc, somnia
 export type NetworkEnv = "testnet" | "mainnet"
 
 export interface DepositIntent {
@@ -65,11 +65,14 @@ export class CryptoUnavailableError extends Error {
   }
 }
 
-// Circle blockchain identifiers per network + env (used by the live adapter).
+// Circle blockchain identifiers per network + env (used by the live Circle
+// adapter). Arc is NOT a Circle-API chain (it's a direct L1) — the entry is a
+// placeholder so the Record stays exhaustive.
 export const CIRCLE_BLOCKCHAIN: Record<
   CryptoNetwork,
   Record<NetworkEnv, string>
 > = {
   base: { testnet: "BASE-SEPOLIA", mainnet: "BASE" },
   solana: { testnet: "SOL-DEVNET", mainnet: "SOL" },
+  arc: { testnet: "ARC-TESTNET", mainnet: "ARC" },
 }

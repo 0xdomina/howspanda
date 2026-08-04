@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 
 import { retrieveCustomer } from "@lib/data/customer"
+import { getPaymentRails } from "@lib/data/payment-rails"
 import { notFound } from "next/navigation"
 
 import WalletClient from "@modules/account/components/wallet"
@@ -22,11 +23,15 @@ export default async function WalletPage() {
     notFound()
   }
 
-  const [wallet, accounts, withdrawals] = await Promise.all([
+  const [wallet, accounts, withdrawals, rails] = await Promise.all([
     getBuyerWallet(customer.email),
     listWithdrawalAccounts(customer.email),
     listWithdrawals(customer.email),
+    getPaymentRails().catch(() => []),
   ])
+
+  // Only surface withdrawal rails that are toggled ON (admin-runtime switch).
+  const enabledRails = rails.filter((r) => r.enabled).map((r) => r.key)
 
   return (
     <WalletClient
@@ -36,6 +41,7 @@ export default async function WalletPage() {
       ledger={wallet?.ledger ?? []}
       accounts={accounts}
       withdrawals={withdrawals}
+      enabledRails={enabledRails}
     />
   )
 }

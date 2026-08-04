@@ -24,6 +24,7 @@ const SellerNav = () => {
     { href: "/seller/reviews", label: "Reviews" },
     { href: "/seller/referrals", label: "Referrals" },
     { href: "/seller/redeemables", label: "Redeemables" },
+    { href: "/seller/broadcasts", label: "Broadcasts" },
     { href: "/seller/ai", label: "AI tools" },
   ]
 

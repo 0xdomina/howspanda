@@ -31,6 +31,8 @@ export type FlutterwaveOptions = {
   secretKey?: string
   publicKey?: string
   encryptionKey?: string
+  /** Boot-time on/off from FLUTTERWAVE_ENABLED; the runtime toggle is the rails module. */
+  enabled?: boolean
 }
 
 /**
@@ -76,6 +78,12 @@ class FlutterwaveProviderService extends AbstractPaymentProvider<FlutterwaveOpti
   async initiatePayment(
     input: InitiatePaymentInput
   ): Promise<InitiatePaymentOutput> {
+    if (this.options_.enabled === false) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Flutterwave rail is disabled"
+      )
+    }
     const amount = Number(input.amount)
     const currencyCode = input.currency_code
     const txRef =

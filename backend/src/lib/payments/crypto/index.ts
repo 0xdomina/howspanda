@@ -6,12 +6,15 @@ import {
 } from "./adapter"
 import { MockCryptoSettlement } from "./mock"
 import { CircleCryptoSettlement } from "./circle"
+import { ArcCryptoSettlement, isArcConfigured } from "./arc"
 
-const VALID_NETWORKS: CryptoNetwork[] = ["base", "solana"]
+const VALID_NETWORKS: CryptoNetwork[] = ["base", "solana", "arc"]
 
 export function isCryptoEnabled(): boolean {
   return process.env.CRYPTO_ENABLED === "true"
 }
+
+export { isArcConfigured } from "./arc"
 
 export function getNetworkEnv(): NetworkEnv {
   return process.env.CRYPTO_NETWORK_ENV === "mainnet" ? "mainnet" : "testnet"
@@ -30,9 +33,10 @@ export function quoteUsdc(ngnAmount: number): string {
 
 /**
  * Factory: env → settlement implementation + network. Returns the mock adapter
- * when `CIRCLE_API_KEY` is absent/`"mock"` (default), else the live Circle
- * adapter. Throws on an unknown network — mirrors the AI `getModel`
- * unknown-provider guard so a typo can never silently pick a wrong chain.
+ * when no real provider is configured (default), else the live Arc (for the
+ * "arc" network) or Circle adapter. Throws on an unknown network — mirrors the
+ * AI `getModel` unknown-provider guard so a typo can never silently pick a
+ * wrong chain.
  */
 export function getCryptoSettlement(network?: string): CryptoSettlement {
   const chosen = (network ||
@@ -44,6 +48,16 @@ export function getCryptoSettlement(network?: string): CryptoSettlement {
   }
 
   const env = getNetworkEnv()
+
+  // Arc is the USDC-native L1: configured directly via a dev-controlled wallet
+  // (ARC_MNEMONIC / ARC_PRIVATE_KEY), no Circle merchant API key required.
+  if (chosen === "arc") {
+    if (isArcConfigured()) {
+      return new ArcCryptoSettlement()
+    }
+    return new MockCryptoSettlement(chosen, env)
+  }
+
   const apiKey = process.env.CIRCLE_API_KEY
 
   if (!apiKey || apiKey === "mock") {

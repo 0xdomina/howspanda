@@ -267,9 +267,11 @@ const PayoutHistory = ({ payouts }: { payouts: any[] }) => {
 const RequestPayout = ({
   balance,
   payoutAccounts,
+  enabledRails,
 }: {
   balance: any
   payoutAccounts: any[]
+  enabledRails: string[]
 }) => {
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -307,22 +309,26 @@ const RequestPayout = ({
       </p>
       {message && <p className="mt-2 text-sm text-ink-muted">{message}</p>}
       <div className="mt-3 flex flex-col gap-2">
-        <button
-          type="button"
-          disabled={!canPay || isPending}
-          onClick={() => request("paystack")}
-          className="rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-40"
-        >
-          {isPending ? "Requesting…" : "Request bank payout"}
-        </button>
-        <button
-          type="button"
-          disabled={!canPay || isPending}
-          onClick={() => request("crypto-usdc")}
-          className="rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-40"
-        >
-          Request USDC payout
-        </button>
+        {enabledRails.includes("paystack") && (
+          <button
+            type="button"
+            disabled={!canPay || isPending}
+            onClick={() => request("paystack")}
+            className="rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-40"
+          >
+            {isPending ? "Requesting…" : "Request bank payout"}
+          </button>
+        )}
+        {enabledRails.includes("crypto-usdc") && (
+          <button
+            type="button"
+            disabled={!canPay || isPending}
+            onClick={() => request("crypto-usdc")}
+            className="rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-40"
+          >
+            Request USDC payout
+          </button>
+        )}
       </div>
       {!canPay && available > 0 && (
         <p className="mt-2 text-xs text-ink-muted">
@@ -399,11 +405,13 @@ const SellerMoneyClient = ({
   commissions,
   payoutAccounts,
   payouts,
+  enabledRails,
 }: {
   balance: any
   commissions: any
   payoutAccounts: any[]
   payouts: any[]
+  enabledRails: string[]
 }) => {
   const ngn = balance?.balances?.ngn ?? {}
   const buckets: { label: string; value: number }[] = [
@@ -436,7 +444,11 @@ const SellerMoneyClient = ({
       <CommissionsCard commissions={commissions} />
 
       <div className="grid grid-cols-1 gap-6 small:grid-cols-2">
-        <RequestPayout balance={balance} payoutAccounts={payoutAccounts} />
+        <RequestPayout
+          balance={balance}
+          payoutAccounts={payoutAccounts}
+          enabledRails={enabledRails}
+        />
         <PayoutAccounts accounts={payoutAccounts} />
       </div>
 

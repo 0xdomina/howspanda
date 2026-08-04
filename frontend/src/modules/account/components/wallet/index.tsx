@@ -281,11 +281,13 @@ const RequestWithdrawal = ({
   balance,
   accounts,
   minimum,
+  enabledRails,
 }: {
   email: string
   balance: number
   accounts: WithdrawalAccount[]
   minimum: number
+  enabledRails: string[]
 }) => {
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -322,22 +324,26 @@ const RequestWithdrawal = ({
       </p>
       {message && <p className="mt-2 text-sm text-ink-muted">{message}</p>}
       <div className="mt-3 flex flex-col gap-2">
-        <button
-          type="button"
-          disabled={!canPay || isPending}
-          onClick={() => request("paystack")}
-          className="rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-40"
-        >
-          {isPending ? "Requesting…" : "Request bank withdrawal"}
-        </button>
-        <button
-          type="button"
-          disabled={!canPay || isPending}
-          onClick={() => request("crypto-usdc")}
-          className="rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-40"
-        >
-          Request USDC withdrawal
-        </button>
+        {enabledRails.includes("paystack") && (
+          <button
+            type="button"
+            disabled={!canPay || isPending}
+            onClick={() => request("paystack")}
+            className="rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-40"
+          >
+            {isPending ? "Requesting…" : "Request bank withdrawal"}
+          </button>
+        )}
+        {enabledRails.includes("crypto-usdc") && (
+          <button
+            type="button"
+            disabled={!canPay || isPending}
+            onClick={() => request("crypto-usdc")}
+            className="rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-40"
+          >
+            Request USDC withdrawal
+          </button>
+        )}
       </div>
       {!canPay && available > 0 && (
         <p className="mt-2 text-xs text-ink-muted">
@@ -365,6 +371,7 @@ const WalletClient = ({
   ledger,
   accounts,
   withdrawals,
+  enabledRails,
 }: {
   email: string
   balance: number
@@ -372,6 +379,7 @@ const WalletClient = ({
   ledger: WalletLedger[]
   accounts: WithdrawalAccount[]
   withdrawals: BuyerWithdrawal[]
+  enabledRails: string[]
 }) => {
   const credits = ledger.filter((l) => Number(l.amount) > 0).reduce((s, l) => s + Number(l.amount), 0)
   const debits = ledger.filter((l) => Number(l.amount) < 0).reduce((s, l) => s + Math.abs(Number(l.amount)), 0)
@@ -407,6 +415,7 @@ const WalletClient = ({
           balance={balance}
           accounts={accounts}
           minimum={minimum}
+          enabledRails={enabledRails}
         />
         <WithdrawalAccounts email={email} accounts={accounts} />
       </div>

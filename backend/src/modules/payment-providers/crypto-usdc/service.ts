@@ -25,6 +25,7 @@ import {
 } from "@medusajs/framework/types"
 import {
   getCryptoSettlement,
+  isCryptoEnabled,
   quoteUsdc,
 } from "../../../lib/payments/crypto"
 
@@ -65,6 +66,12 @@ class CryptoUsdcProviderService extends AbstractPaymentProvider<CryptoUsdcOption
   async initiatePayment(
     input: InitiatePaymentInput
   ): Promise<InitiatePaymentOutput> {
+    if (!isCryptoEnabled()) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "USDC rail is disabled"
+      )
+    }
     const amount = Number(input.amount)
     const reference =
       input.context?.idempotency_key ?? `cr_${randomUUID().replace(/-/g, "")}`

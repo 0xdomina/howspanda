@@ -30,6 +30,8 @@ const PAYSTACK_API_BASE = "https://api.paystack.co"
 export type PaystackOptions = {
   secretKey?: string
   publicKey?: string
+  /** Boot-time on/off from PAYSTACK_ENABLED; the runtime toggle is the rails module. */
+  enabled?: boolean
 }
 
 /**
@@ -72,6 +74,12 @@ class PaystackProviderService extends AbstractPaymentProvider<PaystackOptions> {
   async initiatePayment(
     input: InitiatePaymentInput
   ): Promise<InitiatePaymentOutput> {
+    if (this.options_.enabled === false) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Paystack rail is disabled"
+      )
+    }
     const amount = Number(input.amount)
     const currencyCode = input.currency_code
     const reference =

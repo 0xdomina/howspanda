@@ -102,6 +102,12 @@ module.exports = defineConfig({
       resolve: "./src/modules/auth-otp",
     },
     {
+      resolve: "./src/modules/payment-rails",
+    },
+    {
+      resolve: "./src/modules/follows",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,
@@ -129,6 +135,7 @@ module.exports = defineConfig({
             resolve: "./src/modules/payment-providers/paystack",
             id: "paystack",
             options: {
+              enabled: process.env.PAYSTACK_ENABLED !== "false",
               secretKey: process.env.PAYSTACK_SECRET_KEY,
               publicKey: process.env.PAYSTACK_PUBLIC_KEY,
             },
@@ -137,6 +144,7 @@ module.exports = defineConfig({
             resolve: "./src/modules/payment-providers/flutterwave",
             id: "flutterwave",
             options: {
+              enabled: process.env.FLUTTERWAVE_ENABLED !== "false",
               secretKey: process.env.FLUTTERWAVE_SECRET_KEY,
               publicKey: process.env.FLUTTERWAVE_PUBLIC_KEY,
             },
