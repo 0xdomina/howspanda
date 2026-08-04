@@ -432,6 +432,31 @@ export const PostKycVerifySchema = z
     message: "Provide at least an email or a phone number",
   })
 
+// Auth OTP (Phase: true OTP for signup verify + forgot-password reset). The
+// code is deliberately NOT digit-restricted here: pre-launch any non-empty
+// code passes, so the flows work end-to-end without a mail provider.
+export const PostAuthOtpRequestSchema = z.object({
+  email: z.string().email(),
+  purpose: z.enum(["signup", "reset"]),
+})
+
+export const PostAuthOtpVerifySchema = z.object({
+  email: z.string().email(),
+  purpose: z.enum(["signup", "reset"]),
+  code: z.string().min(1).max(8),
+})
+
+export const PostAuthOtpResetSchema = z.object({
+  email: z.string().email(),
+  code: z.string().min(1).max(8),
+  newPassword: z.string().min(8),
+})
+
+export const PostAuthOtpAssertSchema = z.object({
+  email: z.string().email(),
+  proof: z.string().min(10),
+})
+
 export const PostKycIdentitySchema = z
   .object({
     email: z.string().email().optional(),
@@ -847,6 +872,26 @@ export default defineMiddlewares({
       matcher: "/kyc/identity",
       methods: ["POST"],
       middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycIdentitySchema)],
+    },
+    {
+      matcher: "/auth/otp/request",
+      methods: ["POST"],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpRequestSchema)],
+    },
+    {
+      matcher: "/auth/otp/verify",
+      methods: ["POST"],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpVerifySchema)],
+    },
+    {
+      matcher: "/auth/otp/reset",
+      methods: ["POST"],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpResetSchema)],
+    },
+    {
+      matcher: "/auth/otp/assert",
+      methods: ["POST"],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpAssertSchema)],
     },
   ],
 })

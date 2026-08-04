@@ -99,6 +99,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/kyc",
     },
     {
+      resolve: "./src/modules/auth-otp",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,

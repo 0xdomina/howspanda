@@ -2,6 +2,7 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
+import { assertSignupProof } from "@lib/data/auth-otp"
 import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
@@ -60,17 +61,43 @@ export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
 }
 
 export async function signup(_currentState: unknown, formData: FormData) {
+  const email = (formData.get("email") as string)?.trim().toLowerCase()
   const password = formData.get("password") as string
-  const customerForm = {
-    email: formData.get("email") as string,
-    first_name: formData.get("first_name") as string,
-    last_name: formData.get("last_name") as string,
-    phone: formData.get("phone") as string,
+  const proof = formData.get("proof") as string | null
+
+  if (!email || !password) {
+    return "Email and password are required."
   }
 
   try {
+    // Signup is gated on a valid email-verification proof (server-side check),
+    // so accounts can only be created after the OTP step succeeds.
+    if (!proof) {
+      return "Please verify your email before creating an account."
+    }
+
+    const proofRes = await assertSignupProof({ email, proof })
+    if (!proofRes.ok) {
+      return (
+        proofRes.error ??
+        "Please verify your email before creating an account."
+      )
+    }
+
+    // Progressive profiling: only what the form collected (email by default).
+    const customerForm: {
+      email: string
+      first_name?: string
+      last_name?: string
+      phone?: string
+    } = { email }
+    for (const key of ["first_name", "last_name", "phone"] as const) {
+      const value = formData.get(key) as string | null
+      if (value) customerForm[key] = value
+    }
+
     const token = await sdk.auth.register("customer", "emailpass", {
-      email: customerForm.email,
+      email,
       password: password,
     })
 
@@ -87,7 +114,7 @@ export async function signup(_currentState: unknown, formData: FormData) {
     )
 
     const loginToken = await sdk.auth.login("customer", "emailpass", {
-      email: customerForm.email,
+      email,
       password,
     })
 
