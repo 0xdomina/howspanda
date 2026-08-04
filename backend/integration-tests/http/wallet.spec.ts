@@ -33,6 +33,41 @@ medusaIntegrationTestRunner({
         ])
         storeHeaders = { headers: { "x-publishable-api-key": pubKey.token } }
 
+        // The /store/wallet money routes require an authenticated customer
+        // (email is resolved from the JWT actor, never the request). Sign up
+        // the spec's buyer so storeHeaders carries a valid bearer token.
+        const register = await api.post("/auth/customer/emailpass/register", {
+          email: EMAIL,
+          password: "supersecret",
+        })
+        expect(register.status).toEqual(200)
+        expect(register.data.token).toBeTruthy()
+
+        const created = await api.post(
+          "/store/customers",
+          { email: EMAIL, first_name: "Wallet", last_name: "Spec" },
+          {
+            headers: {
+              authorization: `Bearer ${register.data.token}`,
+              ...storeHeaders.headers,
+            },
+          }
+        )
+        expect(created.status).toEqual(200)
+
+        const login = await api.post("/auth/customer/emailpass", {
+          email: EMAIL,
+          password: "supersecret",
+        })
+        expect(login.status).toEqual(200)
+        expect(login.data.token).toBeTruthy()
+        storeHeaders = {
+          headers: {
+            "x-publishable-api-key": pubKey.token,
+            authorization: `Bearer ${login.data.token}`,
+          },
+        }
+
         // seed a real balance + verified destinations in beforeAll, then
         // snapshot so every test starts from this state (25k balance, both
         // rails have a default verified account)
@@ -46,7 +81,6 @@ medusaIntegrationTestRunner({
         const bank = await api.post(
           "/store/wallet/withdrawal-accounts",
           {
-            buyerEmail: EMAIL,
             type: "bank_account",
             bank_code: "058",
             account_number: "0123456789",
@@ -66,7 +100,6 @@ medusaIntegrationTestRunner({
         const crypto = await api.post(
           "/store/wallet/withdrawal-accounts",
           {
-            buyerEmail: EMAIL,
             type: "crypto_address",
             network: "base",
             address: "0x1111222233334444555566667777888899990000",
@@ -80,7 +113,7 @@ medusaIntegrationTestRunner({
 
       it("reports balance, minimum and ledger for a seeded wallet", async () => {
         const res = await api.get(
-          `/store/wallet?email=${encodeURIComponent(EMAIL)}`,
+          `/store/wallet`,
           storeHeaders
         )
         expect(res.status).toEqual(200)
@@ -92,7 +125,7 @@ medusaIntegrationTestRunner({
 
       it("lists the buyer's withdrawal accounts", async () => {
         const list = await api.get(
-          `/store/wallet/withdrawal-accounts?email=${encodeURIComponent(EMAIL)}`,
+          `/store/wallet/withdrawal-accounts`,
           storeHeaders
         )
         expect(list.status).toEqual(200)
@@ -104,7 +137,6 @@ medusaIntegrationTestRunner({
           api.post(
             "/store/wallet/withdrawal-accounts",
             {
-              buyerEmail: EMAIL,
               type: "bank_account",
               bank_code: "058",
               account_number: "0011223344",
@@ -124,7 +156,6 @@ medusaIntegrationTestRunner({
         const res = await api.post(
           "/store/wallet/withdrawals",
           {
-            buyerEmail: EMAIL,
             rail: "paystack",
             amount: 10_000,
             idempotency_key: "spec-bw-1",
@@ -142,7 +173,7 @@ medusaIntegrationTestRunner({
 
         // the money left the buyer-visible balance
         const wallet = await api.get(
-          `/store/wallet?email=${encodeURIComponent(EMAIL)}`,
+          `/store/wallet`,
           storeHeaders
         )
         expect(wallet.data.balance).toEqual(15_000)
@@ -158,7 +189,6 @@ medusaIntegrationTestRunner({
         const replay = await api.post(
           "/store/wallet/withdrawals",
           {
-            buyerEmail: EMAIL,
             rail: "paystack",
             amount: 10_000,
             idempotency_key: "spec-bw-1",
@@ -179,7 +209,6 @@ medusaIntegrationTestRunner({
           api.post(
             "/store/wallet/withdrawals",
             {
-              buyerEmail: EMAIL,
               rail: "paystack",
               amount: 0.5,
               idempotency_key: "spec-bw-small",
@@ -206,7 +235,6 @@ medusaIntegrationTestRunner({
           api.post(
             "/store/wallet/withdrawals",
             {
-              buyerEmail: EMAIL,
               rail: "paystack",
               amount: 1_000_000,
               idempotency_key: "spec-bw-over",
@@ -229,7 +257,6 @@ medusaIntegrationTestRunner({
         const { data } = await api.post(
           "/store/wallet/withdrawals",
           {
-            buyerEmail: EMAIL,
             rail: "paystack",
             amount: 4_000,
             idempotency_key: "spec-bw-hook",
@@ -262,7 +289,6 @@ medusaIntegrationTestRunner({
         const { data } = await api.post(
           "/store/wallet/withdrawals",
           {
-            buyerEmail: EMAIL,
             rail: "paystack",
             amount: 3_000,
             idempotency_key: "spec-bw-hookfail",
@@ -315,7 +341,6 @@ medusaIntegrationTestRunner({
         const { data } = await api.post(
           "/store/wallet/withdrawals",
           {
-            buyerEmail: EMAIL,
             rail: "crypto-usdc",
             amount: 5_000,
             idempotency_key: "spec-bw-crypto",
@@ -411,7 +436,6 @@ medusaIntegrationTestRunner({
         const { data } = await api.post(
           "/store/wallet/withdrawals",
           {
-            buyerEmail: EMAIL,
             rail: "paystack",
             amount: 2_000,
             idempotency_key: "spec-bw-redeliver",

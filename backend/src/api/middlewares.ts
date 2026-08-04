@@ -38,6 +38,14 @@ const WALLET_RATE_LIMIT = rateLimit({
     const authed = req as AuthenticatedMedusaRequest
     return (authed.auth_context?.actor_id as string) ?? undefined
   },})
+const CRYPTO_WALLET_PAY_RATE_LIMIT = rateLimit({
+  name: "crypto-wallet-pay",
+  limit: 10,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const authed = req as AuthenticatedMedusaRequest
+    return (authed.auth_context?.actor_id as string) ?? undefined
+  },})
 const CHECKOUT_RATE_LIMIT = rateLimit({
   name: "checkout",
   limit: 60,
@@ -241,6 +249,21 @@ export const PostWalletWithdrawalSchema = z.object({
   rail: z.enum(["paystack", "crypto-usdc"]),
   amount: z.number().positive(),
   idempotency_key: z.string().optional(),
+})
+
+// Managed per-user USDC wallet (Phase 16): the customer authenticates with
+// their JWT actor and the destination address is derived server-side from the
+// crypto-usdc payment session — a client can NEVER choose where the money
+// goes (that would be the drain path). The spend is one per session.
+export const PostCryptoWalletPaySchema = z.object({
+  session_id: z.string().min(1),
+  idempotency_key: z.string().optional(),
+})
+
+// Dev/mock-only top-up so the fund→spend flow can be exercised offline. Only
+// reachable when the wallet signer is the in-process mock (no real chain).
+export const PostCryptoWalletFundSchema = z.object({
+  amount: z.number().positive().max(1000000).default(100),
 })
 
 // Buyer escrow actions (guest checkout): email is the ownership proof
@@ -631,6 +654,28 @@ export default defineMiddlewares({
       middlewares: [
         WALLET_RATE_LIMIT,
         validateAndTransformBody(PostWalletWithdrawalSchema),
+      ],
+    },
+    {
+      matcher: "/store/crypto-wallet",
+      middlewares: [authenticate("customer", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/crypto-wallet/fund",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        CRYPTO_WALLET_PAY_RATE_LIMIT,
+        validateAndTransformBody(PostCryptoWalletFundSchema),
+      ],
+    },
+    {
+      matcher: "/store/crypto-wallet/pay",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        CRYPTO_WALLET_PAY_RATE_LIMIT,
+        validateAndTransformBody(PostCryptoWalletPaySchema),
       ],
     },
     {

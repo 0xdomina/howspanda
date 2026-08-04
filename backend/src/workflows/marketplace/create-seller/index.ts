@@ -9,6 +9,7 @@ import {
 } from "@medusajs/medusa/core-flows"
 import createSellerAdminStep from "./steps/create-seller-admin"
 import createSellerStep from "./steps/create-seller"
+import provisionSellerWalletStep from "./steps/provision-seller-wallet"
 import seedSellerKycStep from "./steps/seed-seller-kyc"
 
 export type CreateSellerWorkflowInput = {
@@ -73,6 +74,11 @@ const createSellerWorkflow = createWorkflow(
     seedSellerKycStep({
       email: input.admin.email,
       phone: input.admin.phone,
+    })
+
+    provisionSellerWalletStep({
+      seller_id: seller.id,
+      seller_admin_id: sellerAdmin.id,
     })
 
     // @ts-ignore

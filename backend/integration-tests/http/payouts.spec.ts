@@ -204,7 +204,7 @@ medusaIntegrationTestRunner({
         // default verified destinations for both rails
         const bank = await api.post(
           "/sellers/payout-accounts",
-          { type: "bank_account", bank_code: "058", account_number: "0123456789" },
+          { type: "bank_account", bank_code: "058", account_number: "0123456789", account_name: "MOCK ACCOUNT 6789" },
           auth()
         )
         expect(bank.status).toEqual(201)

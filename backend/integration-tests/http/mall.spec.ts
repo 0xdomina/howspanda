@@ -24,6 +24,8 @@ medusaIntegrationTestRunner({
       let twoToken: string
       let sellerId: string
       let mallId: string
+      let mallBuyerOrderId: string
+      let drawBuyerOrderId: string
       let storeHeaders: { headers: Record<string, string> }
 
       const sellerAuth = () => ({
@@ -114,6 +116,25 @@ medusaIntegrationTestRunner({
           sellerAuth()
         )
         mallId = createdMall.data.mall.id
+
+        // The purchase route only credits a prize for a REAL order that
+        // belongs to the buyer — seed real orders for both buyers.
+        const orderModule = getContainer().resolve(Modules.ORDER)
+        const [orderProduct] = await getContainer()
+          .resolve(Modules.PRODUCT)
+          .createProducts([{ title: "Mall Product", status: "published" }])
+        const seedOrder = async (email: string) => {
+          const order = await orderModule.createOrders({
+            currency_code: "ngn",
+            email,
+            items: [
+              { title: orderProduct.title, product_id: orderProduct.id, quantity: 1, unit_price: 1000 },
+            ],
+          })
+          return order.id
+        }
+        mallBuyerOrderId = await seedOrder("mall-buyer@howsu.local")
+        drawBuyerOrderId = await seedOrder("draw-buyer@howsu.local")
       })
 
       it("creates a pending mall with the bonding-curve defaults", async () => {
@@ -202,7 +223,7 @@ medusaIntegrationTestRunner({
       it("records a purchase on a pending mall without a prize draw", async () => {
         const res = await api.post(
           `/store/malls/${mallId}/purchase`,
-          { buyerEmail: "mall-buyer@howsu.local", orderId: "order_mall_1" },
+          { buyerEmail: "mall-buyer@howsu.local", orderId: mallBuyerOrderId },
           storeHeaders
         )
         expect(res.status).toEqual(200)
@@ -241,7 +262,7 @@ medusaIntegrationTestRunner({
 
         const res = await api.post(
           `/store/malls/${mallForDraw.id}/purchase`,
-          { buyerEmail: "draw-buyer@howsu.local", orderId: "order_draw_1" },
+          { buyerEmail: "draw-buyer@howsu.local", orderId: drawBuyerOrderId },
           storeHeaders
         )
         expect(res.status).toEqual(200)

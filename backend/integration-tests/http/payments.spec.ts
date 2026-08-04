@@ -128,6 +128,20 @@ describe("Payments — Flutterwave provider (mock)", () => {
 describe("Payments — crypto USDC provider (mock)", () => {
   const crypto = new CryptoUsdcProviderService(container, {})
 
+  // These tests assert a Base-testnet intent, so pin the DEFAULT network the
+  // provider factory falls back to — .env may set CRYPTO_DEFAULT_NETWORK=arc.
+  const prevDefaultNetwork = process.env.CRYPTO_DEFAULT_NETWORK
+  beforeAll(() => {
+    process.env.CRYPTO_DEFAULT_NETWORK = "base"
+  })
+  afterAll(() => {
+    if (prevDefaultNetwork === undefined) {
+      delete process.env.CRYPTO_DEFAULT_NETWORK
+    } else {
+      process.env.CRYPTO_DEFAULT_NETWORK = prevDefaultNetwork
+    }
+  })
+
   it("initiates a Base-testnet deposit intent with a USDC quote", async () => {
     const init = await crypto.initiatePayment(initInput(17_500))
     expect(init.status).toEqual("pending")

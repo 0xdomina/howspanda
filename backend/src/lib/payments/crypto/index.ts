@@ -14,6 +14,16 @@ export function isCryptoEnabled(): boolean {
   return process.env.CRYPTO_ENABLED === "true"
 }
 
+/**
+ * Explicit mock-mode override: when CRYPTO_WALLET_SIGNER=mock both the wallet
+ * signer and settlement rails resolve to the offline mock even if a real
+ * provider (ARC_MNEMONIC / CIRCLE_API_KEY) is configured. Defaults to off so
+ * a configured provider always wins.
+ */
+export function isMockSignerForced(): boolean {
+  return process.env.CRYPTO_WALLET_SIGNER === "mock"
+}
+
 export { isArcConfigured } from "./arc"
 
 export function getNetworkEnv(): NetworkEnv {
@@ -48,6 +58,10 @@ export function getCryptoSettlement(network?: string): CryptoSettlement {
   }
 
   const env = getNetworkEnv()
+
+  if (isMockSignerForced()) {
+    return new MockCryptoSettlement(chosen, env)
+  }
 
   // Arc is the USDC-native L1: configured directly via a dev-controlled wallet
   // (ARC_MNEMONIC / ARC_PRIVATE_KEY), no Circle merchant API key required.

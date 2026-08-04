@@ -182,6 +182,8 @@ medusaIntegrationTestRunner({
         expect(picked.data.job.status).toEqual("in_transit")
 
         // recipient confirms → payout released to the courier wallet
+        // (the recipient must already be on the job roster to confirm)
+        await delivery.ensureParty(jobId, "recipient", "recipient@howsu.local")
         const before = await buyerWallet.balance("courier-b@howsu.local")
         const confirm = await api.post(
           `/store/delivery-jobs/${jobId}/confirm`,
