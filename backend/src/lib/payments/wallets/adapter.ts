@@ -29,16 +29,20 @@ export interface WalletSpendResult {
 export interface UserWalletSigner {
   readonly network: CryptoNetwork
   readonly env: NetworkEnv
-  /** Derive (or re-derive) the user's wallet address from a stable key. */
-  deriveWallet(key: string): Promise<UserWallet>
+  /**
+   * Derive (or re-derive) the user's wallet address from a unique derivation
+   * index. Indices are allocated from a DB counter (never a hash), so no two
+   * actors can ever collide on the same address.
+   */
+  deriveWallet(derivationIndex: number): Promise<UserWallet>
   /** Current USDC spendable balance at the address (6-decimals, string). */
   balanceOf(address: string): Promise<string>
   /**
-   * Transfer USDC from a user wallet (derived) to a destination. `key` is the
-   * same stable key passed to `deriveWallet`. Amount is in USDC 6-decimals.
+   * Transfer USDC from a user wallet (derived) to a destination. Amount is in
+   * USDC 6-decimals.
    */
   spend(input: {
-    key: string
+    derivationIndex: number
     to: string
     usdc_amount: string
     reference: string

@@ -3,7 +3,6 @@ import {
   UserWalletSigner,
   WalletSpendResult,
 } from "./adapter"
-import { userWalletIndex } from "./arc"
 import { CryptoNetwork } from "../crypto/adapter"
 
 // Module-level balances survive factory recreation (the provider/service builds
@@ -39,12 +38,12 @@ export class MockUserWalletSigner implements UserWalletSigner {
     this.env = env
   }
 
-  async deriveWallet(key: string): Promise<UserWallet> {
+  async deriveWallet(derivationIndex: number): Promise<UserWallet> {
     return {
       network: this.network,
       env: this.env,
-      address: `mock-${this.network}-${userWalletIndex(key).toString(36)}`,
-      derivation_index: userWalletIndex(key),
+      address: `mock-${this.network}-${derivationIndex.toString(36)}`,
+      derivation_index: derivationIndex,
     }
   }
 
@@ -53,12 +52,12 @@ export class MockUserWalletSigner implements UserWalletSigner {
   }
 
   async spend(input: {
-    key: string
+    derivationIndex: number
     to: string
     usdc_amount: string
     reference: string
   }): Promise<WalletSpendResult> {
-    const { address } = await this.deriveWallet(input.key)
+    const { address } = await this.deriveWallet(input.derivationIndex)
     const current = Number(mockWalletBalance(address))
     const amount = Number(input.usdc_amount)
     if (current < amount) {

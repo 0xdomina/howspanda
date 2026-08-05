@@ -36,8 +36,8 @@ type WalletSpendView = {
 
 class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend }) {
   /**
-   * Ensure the actor has a wallet row (deriving the address from the stable
-   * wallet key) and return the stored row + its live USDC balance.
+   * Ensure the actor has a wallet row (deriving the address from a uniquely
+   * allocated derivation index) and return the stored row + its live balance.
    */
   async getOrCreateWallet(input: WalletActor): Promise<{
     wallet: UserWalletView
@@ -45,7 +45,6 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
   }> {
     const network = input.network || "arc"
     const signer = getUserWalletSigner(network)
-    const derived = await signer.deriveWallet(input.wallet_key)
 
     let [wallet] = await this.listUserWallets({
       actor_type: input.actor_type,
@@ -53,6 +52,10 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
       network,
     })
     if (!wallet) {
+      // Derivation indices come from an atomic DB counter — unique by
+      // construction, so two actors can never be derived onto the same key.
+      const derivationIndex = await this.nextDerivationIndex()
+      const derived = await signer.deriveWallet(derivationIndex)
       wallet = await this.createUserWallets({
         actor_type: input.actor_type,
         actor_id: input.actor_id,
@@ -74,6 +77,21 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
       },
       balance_usdc,
     }
+  }
+
+  /**
+   * Atomically allocate the next unique derivation index from a Postgres
+   * sequence. `nextval` is concurrency-safe: parallel wallet creations never
+   * observe the same value, so no two actors share a derived key.
+   */
+  private async nextDerivationIndex(): Promise<number> {
+    const manager = (this as any).baseRepository_.getActiveManager() as {
+      execute: (sql: string) => Promise<Array<{ idx: string | number }>>
+    }
+    const [row] = await manager.execute(
+      `SELECT nextval('wallet_derivation_index_seq') AS idx`
+    )
+    return Number(row?.idx ?? 0)
   }
 
   /**
@@ -177,9 +195,9 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
 
   /**
    * Sign + broadcast a previously recorded spend intent. Re-derives the key
-   * from the stored wallet_key and moves USDC from the user wallet to the
-   * allowlisted destination (a platform treasury / payment-session deposit
-   * address). Idempotent on the stored intent row.
+   * from the wallet's stored derivation index and moves USDC from the user
+   * wallet to the allowlisted destination (a platform treasury /
+   * payment-session deposit address). Idempotent on the stored intent row.
    */
   async signSpend(input: {
     actor_type: string
@@ -219,7 +237,7 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
 
     const signer = getUserWalletSigner(wallet.network)
     const result = await signer.spend({
-      key: wallet.wallet_key,
+      derivationIndex: wallet.derivation_index,
       to: spend.to_address,
       usdc_amount: spend.usdc_amount,
       reference: spend.reference,

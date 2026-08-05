@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto"
 import {
   UserWallet,
   UserWalletSigner,
@@ -54,19 +53,6 @@ function rpcUrl(): string {
   return process.env.ARC_RPC_URL || "https://rpc.testnet.arc.io"
 }
 
-/**
- * Stable per-user derivation index: hash the wallet key so the same user
- * always maps to the same address across restarts, and different users never
- * collide. Namespaced (`wallet-user:` prefix) so it can never overlap the
- * per-intent deposit index space from the settlement adapter.
- */
-export function userWalletIndex(key: string): number {
-  return (
-    createHash("sha256").update(`wallet-user:${key}`).digest().readUInt32BE(0) &
-    0x7fffffff
-  )
-}
-
 async function signer(index: number): Promise<any> {
   const mod = await accountsMod()
   if (process.env.ARC_MNEMONIC) {
@@ -91,13 +77,13 @@ export class ArcUserWalletSigner implements UserWalletSigner {
   readonly network = "arc" as const
   readonly env = "testnet" as const
 
-  async deriveWallet(key: string): Promise<UserWallet> {
-    const account = await signer(userWalletIndex(key))
+  async deriveWallet(derivationIndex: number): Promise<UserWallet> {
+    const account = await signer(derivationIndex)
     return {
       network: this.network,
       env: this.env,
       address: account.address,
-      derivation_index: userWalletIndex(key),
+      derivation_index: derivationIndex,
     }
   }
 
@@ -126,13 +112,13 @@ export class ArcUserWalletSigner implements UserWalletSigner {
   }
 
   async spend(input: {
-    key: string
+    derivationIndex: number
     to: string
     usdc_amount: string
     reference: string
   }): Promise<WalletSpendResult> {
     const viem = await viemMod()
-    const account = await signer(userWalletIndex(input.key))
+    const account = await signer(input.derivationIndex)
     const client = viem.createWalletClient({
       account,
       chain: ARC_CHAIN,
