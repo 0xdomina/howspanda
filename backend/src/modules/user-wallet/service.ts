@@ -196,8 +196,9 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
   /**
    * Sign + broadcast a previously recorded spend intent. Re-derives the key
    * from the wallet's stored derivation index and moves USDC from the user
-   * wallet to the allowlisted destination (a platform treasury /
-   * payment-session deposit address). Idempotent on the stored intent row.
+   * wallet to the intent's destination (a server-derived session deposit
+   * address for payments, or a password-confirmed external address for
+   * withdrawals). Idempotent on the stored intent row.
    */
   async signSpend(input: {
     actor_type: string
@@ -296,7 +297,10 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     // a replay would re-broadcast.
     if (spend.status === "signed") {
       const signer = getUserWalletSigner(wallet.network)
-      const result = await signer.checkSpend(spend.reference)
+      const result = await signer.checkSpend({
+        reference: spend.reference,
+        tx_hash: spend.tx_hash,
+      })
       if (result.status === "confirmed" || result.status === "failed") {
         await this.updateWalletSpends({
           id: spend.id,
@@ -305,6 +309,46 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
         })
         return { ...spend, status: result.status, tx_hash: result.tx_hash ?? null }
       }
+    }
+    return spend
+  }
+
+  /**
+   * Reconcile ONE signed spend against the chain (driven by the
+   * reconcile-wallet-spends scheduled job). Terminal verdicts are applied
+   * idempotently; anything still in flight is left signed for the next sweep.
+   * Never regresses a row.
+   */
+  async reconcileSpend(input: { id: string }): Promise<WalletSpendView> {
+    const [spend] = await this.listWalletSpends({ id: input.id }, { take: 1 })
+    if (!spend) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        "No spend intent for this id"
+      )
+    }
+    if (spend.status !== "signed") {
+      return spend
+    }
+    const [wallet] = await this.listUserWallets(
+      { id: spend.wallet_id },
+      { take: 1 }
+    )
+    if (!wallet) {
+      return spend
+    }
+    const signer = getUserWalletSigner(wallet.network)
+    const result = await signer.checkSpend({
+      reference: spend.reference,
+      tx_hash: spend.tx_hash,
+    })
+    if (result.status === "confirmed" || result.status === "failed") {
+      await this.updateWalletSpends({
+        id: spend.id,
+        status: result.status,
+        tx_hash: result.tx_hash ?? null,
+      })
+      return { ...spend, status: result.status, tx_hash: result.tx_hash ?? null }
     }
     return spend
   }

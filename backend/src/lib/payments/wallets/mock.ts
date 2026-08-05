@@ -71,7 +71,10 @@ export class MockUserWalletSigner implements UserWalletSigner {
     return MOCK_SPENDS.get(input.reference)!
   }
 
-  async checkSpend(reference: string): Promise<WalletSpendResult> {
-    return MOCK_SPENDS.get(reference) ?? { status: "pending" }
+  async checkSpend(input: {
+    reference: string
+    tx_hash?: string | null
+  }): Promise<WalletSpendResult> {
+    return MOCK_SPENDS.get(input.reference) ?? { status: "pending" }
   }
 }

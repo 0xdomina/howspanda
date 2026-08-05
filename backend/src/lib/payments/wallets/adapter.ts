@@ -48,7 +48,10 @@ export interface UserWalletSigner {
     reference: string
   }): Promise<WalletSpendResult>
   /** Resolve the on-chain status of a previously signed spend. */
-  checkSpend(reference: string): Promise<WalletSpendResult>
+  checkSpend(input: {
+    reference: string
+    tx_hash?: string | null
+  }): Promise<WalletSpendResult>
 }
 
 export class WalletUnavailableError extends Error {

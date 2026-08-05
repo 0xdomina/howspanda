@@ -138,10 +138,35 @@ export class ArcUserWalletSigner implements UserWalletSigner {
     }
   }
 
-  async checkSpend(reference: string): Promise<WalletSpendResult> {
-    // Spending is synchronous (sendTransaction resolves with a hash) and the
-    // transfer is final once accepted — pending tx confirmation is not needed
-    // for the PoC spend path.
-    return { status: "confirmed" }
+  async checkSpend(input: {
+    reference: string
+    tx_hash?: string | null
+  }): Promise<WalletSpendResult> {
+    // Real receipt polling: the spend row's tx_hash (returned at broadcast)
+    // drives the verdict. A missing receipt simply means the tx is still in
+    // the mempool — leave it signed for the next reconcile sweep.
+    if (!input.tx_hash) {
+      return { status: "pending" }
+    }
+    const viem = await viemMod()
+    const client = viem.createPublicClient({
+      chain: ARC_CHAIN,
+      transport: viem.http(rpcUrl()),
+    })
+    try {
+      const receipt = await client.getTransactionReceipt({
+        hash: input.tx_hash,
+      })
+      if (!receipt) {
+        return { status: "pending" }
+      }
+      if (receipt.status === "success") {
+        return { status: "confirmed", tx_hash: input.tx_hash }
+      }
+      return { status: "failed", tx_hash: input.tx_hash }
+    } catch {
+      // Receipt not found yet (pending in the mempool).
+      return { status: "pending" }
+    }
   }
 }

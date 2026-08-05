@@ -260,6 +260,22 @@ export const PostCryptoWalletPaySchema = z.object({
   idempotency_key: z.string().optional(),
 })
 
+// Send USDC out of the managed per-user wallet to ANY external USDC address.
+// The transfer is gated by re-entering the account password — the only proof
+// that the request really comes from the wallet owner. The `reference` for the
+// spend is derived server-side from the idempotency key; one transfer per key.
+export const PostCryptoWalletWithdrawSchema = z.object({
+  to_address: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, "Invalid USDC address format"),
+  usdc_amount: z
+    .string()
+    .regex(/^\d{1,12}(\.\d{1,6})?$/, "USDC amount must be a 6-decimal string")
+    .refine((v) => Number(v) > 0, "USDC amount must be positive"),
+  password: z.string().min(1),
+  idempotency_key: z.string().min(1),
+})
+
 // Dev/mock-only top-up so the fund→spend flow can be exercised offline. Only
 // reachable when the wallet signer is the in-process mock (no real chain).
 export const PostCryptoWalletFundSchema = z.object({
@@ -676,6 +692,15 @@ export default defineMiddlewares({
         authenticate("customer", ["session", "bearer"]),
         CRYPTO_WALLET_PAY_RATE_LIMIT,
         validateAndTransformBody(PostCryptoWalletPaySchema),
+      ],
+    },
+    {
+      matcher: "/store/crypto-wallet/withdraw",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        CRYPTO_WALLET_PAY_RATE_LIMIT,
+        validateAndTransformBody(PostCryptoWalletWithdrawSchema),
       ],
     },
     {
