@@ -50,3 +50,41 @@ export async function resolveSellerByHandle(
 
   return seller
 }
+
+export type SellerContext = {
+  sellerAdminId: string
+  sellerId: string
+  role: "owner" | "staff"
+  email: string | null
+  phone: string | null
+}
+
+/** Resolves the acting seller admin row plus the seller it administers. */
+export async function resolveSellerContext(
+  req: AuthenticatedMedusaRequest
+): Promise<SellerContext> {
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+  const { data: [sellerAdmin] } = await query.graph({
+    entity: "seller_admin",
+    fields: ["id", "email", "phone", "role", "seller.id"],
+    filters: {
+      id: [req.auth_context.actor_id],
+    },
+  })
+
+  if (!sellerAdmin?.seller?.id) {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Seller not found for authenticated actor"
+    )
+  }
+
+  return {
+    sellerAdminId: sellerAdmin.id,
+    sellerId: sellerAdmin.seller.id,
+    role: sellerAdmin.role ?? "owner",
+    email: sellerAdmin.email ?? null,
+    phone: sellerAdmin.phone ?? null,
+  }
+}

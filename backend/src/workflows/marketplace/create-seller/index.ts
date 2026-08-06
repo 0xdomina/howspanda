@@ -56,6 +56,8 @@ const createSellerWorkflow = createWorkflow(
     }, (data) => {
       return {
         ...data.input.admin,
+        role: "owner" as const,
+        auth_identity_id: data.input.authIdentityId,
         seller_id: data.seller.id,
       }
     })

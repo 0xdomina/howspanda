@@ -2,6 +2,7 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { MedusaError } from "@medusajs/framework/utils"
 import DeliveryModuleService from "../../../../../modules/delivery/service"
 import { DELIVERY_MODULE } from "../../../../../modules/delivery"
+import { resolvePartyNames } from "../../../../../lib/delivery/party-names"
 
 // Timeline + messages (polling). `email` identifies the requesting party so we
 // can gate reads to job parties — it is REQUIRED (an anonymous read would leak
@@ -17,7 +18,16 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   }
   const deliveryService = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)
   const messages = await deliveryService.listMessages(id, email)
-  res.json({ messages })
+  // Annotate senders with display names so the chat renders names, not emails.
+  const names = await resolvePartyNames(
+    req,
+    (messages as any[]).map((m) => m.sender_email)
+  )
+  const enriched = (messages as any[]).map((m) => ({
+    ...m,
+    sender_name: names[m.sender_email.trim().toLowerCase()] ?? null,
+  }))
+  res.json({ messages: enriched })
 }
 
 // Any job party can send a message (writes are gated in the service).

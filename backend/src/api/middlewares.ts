@@ -7,6 +7,9 @@ import {
 import { z } from "@medusajs/framework/zod"
 import { rateLimit } from "../lib/security/rate-limit"
 import { PostSellerCreateSchema } from "./sellers/route"
+import { PostSellerTeamSchema } from "./sellers/team/route"
+import { PatchSellerMeSchema } from "./sellers/me/route"
+import { PostCourierApplySchema } from "./store/couriers/apply/route"
 
 // Abuse-throttling for sensitive routes. Keyed by identity where the request
 // body already carries the actor's email (so NAT'd users behind one IP are not
@@ -393,6 +396,43 @@ export const PostReferralClaimSchema = z.object({
   email: z.string().email(),
 })
 
+// Challenges (Phases 17-18): campaigns live as `draft` until admin flips them
+// live; `config` carries the per-type reward rules (milestones/buyer reward/cap
+// for invite; ticket spend/winner count for arc_pool).
+export const PostChallengeCreateSchema = z.object({
+  name: z.string().min(2),
+  slug: z.string().min(2),
+  description: z.string().max(2000).optional(),
+  type: z.enum(["invite", "arc_pool"]),
+  audience: z.enum(["sellers", "buyers", "all"]).default("all"),
+  starts_at: z.coerce.date().optional(),
+  ends_at: z.coerce.date().optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+})
+
+export const PatchChallengeUpdateSchema = z.object({
+  name: z.string().min(2).optional(),
+  description: z.string().max(2000).optional(),
+  status: z.enum(["draft", "live", "ended"]).optional(),
+  starts_at: z.coerce.date().nullable().optional(),
+  ends_at: z.coerce.date().nullable().optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+})
+
+export const PostChallengeClaimSchema = z.object({
+  reward_id: z.string().min(1),
+})
+
+export const PostChallengeDrawSchema = z.object({
+  winner_count: z.number().int().min(1).optional(),
+  prize_amount_ngn: z.number().positive().optional(),
+  seed: z.string().optional(),
+})
+
+export const PostChallengeSettleSchema = z.object({
+  pool_ngn: z.number().positive(),
+})
+
 // Malls (Phase 10)
 export const PostMallCreateSchema = z.object({
   name: z.string().min(2),
@@ -431,12 +471,12 @@ export const PostDeliveryJobSchema = z.object({
 })
 
 export const PostDeliveryOfferSchema = z.object({
-  courierEmail: z.string().email(),
+  courierEmail: z.string().email().optional(),
   offeredPrice: z.number().positive(),
 })
 
 export const PostDeliveryPickupSchema = z.object({
-  courierEmail: z.string().email(),
+  courierEmail: z.string().email().optional(),
 })
 
 export const PostDeliveryCancelSchema = z.object({
@@ -584,6 +624,18 @@ export default defineMiddlewares({
       middlewares: [
         authenticate("seller", ["session", "bearer"]),
       ],
+    },
+    {
+      // Store owner provisions a staff login for their store.
+      matcher: "/sellers/team",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostSellerTeamSchema)],
+    },
+    {
+      // Store settings + own profile. Auth comes from the /sellers/* matcher.
+      matcher: "/sellers/me",
+      methods: ["PATCH"],
+      middlewares: [validateAndTransformBody(PatchSellerMeSchema)],
     },
     {
       matcher: "/sellers/products",
@@ -862,6 +914,38 @@ export default defineMiddlewares({
       middlewares: [ADMIN_RATE_LIMIT],
     },
     {
+      matcher: "/admin/challenges",
+      methods: ["GET", "POST"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostChallengeCreateSchema),
+      ],
+    },
+    {
+      matcher: "/admin/challenges/:id",
+      methods: ["GET", "PATCH"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PatchChallengeUpdateSchema),
+      ],
+    },
+    {
+      matcher: "/admin/challenges/:id/draw",
+      methods: ["POST"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostChallengeDrawSchema),
+      ],
+    },
+    {
+      matcher: "/admin/challenges/:id/settle",
+      methods: ["POST"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostChallengeSettleSchema),
+      ],
+    },
+    {
       // Paystack signs the exact raw bytes — keep them for the HMAC check
       matcher: "/hooks/payouts/paystack",
       methods: ["POST"],
@@ -889,6 +973,31 @@ export default defineMiddlewares({
       ],
     },
     {
+      // Challenge detail + standing: auth optional so anonymous browsing works.
+      matcher: "/store/challenges/:slug",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
+      matcher: "/store/challenges/:slug/claim",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        CLAIM_RATE_LIMIT,
+        validateAndTransformBody(PostChallengeClaimSchema),
+      ],
+    },
+    {
+      // Seller claim: auth comes from the /sellers/* matcher above.
+      matcher: "/sellers/challenges/:slug/claim",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostChallengeClaimSchema)],
+    },
+    {
       // Seller (store owner) mall routes: publishable key + seller bearer both
       // required (the store namespace enforces the key, we enforce the actor).
       matcher: "/store/malls",
@@ -910,6 +1019,23 @@ export default defineMiddlewares({
         authenticate("seller", ["session", "bearer"]),
         validateAndTransformBody(PostMallJoinSchema),
       ],
+    },
+    {
+      // Author-only mall lifecycle after expiry: re-launch or cancel.
+      matcher: "/store/malls/:id/relaunch",
+      methods: ["POST"],
+      middlewares: [authenticate("seller", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/malls/:id/cancel",
+      methods: ["POST"],
+      middlewares: [authenticate("seller", ["session", "bearer"])],
+    },
+    {
+      // Public win ticker for the storefront malls pages.
+      matcher: "/store/malls/wins",
+      methods: ["GET"],
+      middlewares: [],
     },
     {
       matcher: "/store/malls/:id/join-buyer",
@@ -936,9 +1062,32 @@ export default defineMiddlewares({
       middlewares: [authenticate("seller", ["session", "bearer"])],
     },
     {
+      // Courier application: only a signed-in customer or seller account can
+      // apply (the route derives the courier's identity from the actor).
+      matcher: "/store/couriers/apply",
+      methods: ["POST"],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostCourierApplySchema),
+      ],
+    },
+    {
+      // Courier dashboard: application status, KYC level, activity, earnings.
+      matcher: "/store/couriers/me",
+      methods: ["GET"],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
+    },
+    {
+      // Offers are courier actions: the courier identity comes from the signed
+      // in customer/seller actor (never from the body), and the route enforces
+      // an approved courier application + phone KYC.
       matcher: "/store/delivery-jobs/:id/offers",
       methods: ["POST"],
-      middlewares: [validateAndTransformBody(PostDeliveryOfferSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        validateAndTransformBody(PostDeliveryOfferSchema),
+      ],
     },
     {
       matcher: "/store/delivery-jobs/:id/offers/:offerId/accept",
@@ -948,7 +1097,11 @@ export default defineMiddlewares({
     {
       matcher: "/store/delivery-jobs/:id/pickup",
       methods: ["POST"],
-      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryPickupSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostDeliveryPickupSchema),
+      ],
     },
     {
       matcher: "/store/delivery-jobs/:id/cancel",

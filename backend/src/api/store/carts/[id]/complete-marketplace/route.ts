@@ -6,6 +6,8 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import createSellerOrdersWorkflow from "../../../../../workflows/marketplace/create-seller-orders"
 import { REDEEMABLES_MODULE } from "../../../../../modules/redeemables"
 import RedeemablesModuleService from "../../../../../modules/redeemables/service"
+import { GROWTH_MODULE } from "../../../../../modules/growth"
+import GrowthModuleService from "../../../../../modules/growth/service"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest,
@@ -15,6 +17,7 @@ export const POST = async (
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const redeemables =
     req.scope.resolve<RedeemablesModuleService>(REDEEMABLES_MODULE)
+  const growth = req.scope.resolve<GrowthModuleService>(GROWTH_MODULE)
 
   const { data: [cart] } = await query.graph({
     entity: "cart",
@@ -47,6 +50,16 @@ export const POST = async (
       await redeemables.updateRedemptions([
         { id: consumption.redemption.id, order_id: result.order.id },
       ])
+    }
+
+    // Campaign #2 hook: qualifying spend accrues arc_pool revenue-share + raffle
+    // tickets (idempotent per order) for any live arc_pool challenge.
+    if (result.order.email) {
+      await growth.recordBuyerSpend({
+        buyerEmail: result.order.email,
+        amountNgn: Number(result.order.total ?? 0),
+        orderId: result.order.id,
+      })
     }
 
     res.json({

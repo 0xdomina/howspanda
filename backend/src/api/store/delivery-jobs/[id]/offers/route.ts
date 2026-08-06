@@ -1,30 +1,38 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import {
+  AuthenticatedMedusaRequest,
+  MedusaResponse,
+} from "@medusajs/framework/http"
+import { z } from "@medusajs/framework/zod"
 import DeliveryModuleService from "../../../../../modules/delivery/service"
 import { DELIVERY_MODULE } from "../../../../../modules/delivery"
 import type { MakeOfferInput } from "../../../../../modules/delivery/service"
 import KycModuleService from "../../../../../modules/kyc/service"
 import { KYC_MODULE } from "../../../../../modules/kyc"
+import { resolveActorEmail } from "../../../../../lib/accounts/resolve-actor-email"
 
-// Any actor can make an offer or accept the posted price (email identity,
-// matching the buyer-wallet pattern — couriers need no seller account).
-// When the KYC courier gate is enabled (KYC_COURIER_GATE_ENABLED=true), the
-// courier must be at least phone-verified to participate.
+// Making an offer is a courier action: only a signed-in account holder with an
+// APPROVED courier application and at least phone-verified KYC can bid. The
+// courier's email is derived from the authenticated actor — a client-supplied
+// email is never trusted (an anonymous visitor cannot pose as a courier).
 export const POST = async (
-  req: MedusaRequest<MakeOfferInput>,
+  req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
   const { id } = req.params as { id: string }
-  const body = req.validatedBody ?? (req.body as MakeOfferInput)
+  const body = req.validatedBody as MakeOfferInput
+  const email = await resolveActorEmail(req)
+
   const deliveryService = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)
   const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
 
-  if (kyc.courierGateEnabled()) {
-    await kyc.assertCourierKyc(body.courierEmail)
-  }
+  // Minimum KYC level to courier (unconditional — courier is a real role).
+  await kyc.assertCourierKyc(email)
+  await deliveryService.assertCourierCanOffer(email)
 
   const offer = await deliveryService.makeOffer({
-    ...body,
     jobId: id,
+    courierEmail: email,
+    offeredPrice: body.offeredPrice,
   })
   res.status(201).json({ offer })
 }

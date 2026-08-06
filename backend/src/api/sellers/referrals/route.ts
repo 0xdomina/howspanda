@@ -111,6 +111,13 @@ export const GET = async (
         })
         lifetimePaid += reward
       }
+      // Campaign #1 hook: a qualified referral also scores the seller (and
+      // issues the invitee's double-sided credit) on any live invite challenge.
+      await growth.recordInviteQualified({
+        sellerId,
+        referralId: ref.id,
+        refereeEmail: ref.referee_email,
+      })
       break // first completed transaction qualifies the referral
     }
   }

@@ -6,8 +6,15 @@ import DeliveryOffer from "./models/delivery-offer"
 import DeliveryParty from "./models/delivery-party"
 import DeliveryMessage from "./models/delivery-message"
 import DeliveryVerification from "./models/delivery-verification"
+import DeliveryCourier from "./models/delivery-courier"
 
 const round2 = (n: number) => Math.round(n * 100) / 100
+
+// Public job views must never leak the recipient's phone number.
+function stripDestinationPhone(job: Record<string, unknown>) {
+  const { destination_phone, ...rest } = job
+  return rest
+}
 
 // In-app verification codes are 6 digits, valid for 15 minutes.
 const CODE_LIFETIME_MS = 15 * 60 * 1000
@@ -44,6 +51,7 @@ class DeliveryModuleService extends MedusaService({
   DeliveryParty,
   DeliveryMessage,
   DeliveryVerification,
+  DeliveryCourier,
 }) {
   /**
    * Post a delivery job (sender: the store owner). Always registers the sender
@@ -200,6 +208,109 @@ class DeliveryModuleService extends MedusaService({
       throw new MedusaError(MedusaError.Types.NOT_FOUND, "Delivery job not found")
     }
     return jobs[0]
+  }
+
+  /**
+   * Courier role (Phase: courier is a real role). Applications come from a
+   * logged-in customer or seller account; the route layer enforces phone KYC
+   * before the profile is approved, so "approved" always means "a real account
+   * holder who proved a phone number". Offers and pickups then derive the
+   * courier's email from the authenticated actor — never from the body.
+   */
+  async getCourierProfile(courierEmail: string) {
+    const email = courierEmail.trim().toLowerCase()
+    const [profile] = await this.listDeliveryCouriers(
+      { courier_email: email },
+      { take: 1 }
+    )
+    return profile ?? null
+  }
+
+  async applyCourier(input: {
+    courierEmail: string
+    authIdentityId?: string | null
+    actorType?: "customer" | "seller" | null
+    name?: string | null
+    phone?: string | null
+    city?: string | null
+    vehicle?: string | null
+  }) {
+    const email = input.courierEmail.trim().toLowerCase()
+    const existing = await this.getCourierProfile(email)
+
+    // Re-applying updates the courier's details and re-activates a suspended
+    // profile (KYC is re-checked by the route each time).
+    if (existing) {
+      return await this.updateDeliveryCouriers({
+        id: existing.id,
+        name: input.name ?? existing.name,
+        phone: input.phone ?? existing.phone,
+        city: input.city ?? existing.city,
+        vehicle: input.vehicle ?? existing.vehicle,
+        auth_identity_id: input.authIdentityId ?? existing.auth_identity_id,
+        actor_type: input.actorType ?? existing.actor_type,
+        status: "approved",
+        approved_at: new Date(),
+      })
+    }
+
+    return await this.createDeliveryCouriers({
+      courier_email: email,
+      name: input.name ?? null,
+      phone: input.phone ?? null,
+      city: input.city ?? null,
+      vehicle: input.vehicle ?? null,
+      auth_identity_id: input.authIdentityId ?? null,
+      actor_type: input.actorType ?? null,
+      status: "approved",
+      approved_at: new Date(),
+    })
+  }
+
+  /**
+   * Gate check for courier actions (offers, pickup). Throws when the email is
+   * not an approved courier. Phone KYC is asserted separately by the KYC
+   * module at the route layer.
+   */
+  async assertCourierCanOffer(courierEmail: string): Promise<void> {
+    const profile = await this.getCourierProfile(courierEmail)
+    if (!profile) {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Apply to be a courier before making delivery offers",
+        "courier_required"
+      )
+    }
+    if (profile.status !== "approved") {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Your courier application is not approved yet",
+        "courier_not_approved"
+      )
+    }
+  }
+
+  /**
+   * A courier's own activity feed for the dashboard: every offer they made
+   * (with the job) plus the jobs they accepted — newest first.
+   */
+  async listCourierJobs(courierEmail: string) {
+    const email = courierEmail.trim().toLowerCase()
+    const offers = await this.listDeliveryOffers(
+      { courier_email: email },
+      { order: { created_at: "DESC" }, take: 100, relations: ["job"] }
+    )
+    return offers.map((offer) => {
+      const job = (offer as any).job
+      const stripped = job ? stripDestinationPhone(job) : null
+      return {
+        offer_id: offer.id,
+        offered_price: offer.offered_price,
+        offer_status: offer.status,
+        created_at: offer.created_at,
+        job: stripped,
+      }
+    })
   }
 
   /**

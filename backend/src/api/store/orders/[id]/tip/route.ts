@@ -35,16 +35,22 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
   const currency = lines.find((l) => l.currency_code)?.currency_code ?? "ngn"
 
-  // 0% platform commission — the full tip nets to the seller (locked spec).
+  // Locked spec: tips carry a 10% platform fee on every rail (card AND USDC)
+  // — the seller nets 90%, matching the platform's standard marketplace
+  // commission rate. The commission is withheld here at the ledger line, so it
+  // holds whether the order was paid by card or USDC.
+  const rate = 0.1
+  const commission = Math.round(amount * rate * 100) / 100
+  const net = Math.round((amount - commission) * 100) / 100
   const line = await marketplace.createCommissionLines([
     {
       order_id: `tip:${orderId}:${Date.now()}`,
       parent_order_id: orderId,
       currency_code: currency,
       order_total: amount,
-      rate: 0,
-      commission_amount: 0,
-      net_amount: amount,
+      rate,
+      commission_amount: commission,
+      net_amount: net,
       status: "available",
       available_at: new Date(),
       seller_id: sellerId,

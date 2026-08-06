@@ -71,6 +71,59 @@ medusaIntegrationTestRunner({
         })
       })
 
+      // Register + finish a customer account (register token -> create customer).
+      const createCustomer = async (email: string) => {
+        const reg = await api.post("/auth/customer/emailpass/register", {
+          email,
+          password: "supersecret",
+        })
+        await api.post(
+          "/store/customers",
+          { email },
+          {
+            headers: {
+              Authorization: `Bearer ${reg.data.token}`,
+              ...storeHeaders.headers,
+            },
+          }
+        )
+        const login = await api.post("/auth/customer/emailpass", {
+          email,
+          password: "supersecret",
+        })
+        return {
+          headers: {
+            Authorization: `Bearer ${login.data.token}`,
+            ...storeHeaders.headers,
+          },
+        }
+      }
+
+      // Couriers are real roles: account + phone KYC + approved application.
+      let courierSeq = 0
+      const makeCourier = async (email: string) => {
+        courierSeq += 1
+        const phone = `+2348${String(90000000 + courierSeq).padStart(8, "0")}`
+        const customer = await createCustomer(email)
+        const requested = await api.post("/kyc/request", {
+          email,
+          channel: "phone",
+          destination: phone,
+        })
+        await api.post("/kyc/verify", {
+          email,
+          channel: "phone",
+          destination: phone,
+          code: requested.data.code,
+        })
+        await api.post(
+          "/store/couriers/apply",
+          { city: "Lagos", vehicle: "motorcycle" },
+          customer
+        )
+        return { headers: customer, phone }
+      }
+
       it("is wired but does NOT send when verification is disabled", async () => {
         process.env.KYC_VERIFICATION_ENABLED = "false"
         try {
@@ -196,8 +249,7 @@ medusaIntegrationTestRunner({
         expect(status.data.profile.id_tail).toEqual("6554")
       })
 
-      it("gates courier offers on phone KYC when enabled", async () => {
-        // post a job first
+      it("requires phone KYC before a courier can offer (always on)", async () => {
         const job = await api.post(
           "/store/delivery-jobs",
           { ...POST_JOB_BODY, orderId: "order_kyc_gate" },
@@ -205,56 +257,61 @@ medusaIntegrationTestRunner({
         )
         const jobId = job.data.job.id
 
-        process.env.KYC_COURIER_GATE_ENABLED = "true"
-        try {
-          // unverified courier cannot make an offer
-          await expect(
-            api.post(
-              `/store/delivery-jobs/${jobId}/offers`,
-              { courierEmail: "unverified-kyc@howsu.local", offeredPrice: 4500 },
-              storeHeaders
-            )
-          ).rejects.toMatchObject({
-            response: { status: 400, data: { code: "kyc_required" } },
-          })
-
-          // verify the courier phone, then the same offer succeeds
-          const requested = await api.post("/kyc/request", {
-            email: "courier-verify-kyc@howsu.local",
-            channel: "phone",
-            destination: "+2348099999999",
-          })
-          await api.post("/kyc/verify", {
-            email: "courier-verify-kyc@howsu.local",
-            channel: "phone",
-            destination: "+2348099999999",
-            code: requested.data.code,
-          })
-
-          const ok = await api.post(
+        // an account with no phone verification cannot offer
+        const unverified = await createCustomer("unverified-kyc@howsu.local")
+        await expect(
+          api.post(
             `/store/delivery-jobs/${jobId}/offers`,
-            { courierEmail: "courier-verify-kyc@howsu.local", offeredPrice: 4500 },
-            storeHeaders
+            { offeredPrice: 4500 },
+            unverified
           )
-          expect(ok.status).toEqual(201)
-          expect(ok.data.offer.courier_email).toEqual("courier-verify-kyc@howsu.local")
-        } finally {
-          process.env.KYC_COURIER_GATE_ENABLED = "false"
-        }
-      })
+        ).rejects.toMatchObject({
+          response: { status: 400, data: { code: "kyc_required" } },
+        })
 
-      it("lets an unverified courier offer when the gate is off", async () => {
-        const job = await api.post(
-          "/store/delivery-jobs",
-          { ...POST_JOB_BODY, orderId: "order_kyc_nogate" },
-          sellerAuth()
-        )
+        // phone-verified + approved courier can offer
+        const courier = await makeCourier("courier-verify-kyc@howsu.local")
         const ok = await api.post(
-          `/store/delivery-jobs/${job.data.job.id}/offers`,
-          { courierEmail: "anyone-nogate@howsu.local", offeredPrice: 4500 },
-          storeHeaders
+          `/store/delivery-jobs/${jobId}/offers`,
+          { offeredPrice: 4500 },
+          courier.headers
         )
         expect(ok.status).toEqual(201)
+        expect(ok.data.offer.courier_email).toEqual("courier-verify-kyc@howsu.local")
+      })
+
+      it("requires an approved courier application, not just phone KYC", async () => {
+        const job = await api.post(
+          "/store/delivery-jobs",
+          { ...POST_JOB_BODY, orderId: "order_kyc_apply" },
+          sellerAuth()
+        )
+        const jobId = job.data.job.id
+
+        // phone KYC completed, but never applied to be a courier
+        const phone = "+2348088888888"
+        const customer = await createCustomer("applied-nogate@howsu.local")
+        const requested = await api.post("/kyc/request", {
+          email: "applied-nogate@howsu.local",
+          channel: "phone",
+          destination: phone,
+        })
+        await api.post("/kyc/verify", {
+          email: "applied-nogate@howsu.local",
+          channel: "phone",
+          destination: phone,
+          code: requested.data.code,
+        })
+
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${jobId}/offers`,
+            { offeredPrice: 4500 },
+            customer
+          )
+        ).rejects.toMatchObject({
+          response: { status: 401, data: { code: "courier_required" } },
+        })
       })
 
       it("surfaces the seller's KYC level on /sellers/me", async () => {

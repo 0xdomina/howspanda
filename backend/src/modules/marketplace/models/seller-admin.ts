@@ -11,6 +11,13 @@ const SellerAdmin = model.define("seller_admin", {
   // Phone is the login identifier for phone-first sellers. The signup
   // credential itself IS the verified contact, so KYC never re-verifies it.
   phone: model.text().nullable(),
+  // Store staff vs the store owner. The owner (creator) can manage the store,
+  // its team and its money; staff get the day-to-day dashboard (products,
+  // orders, delivery, broadcasts) but cannot touch settings, team or payouts.
+  role: model.enum(["owner", "staff"]).default("owner"),
+  // Links the seller_admin row to its auth identity so the store owner can
+  // later remove a staff member (and their login) by id.
+  auth_identity_id: model.text().nullable(),
   seller: model.belongsTo(() => Seller, {
     mappedBy: "admins",
   }),

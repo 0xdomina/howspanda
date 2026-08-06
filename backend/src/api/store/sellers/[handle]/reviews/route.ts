@@ -3,7 +3,6 @@ import {
   ContainerRegistrationKeys,
   MedusaError,
 } from "@medusajs/framework/utils"
-import { maskName } from "../../../../../lib/reviews/mask-name"
 import { REVIEWS_MODULE } from "../../../../../modules/reviews"
 import type ReviewsModuleService from "../../../../../modules/reviews/service"
 
@@ -35,10 +34,35 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     { order: { created_at: "DESC" }, take: limit, skip: offset }
   )
 
+  // A reviewer's public name is their real profile name — never a string
+  // derived from their email. Buyers without a profile name show as a neutral
+  // label so no part of an email is ever exposed on a public surface.
+  const buyerEmails = [...new Set(items.map((r) => r.buyer_email))].filter(
+    Boolean
+  )
+  const nameMap: Record<string, string> = {}
+  if (buyerEmails.length) {
+    const { data: customers } = await query.graph({
+      entity: "customer",
+      fields: ["email", "first_name", "last_name"],
+      filters: { email: buyerEmails },
+    })
+    for (const c of customers ?? []) {
+      if (!c.email) continue
+      const parts = [c.first_name, c.last_name]
+        .filter(Boolean)
+        .map((p: any) => String(p).trim())
+        .filter(Boolean)
+      const joined = parts.join(" ").trim()
+      if (joined) nameMap[String(c.email).trim().toLowerCase()] = joined
+    }
+  }
+
   res.json({
     reviews: items.map((r) => ({
       id: r.id,
-      name: maskName(r.buyer_email),
+      name:
+        nameMap[r.buyer_email.trim().toLowerCase()] ?? "Verified buyer",
       rating: r.rating,
       comment: r.comment,
       reply_body: r.reply_body,

@@ -8,6 +8,18 @@ const DEFAULT_TARGET_SELLERS = 5
 const DEFAULT_TARGET_BUYERS = 10
 const MAX_MALL_DURATION_DAYS = 30
 
+// Locked economics: 20% platform tax on every seller contribution to the prize
+// pool (₦100 pledged → ₦20 platform → ₦80 pool). The pool is displayed NET so
+// buyers and sellers always see the real pot. The gross pledge is kept in
+// `contributed_ngn` as the refund basis: a mall that never launches returns the
+// FULL gross amount (the platform absorbs its share); a mall that launched
+// refunds only its remaining net pool pro-rata after cancellation.
+const PLATFORM_TAX = 0.2
+
+// Net pool contribution after the platform tax (gross pledge × 0.8).
+const netOfTax = (gross: number) =>
+  Math.floor(gross * (1 - PLATFORM_TAX))
+
 export type CreateMallInput = {
   name: string
   description?: string
@@ -59,6 +71,8 @@ class MallModuleService extends MedusaService({
     const expiresAt = new Date(
       now.getTime() + durationDays * 24 * 60 * 60 * 1000
     )
+    // 20% platform tax: the pledge is the gross contribution, the pool the net.
+    const netPool = netOfTax(input.prizePoolNgn)
     return await this.createMalls({
       name: input.name,
       description: input.description ?? null,
@@ -68,9 +82,9 @@ class MallModuleService extends MedusaService({
       target_buyers: input.targetBuyers ?? DEFAULT_TARGET_BUYERS,
       prize_winner_count: input.prizeWinnerCount,
       prize_distribution: input.prizeDistribution,
-      prize_pool_ngn: input.prizePoolNgn,
-      contributed_ngn: 0,
-      remaining_ngn: input.prizePoolNgn,
+      prize_pool_ngn: netPool,
+      contributed_ngn: input.prizePoolNgn,
+      remaining_ngn: netPool,
       expires_at: expiresAt,
     })
   }
@@ -153,12 +167,15 @@ class MallModuleService extends MedusaService({
       joined_at: new Date(),
     })
     const newContributed = mall[0].contributed_ngn + input.contributionNgn
-    const newRemaining = mall[0].remaining_ngn + input.contributionNgn
+    // Only the NET pledge (80%) enters the pool; the gross stays on the
+    // contribution record as the refund basis.
+    const netContribution = netOfTax(input.contributionNgn)
+    const newRemaining = mall[0].remaining_ngn + netContribution
     await this.updateMalls({
       id: input.mallId,
       contributed_ngn: newContributed,
       remaining_ngn: newRemaining,
-      prize_pool_ngn: mall[0].prize_pool_ngn + input.contributionNgn,
+      prize_pool_ngn: mall[0].prize_pool_ngn + netContribution,
     })
     await this.checkThresholds(input.mallId)
     return sellerJoin
@@ -342,6 +359,9 @@ class MallModuleService extends MedusaService({
     }
   }
 
+  // Time's up. No money moves here: the author decides next — re-launch
+  // (instant live, sellers/buyers preserved) or cancel (refund per the
+  // never-launched / launched rules below).
   async expire(mallId: string) {
     const mall = await this.listMalls(
       { id: mallId },
@@ -353,17 +373,52 @@ class MallModuleService extends MedusaService({
         "Mall not found"
       )
     }
-    if (mall[0].status === "closed" || mall[0].status === "cancelled") {
+    if (
+      mall[0].status === "closed" ||
+      mall[0].status === "cancelled" ||
+      mall[0].status === "expired"
+    ) {
       return mall[0]
-    }
-    if (mall[0].remaining_ngn > 0) {
-      await this.refund(mallId)
     }
     const updated = await this.updateMalls({
       id: mallId,
       status: "expired",
+      ends_at: new Date(),
     })
     return updated
+  }
+
+  // Re-launch an expired mall: straight to live, same sellers and buyers, with
+  // a fresh clock. Nothing is refunded — the pool (net) carries over.
+  async relaunch(mallId: string, durationDays?: number) {
+    const mall = await this.listMalls(
+      { id: mallId },
+      { take: 1 }
+    )
+    if (!mall.length) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        "Mall not found"
+      )
+    }
+    if (mall[0].status !== "expired") {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Only expired malls can be re-launched"
+      )
+    }
+    const now = new Date()
+    const days = Math.min(durationDays ?? 7, MAX_MALL_DURATION_DAYS)
+    const expiresAt = new Date(
+      now.getTime() + days * 24 * 60 * 60 * 1000
+    )
+    return await this.updateMalls({
+      id: mallId,
+      status: "active",
+      starts_at: now,
+      ends_at: null,
+      expires_at: expiresAt,
+    })
   }
 
   async cancel(mallId: string) {
@@ -377,52 +432,129 @@ class MallModuleService extends MedusaService({
         "Mall not found"
       )
     }
-    if (mall[0].status !== "pending") {
+    if (
+      mall[0].status !== "pending" &&
+      mall[0].status !== "expired"
+    ) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Only pending malls can be cancelled"
+        "Only pending or expired malls can be cancelled"
       )
     }
+    let refunds: { seller_id: string; amount: number }[] = []
     if (mall[0].contributed_ngn > 0) {
-      await this.refund(mallId)
+      // Never launched → full gross refunds (platform absorbs the 20%).
+      // Launched → opaque pro-rata refunds of the remaining net pool.
+      refunds = await this.refund(mallId, { full: !mall[0].starts_at })
     }
     const updated = await this.updateMalls({
       id: mallId,
       status: "cancelled",
     })
-    return updated
+    return { mall: updated, refunds }
   }
 
-  private async refund(mallId: string) {
+  // Computes the per-seller refund owed when a mall is wound down. Returns the
+  // breakdown (route layer wires each amount through the marketplace ledger so
+  // it lands on the seller's payout balance) and zeroes the pool.
+  private async refund(
+    mallId: string,
+    opts?: { full?: boolean }
+  ): Promise<{ seller_id: string; amount: number }[]> {
     const mall = await this.listMalls(
       { id: mallId },
       { take: 1 }
     )
-    if (!mall.length) return
+    if (!mall.length) return []
     const sellers = await this.listMallSellers({
       mall_id: mallId,
     })
-    if (sellers.length === 0) return
-    const totalContributed = sellers.reduce(
+    const joinTotal = sellers.reduce(
       (sum, s) => sum + s.contribution_ngn,
       0
     )
-    if (totalContributed === 0) return
-    const remainingPool = mall[0].remaining_ngn
+    const totalContributed = Number(mall[0].contributed_ngn)
+    if (totalContributed === 0) return []
+
+    // Every party with money in the pool: the joined sellers plus the author's
+    // opening pledge (which has no MallSeller row of its own).
+    const parties: { seller_id: string; contribution: number }[] = []
     for (const seller of sellers) {
-      const share = seller.contribution_ngn / totalContributed
-      const refundAmount = Math.floor(remainingPool * share)
-      if (refundAmount > 0) {
+      parties.push({
+        seller_id: seller.seller_id,
+        contribution: Number(seller.contribution_ngn),
+      })
+    }
+    const authorPledge = Math.max(0, totalContributed - joinTotal)
+    if (authorPledge > 0) {
+      parties.push({
+        seller_id: mall[0].created_by_seller_id,
+        contribution: authorPledge,
+      })
+    }
+
+    const refunds: { seller_id: string; amount: number }[] = []
+    if (opts?.full) {
+      // Mall never launched: every party gets their full gross pledge back.
+      for (const party of parties) {
+        if (party.contribution <= 0) continue
+        refunds.push({
+          seller_id: party.seller_id,
+          amount: Math.floor(party.contribution),
+        })
         console.log(
-          `[mall] Refunding ₦${refundAmount} to seller ${seller.seller_id} ` +
-          `(share: ${(share * 100).toFixed(2)}%)`
+          `[mall] Full refund of ₦${party.contribution} to seller ` +
+          `${party.seller_id} (mall never launched)`
         )
       }
+      await this.updateMalls({
+        id: mallId,
+        remaining_ngn: 0,
+        prize_pool_ngn: 0,
+      })
+      return refunds
+    }
+
+    // Mall launched then cancelled: the remaining NET pool is split pro-rata
+    // by gross contribution share. Deliberately not itemized to sellers — the
+    // platform's 20% is folded into the share.
+    const remainingPool = Number(mall[0].remaining_ngn)
+    for (const party of parties) {
+      const share = party.contribution / totalContributed
+      const refundAmount = Math.floor(remainingPool * share)
+      if (refundAmount <= 0) continue
+      refunds.push({ seller_id: party.seller_id, amount: refundAmount })
+      console.log(
+        `[mall] Pro-rata refund of ₦${refundAmount} to seller ${party.seller_id} ` +
+        `(share: ${(share * 100).toFixed(2)}%)`
+      )
     }
     await this.updateMalls({
       id: mallId,
       remaining_ngn: 0,
     })
+    return refunds
+  }
+
+  // Newest prize wins across all malls, with the mall name — feeds the
+  // storefront win ticker.
+  async recentWins(count = 5) {
+    const prizes = await this.listMallPrizes(
+      {},
+      {
+        take: count,
+        order: { created_at: "DESC" },
+        relations: ["mall"],
+      }
+    )
+    return prizes.map((p) => ({
+      id: p.id,
+      mall_id: p.mall_id,
+      mall_name: (p as any).mall?.name ?? "Mall",
+      winner_buyer_email: p.winner_buyer_email,
+      amount_ngn: Number(p.amount_ngn),
+      won_at: p.created_at,
+    }))
   }
 }
 

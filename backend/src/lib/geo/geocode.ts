@@ -74,7 +74,9 @@ function toResult(place: any): GeocodeResult {
 
 /**
  * Forward geocode an address string to coordinates. Returns null when the
- * address cannot be resolved to a location.
+ * address cannot be resolved to a location. Nominatim rate-limits to ~1
+ * request/second and throttles bursts, so a failed first attempt is retried
+ * once after a short backoff before giving up.
  */
 export async function geocodeAddress(
   address: string
@@ -84,14 +86,19 @@ export async function geocodeAddress(
   if (cache.has(key)) return cache.get(key) ?? null
 
   let result: GeocodeResult | null = null
-  try {
-    const results = await nominatimSearch({ q: address.trim() })
-    if (Array.isArray(results) && results.length > 0) {
-      result = toResult(results[0])
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const results = await nominatimSearch({ q: address.trim() })
+      if (Array.isArray(results) && results.length > 0) {
+        result = toResult(results[0])
+        break
+      }
+    } catch {
+      // Network/geocoder failure — retry once, then give up (uncached).
     }
-  } catch {
-    // Network/geocoder failure — do not cache so a later retry can succeed.
-    return null
+    if (attempt === 0) {
+      await new Promise((r) => setTimeout(r, 1100))
+    }
   }
   cacheSet(key, result)
   return result

@@ -8,6 +8,7 @@ import {
 } from "@medusajs/framework/utils"
 import DeliveryModuleService from "../../../../modules/delivery/service"
 import { DELIVERY_MODULE } from "../../../../modules/delivery"
+import { enrichOffersWithCourierNames } from "../../../../lib/delivery/party-names"
 
 // A store owner's own delivery jobs, newest first (seller view).
 export const GET = async (
@@ -28,5 +29,7 @@ export const GET = async (
   }
   const deliveryService = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)
   const jobs = await deliveryService.listJobsForSeller(sellerAdmin.seller.id)
-  res.json({ jobs })
+  // Show courier names instead of emails in the offers list.
+  const enriched = await enrichOffersWithCourierNames(req, jobs as any)
+  res.json({ jobs: enriched })
 }

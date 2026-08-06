@@ -9,6 +9,12 @@ jest.setTimeout(240 * 1000)
 
 process.env.PAYSTACK_SECRET_KEY = "mock"
 
+// Verification delivery is a no-op unless KYC_VERIFICATION_ENABLED=true. For
+// tests we enable it and use the `mock` channel, which returns the raw code so
+// courier phone KYC can be completed offline.
+process.env.KYC_VERIFICATION_ENABLED = "true"
+process.env.KYC_VERIFICATION_CHANNEL = "mock"
+
 // The test runner snapshots the database after the suite beforeAll and
 // restores it before EVERY test. So shared fixtures (sellers, publishable key)
 // live in beforeAll, and any job used across steps must be created within the
@@ -39,6 +45,60 @@ medusaIntegrationTestRunner({
         destinationAddress: "4 Allen Ave, Ikeja, Lagos",
         destinationPhone: "08012345678",
         postedPrice: 5000,
+      }
+
+      // Register + finish a customer account (register token -> create customer).
+      const createCustomer = async (email: string) => {
+        const reg = await api.post("/auth/customer/emailpass/register", {
+          email,
+          password: "supersecret",
+        })
+        await api.post(
+          "/store/customers",
+          { email },
+          {
+            headers: {
+              Authorization: `Bearer ${reg.data.token}`,
+              ...storeHeaders.headers,
+            },
+          }
+        )
+        const login = await api.post("/auth/customer/emailpass", {
+          email,
+          password: "supersecret",
+        })
+        return {
+          headers: {
+            Authorization: `Bearer ${login.data.token}`,
+            ...storeHeaders.headers,
+          },
+        }
+      }
+
+      // A courier is a real role: account + phone KYC + approved application.
+      // Set up all three so the returned headers can make offers / mark pickup.
+      let courierSeq = 0
+      const makeCourier = async (email: string) => {
+        courierSeq += 1
+        const phone = `+2348${String(90000000 + courierSeq).padStart(8, "0")}`
+        const customer = await createCustomer(email)
+        const requested = await api.post("/kyc/request", {
+          email,
+          channel: "phone",
+          destination: phone,
+        })
+        await api.post("/kyc/verify", {
+          email,
+          channel: "phone",
+          destination: phone,
+          code: requested.data.code,
+        })
+        await api.post(
+          "/store/couriers/apply",
+          { city: "Lagos", vehicle: "motorcycle" },
+          customer
+        )
+        return { headers: customer, phone }
       }
 
       beforeAll(async () => {
@@ -116,6 +176,21 @@ medusaIntegrationTestRunner({
         ).toBeGreaterThan(0)
       })
 
+      it("rejects offers from anonymous visitors", async () => {
+        const created = await api.post(
+          "/store/delivery-jobs",
+          { ...POST_JOB_BODY, orderId: "order_anon_offer" },
+          sellerAuth()
+        )
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${created.data.job.id}/offers`,
+            { offeredPrice: 4500 },
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 401 } })
+      })
+
       it("full flow: post → offer → accept → pickup → confirm → payout", async () => {
         const created = await api.post(
           "/store/delivery-jobs",
@@ -124,18 +199,20 @@ medusaIntegrationTestRunner({
         )
         const jobId = created.data.job.id
 
-        // counter-offers make the job negotiating (2 offers)
+        // counter-offers make the job negotiating (2 offers, both approved couriers)
+        const courierA = await makeCourier("courier-a@howsu.local")
+        const courierB = await makeCourier("courier-b@howsu.local")
         const offerA = await api.post(
           `/store/delivery-jobs/${jobId}/offers`,
-          { courierEmail: "courier-a@howsu.local", offeredPrice: 4500 },
-          storeHeaders
+          { offeredPrice: 4500 },
+          courierA.headers
         )
         expect(offerA.status).toEqual(201)
         expect(offerA.data.offer.status).toEqual("pending")
         const offerB = await api.post(
           `/store/delivery-jobs/${jobId}/offers`,
-          { courierEmail: "courier-b@howsu.local", offeredPrice: 4000 },
-          storeHeaders
+          { offeredPrice: 4000 },
+          courierB.headers
         )
         expect(offerB.status).toEqual(201)
 
@@ -164,19 +241,19 @@ medusaIntegrationTestRunner({
         const offers = await delivery.listDeliveryOffers({ job_id: jobId })
         expect(offers.filter((o) => o.status === "rejected").length).toEqual(1)
 
-        // only the accepted courier can mark pickup
+        // only the accepted courier can mark pickup (identity from the actor)
         await expect(
           api.post(
             `/store/delivery-jobs/${jobId}/pickup`,
-            { courierEmail: "not-the-courier@howsu.local" },
-            storeHeaders
+            {},
+            courierA.headers
           )
         ).rejects.toMatchObject({ response: { status: 401 } })
 
         const picked = await api.post(
           `/store/delivery-jobs/${jobId}/pickup`,
-          { courierEmail: "courier-b@howsu.local" },
-          storeHeaders
+          {},
+          courierB.headers
         )
         expect(picked.status).toEqual(200)
         expect(picked.data.job.status).toEqual("in_transit")
@@ -209,10 +286,11 @@ medusaIntegrationTestRunner({
           sellerAuth()
         )
         const id = created.data.job.id
+        const courier = await makeCourier("courier-c@howsu.local")
         await api.post(
           `/store/delivery-jobs/${id}/offers`,
-          { courierEmail: "courier-c@howsu.local", offeredPrice: 5000 },
-          storeHeaders
+          { offeredPrice: 5000 },
+          courier.headers
         )
         const res = await api.post(
           `/store/delivery-jobs/${id}/cancel`,
@@ -231,21 +309,18 @@ medusaIntegrationTestRunner({
           sellerAuth()
         )
         const id = created.data.job.id
+        const courier = await makeCourier("courier-d@howsu.local")
         const offer = await api.post(
           `/store/delivery-jobs/${id}/offers`,
-          { courierEmail: "courier-d@howsu.local", offeredPrice: 5000 },
-          storeHeaders
+          { offeredPrice: 5000 },
+          courier.headers
         )
         await api.post(
           `/store/delivery-jobs/${id}/offers/${offer.data.offer.id}/accept`,
           {},
           sellerAuth()
         )
-        await api.post(
-          `/store/delivery-jobs/${id}/pickup`,
-          { courierEmail: "courier-d@howsu.local" },
-          storeHeaders
-        )
+        await api.post(`/store/delivery-jobs/${id}/pickup`, {}, courier.headers)
         const res = await api.post(
           `/store/delivery-jobs/${id}/cancel`,
           { email: "courier-d@howsu.local", reason: "Bike broke down" },
@@ -267,15 +342,16 @@ medusaIntegrationTestRunner({
           sellerAuth()
         )
         const id = created.data.job.id
+        const courier = await makeCourier("courier-e@howsu.local")
         const first = await api.post(
           `/store/delivery-jobs/${id}/offers`,
-          { courierEmail: "courier-e@howsu.local", offeredPrice: 4800 },
-          storeHeaders
+          { offeredPrice: 4800 },
+          courier.headers
         )
         const second = await api.post(
           `/store/delivery-jobs/${id}/offers`,
-          { courierEmail: "courier-e@howsu.local", offeredPrice: 4600 },
-          storeHeaders
+          { offeredPrice: 4600 },
+          courier.headers
         )
         expect(first.data.offer.id).not.toEqual(second.data.offer.id)
 
@@ -284,6 +360,60 @@ medusaIntegrationTestRunner({
           (o) => o.courier_email === "courier-e@howsu.local"
         )
         expect(byCourier.length).toEqual(2)
+      })
+
+      it("lets a seller account courier after phone KYC + application", async () => {
+        // A second seller registers, verifies their phone, and applies.
+        const regB = await api.post("/auth/seller/emailpass/register", {
+          email: "seller-b@howsu.local",
+          password: "supersecret",
+        })
+        await api.post(
+          "/sellers",
+          {
+            name: "Seller B",
+            handle: "seller-b",
+            admin: { email: "seller-b@howsu.local", first_name: "Sel", last_name: "Bee" },
+          },
+          { headers: { Authorization: `Bearer ${regB.data.token}` } }
+        )
+        const loginB = await api.post("/auth/seller/emailpass", {
+          email: "seller-b@howsu.local",
+          password: "supersecret",
+        })
+        const sellerBH = {
+          headers: {
+            Authorization: `Bearer ${loginB.data.token}`,
+            ...storeHeaders.headers,
+          },
+        }
+        const phone = "+2348098765432"
+        const requested = await api.post("/kyc/request", {
+          email: "seller-b@howsu.local",
+          channel: "phone",
+          destination: phone,
+        })
+        await api.post("/kyc/verify", {
+          email: "seller-b@howsu.local",
+          channel: "phone",
+          destination: phone,
+          code: requested.data.code,
+        })
+        await api.post("/store/couriers/apply", { city: "Lagos" }, sellerBH)
+
+        // Seller A posts a job; seller B offers with their seller account.
+        const job = await api.post(
+          "/store/delivery-jobs",
+          { ...POST_JOB_BODY, orderId: "order_seller_courier" },
+          sellerAuth()
+        )
+        const offer = await api.post(
+          `/store/delivery-jobs/${job.data.job.id}/offers`,
+          { offeredPrice: 4000 },
+          sellerBH
+        )
+        expect(offer.status).toEqual(201)
+        expect(offer.data.offer.courier_email).toEqual("seller-b@howsu.local")
       })
 
       // ---- Phase 12: chat + POD verification -------------------------------
@@ -297,17 +427,18 @@ medusaIntegrationTestRunner({
           sellerAuth()
         )
         const id = created.data.job.id
+        const courier = await makeCourier(courierEmail)
         const offer = await api.post(
           `/store/delivery-jobs/${id}/offers`,
-          { courierEmail, offeredPrice: 4500 },
-          storeHeaders
+          { offeredPrice: 4500 },
+          courier.headers
         )
         await api.post(
           `/store/delivery-jobs/${id}/offers/${offer.data.offer.id}/accept`,
           {},
           sellerAuth()
         )
-        return id
+        return { id, courier }
       }
 
       it("chat rejects writes before the job is accepted", async () => {
@@ -327,7 +458,7 @@ medusaIntegrationTestRunner({
       })
 
       it("parties can send and poll messages after acceptance", async () => {
-        const id = await createAcceptedJob("courier-chat@howsu.local")
+        const { id } = await createAcceptedJob("courier-chat@howsu.local")
 
         const sent = await api.post(
           `/store/delivery-jobs/${id}/chat`,
@@ -350,7 +481,7 @@ medusaIntegrationTestRunner({
       })
 
       it("non-parties cannot read or write chat", async () => {
-        const id = await createAcceptedJob("courier-chat2@howsu.local")
+        const { id } = await createAcceptedJob("courier-chat2@howsu.local")
 
         await expect(
           api.post(
@@ -369,7 +500,7 @@ medusaIntegrationTestRunner({
       })
 
       it("only the courier can generate a pickup code", async () => {
-        const id = await createAcceptedJob("courier-verify@howsu.local")
+        const { id } = await createAcceptedJob("courier-verify@howsu.local")
 
         await expect(
           api.post(
@@ -389,7 +520,7 @@ medusaIntegrationTestRunner({
       })
 
       it("sender verifies pickup code → job in transit", async () => {
-        const id = await createAcceptedJob("courier-verify2@howsu.local")
+        const { id } = await createAcceptedJob("courier-verify2@howsu.local")
         const gen = await api.post(
           `/store/delivery-jobs/${id}/verify/pickup`,
           { courierEmail: "courier-verify2@howsu.local" },
@@ -410,7 +541,7 @@ medusaIntegrationTestRunner({
       })
 
       it("the code generator cannot verify their own code", async () => {
-        const id = await createAcceptedJob("courier-verify3@howsu.local")
+        const { id } = await createAcceptedJob("courier-verify3@howsu.local")
         const gen = await api.post(
           `/store/delivery-jobs/${id}/verify/pickup`,
           { courierEmail: "courier-verify3@howsu.local" },
@@ -430,14 +561,10 @@ medusaIntegrationTestRunner({
       })
 
       it("delivery verification releases payout to the courier wallet", async () => {
-        const id = await createAcceptedJob("courier-verify4@howsu.local")
+        const { id, courier } = await createAcceptedJob("courier-verify4@howsu.local")
 
-        // courier picks up (existing pickup route) then generates delivery code
-        await api.post(
-          `/store/delivery-jobs/${id}/pickup`,
-          { courierEmail: "courier-verify4@howsu.local" },
-          storeHeaders
-        )
+        // courier picks up (actor identity) then generates delivery code
+        await api.post(`/store/delivery-jobs/${id}/pickup`, {}, courier.headers)
         const gen = await api.post(
           `/store/delivery-jobs/${id}/verify/delivery`,
           { courierEmail: "courier-verify4@howsu.local" },
@@ -474,7 +601,7 @@ medusaIntegrationTestRunner({
       })
 
       it("rejects an expired verification code", async () => {
-        const id = await createAcceptedJob("courier-verify5@howsu.local")
+        const { id } = await createAcceptedJob("courier-verify5@howsu.local")
         // generate a code, then force-expire it at the service layer
         const gen = await delivery.generateVerification(id, "pickup", "courier-verify5@howsu.local")
         const active = await delivery.listDeliveryVerifications({ job_id: id, purpose: "pickup" })

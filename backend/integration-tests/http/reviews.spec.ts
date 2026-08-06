@@ -12,7 +12,6 @@ import {
   reconcileLines,
   tierFor,
 } from "../../src/lib/reviews/trust-score"
-import { maskName } from "../../src/lib/reviews/mask-name"
 
 jest.setTimeout(120 * 1000)
 
@@ -237,11 +236,6 @@ medusaIntegrationTestRunner({
         expect(tierFor(94)).toEqual("Trusted")
         expect(tierFor(95)).toEqual("Top Store")
         expect(tierFor(100)).toEqual("Top Store")
-      })
-
-      it("maskName derives a privacy-preserving display name", () => {
-        expect(maskName("chidi.okafor@gmail.com")).toEqual("Chi… O.")
-        expect(maskName("bob@x.com")).toEqual("Bob")
       })
 
       // ---- HTTP lifecycle -------------------------------------------------

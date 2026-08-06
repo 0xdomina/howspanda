@@ -10,6 +10,8 @@ type CreateSellerAdminStepInput = {
   phone?: string
   first_name?: string
   last_name?: string
+  role?: "owner" | "staff"
+  auth_identity_id?: string
   seller_id: string
 }
 
