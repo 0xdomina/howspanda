@@ -7,6 +7,7 @@ import Input from "@modules/common/components/input"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
 import { updateSellerProduct } from "@lib/data/seller"
+import ProductMedia from "@modules/seller/components/product-media"
 
 type VariantRow = {
   id: string
@@ -20,23 +21,28 @@ const EditProduct = ({
   title: initialTitle,
   description: initialDescription,
   photo: initialPhoto,
+  videoUrl: initialVideoUrl,
   variants: initialVariants,
+  showVideo,
 }: {
   productId: string
   title: string
   description?: string
   photo?: string | null
+  videoUrl?: string | null
   variants: {
     id: string
     title: string
     price?: number
     stock?: number
   }[]
+  showVideo: boolean
 }) => {
   const router = useRouter()
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription ?? "")
   const [photo, setPhoto] = useState(initialPhoto ?? "")
+  const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl ?? null)
   const [variants, setVariants] = useState<VariantRow[]>(() =>
     initialVariants.map((v) => ({
       id: v.id,
@@ -55,6 +61,7 @@ const EditProduct = ({
       title?: string
       description?: string
       photo?: string
+      videoUrl?: string | null
       variants?: {
         id: string
         price?: number
@@ -70,6 +77,7 @@ const EditProduct = ({
         stock: v.stock !== "" ? Number(v.stock) : undefined,
       })),
     }
+    if (showVideo && videoUrl !== undefined) update.videoUrl = videoUrl
 
     startTransition(async () => {
       const result = await updateSellerProduct(productId, update)
@@ -98,14 +106,12 @@ const EditProduct = ({
           autoComplete="off"
           data-testid="product-title-input"
         />
-        <Input
-          label="Photo URL"
-          name="photo"
-          type="url"
-          value={photo}
-          onChange={(e) => setPhoto(e.target.value)}
-          autoComplete="off"
-          data-testid="product-photo-input"
+        <ProductMedia
+          photo={photo}
+          onPhotoChange={setPhoto}
+          videoUrl={videoUrl}
+          onVideoChange={setVideoUrl}
+          showVideo={showVideo}
         />
 
         {variants.length > 0 && (

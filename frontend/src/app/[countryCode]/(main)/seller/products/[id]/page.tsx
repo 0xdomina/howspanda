@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveSeller, retrieveSellerProduct } from "@lib/data/seller"
+import { retrieveFeatures } from "@lib/data/kyc"
 import EditProduct from "@modules/seller/components/edit-product"
 
 export const metadata: Metadata = {
@@ -34,6 +35,8 @@ export default async function EditProductPage({
     stock: v.inventory_items?.[0]?.location_levels?.[0]?.stocked_quantity,
   }))
 
+  const features = await retrieveFeatures().catch(() => null)
+
   return (
     <div data-testid="edit-product-page">
       <EditProduct
@@ -41,7 +44,9 @@ export default async function EditProductPage({
         title={product.title}
         description={product.description}
         photo={product.thumbnail}
+        videoUrl={product.metadata?.product_video ?? null}
         variants={variants}
+        showVideo={features?.product_video ?? false}
       />
     </div>
   )

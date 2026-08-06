@@ -33,6 +33,7 @@ type SellerProduct = {
   description?: string
   thumbnail?: string | null
   status?: string
+  metadata?: { product_video?: string | null }
   images?: { url: string }[]
   options?: { title?: string; values?: { value?: string }[] }[]
   variants?: {
@@ -662,6 +663,7 @@ export const updateSellerProduct = async (
     title?: string
     description?: string
     photo?: string
+    videoUrl?: string | null
     variants?: {
       id: string
       price?: number
@@ -673,10 +675,18 @@ export const updateSellerProduct = async (
     const headers = await getSellerAuthHeaders()
     if (!hasAuth(headers)) return "Not signed in as a seller."
 
+    const body: Record<string, unknown> = {
+      title: update.title,
+      description: update.description,
+      photo: update.photo,
+      variants: update.variants,
+    }
+    if (update.videoUrl !== undefined) body.video_url = update.videoUrl
+
     await sdk.client.fetch(`/sellers/products/${id}`, {
       method: "PATCH",
       headers,
-      body: update,
+      body,
     })
 
     const tag = await getSellerCacheTag("seller")
@@ -699,6 +709,7 @@ export const createSellerProduct = async (
     const title = formData.get("title") as string
     const description = formData.get("description") as string
     const photo = formData.get("photo") as string
+    const videoUrl = formData.get("video_url") as string
     const priceRaw = formData.get("price")
     const price = priceRaw !== "" && priceRaw != null ? Number(priceRaw) : undefined
     const stockRaw = formData.get("stock")
@@ -717,6 +728,7 @@ export const createSellerProduct = async (
             title,
             description,
             photo: photo || undefined,
+            video_url: videoUrl || undefined,
             currency_code,
             status: "published",
             options: variants.options,
@@ -726,6 +738,7 @@ export const createSellerProduct = async (
             title,
             description,
             photo: photo || undefined,
+            video_url: videoUrl || undefined,
             price,
             stock,
             currency_code,

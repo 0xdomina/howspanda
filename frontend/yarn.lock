@@ -2810,6 +2810,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/dom-webcodecs@npm:^0.1.6":
+  version: 0.1.18
+  resolution: "@types/dom-webcodecs@npm:0.1.18"
+  checksum: 10/889ffea2c849ed3d23a2486b9eb3ad4da038cacc2bfe538da87e19cf9cad3c98fd29046e36c21725f01bb75d556eec85119ad39575a455d8b1529be95660c966
+  languageName: node
+  linkType: hard
+
 "@types/estree@npm:^1.0.6, @types/estree@npm:^1.0.8":
   version: 1.0.9
   resolution: "@types/estree@npm:1.0.9"
@@ -2915,6 +2922,13 @@ __metadata:
   dependencies:
     csstype: "npm:^3.2.2"
   checksum: 10/c718ec5c5272ef5c1c77fcdd07f567c77197b593583539459b4bdaea89ca55ad7c814b7eb2151dccfa459b2c384b599a45e7e35550b789883d66b363d30c94d8
+  languageName: node
+  linkType: hard
+
+"@types/wicg-file-system-access@npm:^2020.9.5":
+  version: 2020.9.8
+  resolution: "@types/wicg-file-system-access@npm:2020.9.8"
+  checksum: 10/907e88adb8dc88e307e7e99ff7b734f872cbf509a4155f7600fe61a3d6b16b7dc9594e75a174571a58b5559545719c053a98890b4c1b93d5ade916b21b2af290
   languageName: node
   linkType: hard
 
@@ -5778,6 +5792,7 @@ __metadata:
     eslint-config-next: "npm:16.3.0"
     leaflet: "npm:^1.9.4"
     lodash: "npm:^4.17.21"
+    mp4-muxer: "npm:^5.2.2"
     next: "npm:16.3.0"
     pg: "npm:^8.11.3"
     postcss: "npm:^8.4.8"
@@ -5912,6 +5927,16 @@ __metadata:
   dependencies:
     minipass: "npm:^7.1.2"
   checksum: 10/f47365cc2cb7f078cbe7e046eb52655e2e7e97f8c0a9a674f4da60d94fb0624edfcec9b5db32e8ba5a99a5f036f595680ae6fe02a262beaa73026e505cc52f99
+  languageName: node
+  linkType: hard
+
+"mp4-muxer@npm:^5.2.2":
+  version: 5.2.2
+  resolution: "mp4-muxer@npm:5.2.2"
+  dependencies:
+    "@types/dom-webcodecs": "npm:^0.1.6"
+    "@types/wicg-file-system-access": "npm:^2020.9.5"
+  checksum: 10/2eada6482de844379046cfa07cdc2b63fa248ff0d8a39447d22806f8aec2f5f23a6d6b53988268e08d83df598a54e357643a3598ce611038bc0101d30333c23f
   languageName: node
   linkType: hard
 

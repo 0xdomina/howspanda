@@ -6,6 +6,7 @@ import Input from "@modules/common/components/input"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
 import { createSellerProduct } from "@lib/data/seller"
+import ProductMedia from "@modules/seller/components/product-media"
 
 type VariantType = "Size" | "Color" | "Type"
 
@@ -22,7 +23,7 @@ type VariantValue = {
   stock: string
 }
 
-const AddProduct = () => {
+const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
   const [state, formAction] = useActionState(createSellerProduct, {
     success: false,
     error: null,
@@ -32,6 +33,8 @@ const AddProduct = () => {
   const [variantType, setVariantType] = useState<VariantType>("Size")
   const [values, setValues] = useState<VariantValue[]>([])
   const [draftValue, setDraftValue] = useState("")
+  const [photo, setPhoto] = useState("")
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
 
   // The backend accepts the full admin shape for products that carry
   // options/variants. We serialize it so the server action can forward it
@@ -126,12 +129,14 @@ const AddProduct = () => {
             </div>
           )}
 
-          <Input
-            label="Photo URL"
-            name="photo"
-            type="url"
-            autoComplete="off"
-            data-testid="product-photo-input"
+          <ProductMedia
+            photo={photo}
+            onPhotoChange={setPhoto}
+            videoUrl={videoUrl}
+            onVideoChange={setVideoUrl}
+            showVideo={showVideo}
+            hiddenPhotoName="photo"
+            hiddenVideoName="video_url"
           />
 
           {!withVariants ? (

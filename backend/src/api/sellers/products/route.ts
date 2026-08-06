@@ -58,6 +58,15 @@ export const POST = async (
   const body = req.validatedBody
   const product = toFullProductShape(body)
 
+  // The product video lives in product metadata (feature-flagged), so the
+  // product entity needs no new column.
+  if (body.video_url !== undefined) {
+    product.metadata = {
+      ...(product.metadata ?? {}),
+      product_video: body.video_url,
+    }
+  }
+
   // Per-variant quantity to sell, aligned by index with product.variants.
   const stocks = product.variants?.map(
     (variant: { stock?: number }) => variant.stock

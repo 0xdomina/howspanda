@@ -1,4 +1,5 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
+import { Modules } from "@medusajs/framework/utils"
 import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(240 * 1000)
@@ -34,11 +35,18 @@ medusaIntegrationTestRunner({
   inApp: true,
   env: {},
   testSuite: ({ api, getContainer }) => {
-    describe("seller media uploads", () => {
-      let token: string
-      let auth: () => { headers: Record<string, string> }
+    let token: string
+    let auth: () => { headers: Record<string, string> }
+    let storeHeaders: { headers: Record<string, string> }
 
+    describe("seller media uploads", () => {
       beforeAll(async () => {
+        const apiKeyModule = getContainer().resolve(Modules.API_KEY)
+        const [pubKey] = await apiKeyModule.createApiKeys([
+          { title: "upload-spec", type: "publishable", created_by: "upload-spec" },
+        ])
+        storeHeaders = { headers: { "x-publishable-api-key": pubKey.token } }
+
         const register = await api.post("/auth/seller/emailpass/register", {
           email: "upload-seller@howsu.local",
           password: "supersecret",
@@ -136,6 +144,60 @@ medusaIntegrationTestRunner({
         await expect(api.post("/sellers/uploads", form)).rejects.toMatchObject({
           response: { status: 401 },
         })
+      })
+    })
+
+    describe("product video_url (feature-flagged)", () => {
+      it("stores video_url in product metadata on create", async () => {
+        const created = await api.post(
+          "/sellers/products",
+          {
+            title: "Video product",
+            price: 5000,
+            video_url: "/uploads/video/clip.mp4",
+          },
+          auth()
+        )
+        expect(created.status).toEqual(200)
+
+        const list = await api.get("/sellers/products", auth())
+        const product = (list.data.products as any[]).find(
+          (p: any) => p.id === created.data.product.id
+        )
+        expect(product?.metadata?.product_video).toEqual(
+          "/uploads/video/clip.mp4"
+        )
+      })
+
+      it("clears video_url via patch", async () => {
+        const created = await api.post(
+          "/sellers/products",
+          {
+            title: "Video product two",
+            price: 4000,
+            video_url: "/uploads/video/first.mp4",
+          },
+          auth()
+        )
+
+        const patch = await api.patch(
+          `/sellers/products/${created.data.product.id}`,
+          { video_url: null },
+          auth()
+        )
+        expect(patch.status).toEqual(200)
+        expect(patch.data.product.metadata?.product_video).toBeNull()
+
+        const list = await api.get("/sellers/products", auth())
+        const product = (list.data.products as any[]).find(
+          (p: any) => p.id === created.data.product.id
+        )
+        expect(product?.metadata?.product_video ?? null).toBeNull()
+      })
+
+      it("reports product_video off by default", async () => {
+        const features = await api.get("/store/features", storeHeaders)
+        expect(features.data.features.product_video).toEqual(false)
       })
     })
   },

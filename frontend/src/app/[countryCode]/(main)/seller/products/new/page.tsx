@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveSeller } from "@lib/data/seller"
+import { retrieveFeatures } from "@lib/data/kyc"
 import AddProduct from "@modules/seller/components/add-product"
 
 export const metadata: Metadata = {
@@ -16,9 +17,11 @@ export default async function NewProductPage() {
     notFound()
   }
 
+  const features = await retrieveFeatures().catch(() => null)
+
   return (
     <div data-testid="new-product-page">
-      <AddProduct />
+      <AddProduct showVideo={features?.product_video ?? false} />
     </div>
   )
 }

@@ -121,6 +121,17 @@ export const PostAiListingSchema = z.object({
   category: z.string().optional(),
 })
 
+// Media references are either relative upload paths (/uploads/...) returned by
+// the seller upload endpoint or absolute http(s) URLs. Everything else (plain
+// string, javascript:, file:) is rejected.
+const MEDIA_URL = z
+  .string()
+  .refine(
+    (v) =>
+      /^\/uploads\/[a-z]+\/[\w.-]+$/.test(v) || /^https?:\/\//i.test(v),
+    "Must be an uploaded /uploads/ path or an absolute http(s) URL"
+  )
+
 // Mobile-first listing: photo + price + short description. The route maps
 // this minimal shape onto the full product create payload (default "One Size"
 // option/variant, published, no inventory tracking). Full admin shape stays
@@ -131,7 +142,10 @@ export const PostSellerMobileProductSchema = z.strictObject({
   title: z.string().min(1),
   description: z.string().max(500).optional(),
   price: z.number().positive().optional(),
-  photo: z.string().url().optional(),
+  photo: MEDIA_URL.optional(),
+  // Product showcase video (feature-flagged). Stored in product metadata as
+  // `product_video` so the product entity needs no new column.
+  video_url: MEDIA_URL.optional(),
   // Quantity to sell for a single-option product (maps onto the default
   // "One Size" variant's inventory level).
   stock: z.number().int().min(0).optional(),
@@ -177,7 +191,9 @@ export const PostSellerMobileProductSchema = z.strictObject({
 export const PatchSellerMobileProductSchema = z.strictObject({
   title: z.string().min(1).optional(),
   description: z.string().max(500).optional(),
-  photo: z.string().url().optional(),
+  photo: MEDIA_URL.optional(),
+  // null clears the product video; a URL replaces it.
+  video_url: MEDIA_URL.nullable().optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
   variants: z
     .array(
@@ -629,8 +645,7 @@ export const PostKycReviewSchema = z
 // Personal profile rung of the KYC ladder. Fields are optional individually —
 // the ladder is progressive — but profile_completed only unlocks once the
 // required fields (name, address, country, state, city) are all present.
-export const PostKycProfileSchema = z.object({
-  first_name: z.string().trim().min(1).max(100).optional(),
+export const PostKycProfileSchema = z.object({  first_name: z.string().trim().min(1).max(100).optional(),
   last_name: z.string().trim().min(1).max(100).optional(),
   other_name: z.string().trim().min(1).max(100).optional(),
   address: z.string().trim().min(1).max(300).optional(),

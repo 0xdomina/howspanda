@@ -3,6 +3,7 @@ import {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { PatchSellerMobileProductSchema } from "../../../middlewares"
 import updateSellerProductWorkflow from "../../../../workflows/marketplace/update-seller-product"
 
@@ -22,11 +23,26 @@ export const PATCH = async (
     description?: string
     thumbnail?: string | null
     status?: "draft" | "published" | "archived"
+    metadata?: Record<string, unknown>
   } = {}
   if (body.title !== undefined) update.title = body.title
   if (body.description !== undefined) update.description = body.description
   if (body.photo !== undefined) update.thumbnail = body.photo
   if (body.status !== undefined) update.status = body.status
+
+  // The product video lives in metadata; merge so we never clobber other keys.
+  if (body.video_url !== undefined) {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: [current] } = await query.graph({
+      entity: "product",
+      fields: ["metadata"],
+      filters: { id: req.params.id },
+    })
+    update.metadata = {
+      ...((current?.metadata ?? {}) as Record<string, unknown>),
+      product_video: body.video_url,
+    }
+  }
 
   const { result } = await updateSellerProductWorkflow(req.scope).run({
     input: {
