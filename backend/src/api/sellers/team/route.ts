@@ -11,20 +11,17 @@ import {
 import { z } from "@medusajs/framework/zod"
 import MarketplaceModuleService from "../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
-import KycModuleService from "../../../modules/kyc/service"
-import { KYC_MODULE } from "../../../modules/kyc"
 import { resolveSellerContext } from "../../../lib/sellers/resolve-seller"
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
-// Staff signup: the owner provisions a login for an employee. The email is
-// NOT proven by the staff member here (the owner types it in), so we do NOT
-// seed it as a verified KYC identifier — the new teammate completes their own
-// profile/KYC once they sign in. The login itself is enough to use the store
-// dashboard.
+// Team invitation: the owner adds an EXISTING platform user to the store. No
+// credentials are provisioned here (the invitee logs in with the password they
+// already own) and no KYC is seeded — the invitee's own verification flow runs
+// when they act on the store. The only requirement is that the invited email
+// already holds a platform account.
 export const PostSellerTeamSchema = z.strictObject({
   email: z.string().email(),
-  password: z.string().min(8),
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
 })
@@ -106,46 +103,63 @@ export const POST = async (
 
   const auth = req.scope.resolve(Modules.AUTH)
 
-  const registered = await auth.register("emailpass", {
-    body: { email, password: body.password },
+  // Invite existing platform users only — the invited email must already hold
+  // an account on the platform. We never provision a new login here.
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+
+  const { data } = await query.graph({
+    entity: "auth_identity",
+    fields: [
+      "id",
+      "app_metadata",
+      "provider_identities.provider",
+      "provider_identities.entity_id",
+    ],
+    filters: {
+      provider_identities: { entity_id: email },
+    },
   })
-  if (!registered.success || !registered.authIdentity) {
+
+  const identity = (data ?? []).find(
+    (i: any) =>
+      (i.provider_identities ?? []).some(
+        (p: any) => p.provider === "emailpass"
+      )
+  )
+  if (!identity) {
     throw new MedusaError(
-      MedusaError.Types.CONFLICT,
-      registered.error ?? "Could not create the staff login."
+      MedusaError.Types.NOT_FOUND,
+      "No existing platform account was found for that email. Only existing users can be invited."
     )
   }
-  const authIdentityId = registered.authIdentity.id
+
+  // The invitee must not already run (or staff) a store.
+  if (isDefined(identity.app_metadata?.seller_id)) {
+    throw new MedusaError(
+      MedusaError.Types.CONFLICT,
+      "That account is already attached to a store."
+    )
+  }
 
   const staffAdmin = await marketplace.createSellerAdmins({
     seller_id: context.sellerId,
     role: "staff",
-    auth_identity_id: authIdentityId,
+    auth_identity_id: identity.id,
     email,
     first_name: body.first_name,
     last_name: body.last_name,
   })
 
-  // Attach the seller actor to the new auth identity so the staff member can
-  // sign in to /seller with their own credentials.
-  const authIdentity = await auth.retrieveAuthIdentity(authIdentityId)
-  const appMetadata = authIdentity.app_metadata ?? {}
-  if (isDefined(appMetadata["seller_id"])) {
-    throw new MedusaError(
-      MedusaError.Types.CONFLICT,
-      "That login is already attached to a store."
-    )
-  }
+  // Attach the seller actor to the invitee's EXISTING identity so they sign in
+  // to /seller with the credentials they already own. Any prior app_metadata
+  // (e.g. a customer binding) is preserved.
+  const authMetadata = await auth.retrieveAuthIdentity(identity.id)
+  const appMetadata = authMetadata.app_metadata ?? {}
   appMetadata["seller_id"] = staffAdmin.id
   await auth.updateAuthIdentities({
-    id: authIdentityId,
+    id: identity.id,
     app_metadata: appMetadata,
   })
-
-  // The staff email is not auto-KYC-verified (see above); seed a bare profile
-  // so their in-app verification flow has somewhere to write to.
-  const kyc: KycModuleService = req.scope.resolve(KYC_MODULE)
-  await kyc.getOrCreateProfile({ email, phone: undefined })
 
   res.json({
     team_member: {

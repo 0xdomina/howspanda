@@ -972,7 +972,6 @@ export const listSellerTeam = async (): Promise<SellerTeamMember[]> => {
 
 export const addSellerTeamMember = async (body: {
   email: string
-  password: string
   first_name?: string
   last_name?: string
 }): Promise<{ success: boolean; error: string | null }> => {

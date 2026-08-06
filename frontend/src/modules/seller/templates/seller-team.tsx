@@ -15,7 +15,6 @@ const AddMemberForm = ({ onDone }: { onDone: () => void }) => {
   const [first_name, setFirstName] = useState("")
   const [last_name, setLastName] = useState("")
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -26,14 +25,9 @@ const AddMemberForm = ({ onDone }: { onDone: () => void }) => {
       setMessage({ ok: false, text: "Enter a valid email address." })
       return
     }
-    if (password.length < 8) {
-      setMessage({ ok: false, text: "Password must be at least 8 characters." })
-      return
-    }
     startTransition(async () => {
       const res = await addSellerTeamMember({
         email: cleanEmail,
-        password,
         first_name: first_name.trim() || undefined,
         last_name: last_name.trim() || undefined,
       })
@@ -42,7 +36,6 @@ const AddMemberForm = ({ onDone }: { onDone: () => void }) => {
         setFirstName("")
         setLastName("")
         setEmail("")
-        setPassword("")
         onDone()
       } else {
         setMessage({ ok: false, text: res.error ?? "Could not add team member." })
@@ -52,11 +45,12 @@ const AddMemberForm = ({ onDone }: { onDone: () => void }) => {
 
   return (
     <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
-      <h3 className="font-display text-lg font-medium text-ink">Add a staff member</h3>
+      <h3 className="font-display text-lg font-medium text-ink">Invite a staff member</h3>
       <p className="mt-1 text-xs text-ink-muted">
-        Create a login for an employee. They get the full store dashboard
-        (products, orders, delivery, broadcasts) but cannot change settings,
-        manage the team, or touch money.
+        Invite an existing platform user by email. They keep their own login and
+        sign in with it once they accept — no new password is created. They get
+        the full store dashboard (products, orders, delivery, broadcasts) but
+        cannot change settings, manage the team, or touch money.
       </p>
       <div className="mt-3 grid grid-cols-1 small:grid-cols-2 gap-3">
         <div>
@@ -87,16 +81,10 @@ const AddMemberForm = ({ onDone }: { onDone: () => void }) => {
             className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Minimum 8 characters"
-            className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-          />
-        </div>
+        <p className="text-xs text-ink-muted small:col-span-2">
+          The person must already have an account on the platform to be invited.
+          They will use their existing password to sign in.
+        </p>
       </div>
 
       {message && (
@@ -111,7 +99,7 @@ const AddMemberForm = ({ onDone }: { onDone: () => void }) => {
         onClick={submit}
         className="mt-3 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
       >
-        {isPending ? "Adding…" : "Add staff member"}
+        {isPending ? "Inviting…" : "Invite staff member"}
       </button>
     </div>
   )
