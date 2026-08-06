@@ -22,7 +22,7 @@ const statusLabel: Record<string, string> = {
 }
 
 // Courierhood is activated by the KYC ladder itself — reaching the
-// phone-verified level makes any signed-in account an active courier.
+// profile-completed level makes any signed-in account an active courier.
 const DetailsForm = ({
   active,
   onDone,

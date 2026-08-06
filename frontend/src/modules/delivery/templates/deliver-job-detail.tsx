@@ -58,7 +58,7 @@ const SignInPrompt = ({ children }: { children: React.ReactNode }) => (
 
 // Identity comes from the signed-in account (customer or seller), never from a
 // free-text email. Offer and pickup are courier actions gated on an approved
-// courier application + phone KYC server-side.
+// courier application + a completed KYC profile server-side.
 const DeliverJobDetailClient = ({
   job,
   customer,

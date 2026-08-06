@@ -170,6 +170,19 @@ export const submitKycIdentity = async (input: {
   phone?: string
   id_type: "nin"
   id_number: string
+  // Fields extracted client-side from the ID card (OCR + cleaning). Sent as
+  // JSON so the backend NIN match can check them against the profile.
+  extracted?: {
+    id_number?: string
+    first_name?: string
+    last_name?: string
+    other_name?: string
+    date_of_birth?: string
+    country?: string
+    state?: string
+    city?: string
+    address?: string
+  }
 }): Promise<{ ok: boolean; profile: KycProfileView | null; error: string | null }> => {
   try {
     const res = await sdk.client.fetch<{ ok: boolean; profile: KycProfileView }>(

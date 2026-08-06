@@ -3,6 +3,7 @@ import { MedusaError, MedusaService } from "@medusajs/framework/utils"
 import KycProfile from "./models/kyc-profile"
 import KycOtp from "./models/kyc-otp"
 import { sendOtp } from "../../lib/kyc/send-otp"
+import { matchNin, type ExtractedNinDoc } from "../../lib/kyc/nin-match"
 
 const CODE_LIFETIME_MS = 15 * 60 * 1000
 
@@ -166,6 +167,9 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       phone: string | null
       email_verified_at: Date | null
       phone_verified_at: Date | null
+      first_name: string | null
+      last_name: string | null
+      other_name: string | null
       id_status: string
     } | null = null
 
@@ -547,6 +551,10 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
     phone?: string | null
     id_type: string
     id_number: string
+    // Fields extracted client-side from the ID card (OCR + cleaning). Sent as
+    // JSON so the backend match has something to check the user's claims
+    // against; nothing but the masked number is persisted.
+    extracted?: ExtractedNinDoc
   }): Promise<{ ok: boolean; profile: KycProfileView }> {
     if (input.id_type !== "nin") {
       throw new MedusaError(
@@ -554,7 +562,8 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
         'Only id_type "nin" is supported for now'
       )
     }
-    if (!NIN_RE.test(input.id_number.trim())) {
+    const nin = input.id_number.trim()
+    if (!NIN_RE.test(nin)) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "NIN must be an 11-digit number"
@@ -565,12 +574,37 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       email: input.email,
       phone: input.phone,
     })
+
+    // With NIN verification flipped on, the submission is verified here and
+    // now by the match — there is no admin review on the platform. Off (the
+    // default) keeps the pending state until a review/provider flips it.
+    let idStatus: "pending" | "verified" = "pending"
+    if (this.ninVerificationEnabled()) {
+      const match = matchNin({
+        profile: {
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          other_name: profile.other_name,
+        },
+        doc: { ...(input.extracted ?? {}), id_number: nin },
+      })
+      if (!match.verified) {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          match.reason ?? "NIN could not be verified",
+          "nin_match_failed"
+        )
+      }
+      idStatus = "verified"
+    }
+
     await this.updateKycProfiles({
       id: profile.id,
       id_type: "nin",
-      id_tail: input.id_number.trim().slice(-4),
-      id_status: "pending",
+      id_tail: nin.slice(-4),
+      id_status: idStatus,
       id_submitted_at: new Date(),
+      id_reviewed_at: idStatus === "verified" ? new Date() : null,
     })
 
     return {

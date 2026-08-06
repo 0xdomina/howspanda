@@ -13,6 +13,12 @@ import {
 } from "@lib/data/kyc"
 import { saveMyKycProfile } from "@lib/data/kyc-profile"
 import { addWithdrawalAccount } from "@lib/data/wallet"
+import {
+  preprocessImage,
+  cleanOcrLines,
+  extractFromLines,
+  type ExtractedNinDoc,
+} from "@lib/ocr/id-card"
 
 type StepKey = "email" | "phone" | "profile" | "identity"
 
@@ -529,18 +535,125 @@ const ProfileStep = ({
 
 const IdentityStep = ({
   email,
+  kyc,
   onDone,
 }: {
   email: string
+  kyc: KycProfileView | null
   onDone: (p: KycProfileView) => void
 }) => {
+  const [mode, setMode] = useState<"upload" | "manual">("upload")
+  const [image, setImage] = useState<string | null>(null)
+  const [stage, setStage] = useState<"idle" | "scanning" | "review">("idle")
+  const [progress, setProgress] = useState<number | null>(null)
+  const [doc, setDoc] = useState<ExtractedNinDoc>({})
   const [nin, setNin] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const submit = () => {
+  const setDocField =
+    (key: keyof ExtractedNinDoc) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setDoc((d) => ({ ...d, [key]: e.target.value }))
+
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null)
-    if (nin.replace(/\D/g, "").length !== 11) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      setError("Choose an image of your ID card.")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setImage(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  // Everything runs in the browser: the photo is preprocessed (grayscale +
+  // contrast), OCR'd with Tesseract.js (loaded on demand), and the cleaned text
+  // is parsed into fields. The user reviews/corrects, then the JSON is sent to
+  // the backend for the NIN match — no ID image ever leaves the device.
+  const scan = () => {
+    setError(null)
+    setStage("scanning")
+    setProgress(0)
+    startTransition(async () => {
+      try {
+        const preprocessed = await preprocessImage(image!)
+        const Tesseract = (await import("tesseract.js")).createWorker
+        const worker = await Tesseract("eng", 1, {
+          logger: (m: any) => {
+            if (m.status === "recognizing text") {
+              setProgress(Math.round(m.progress * 100))
+            }
+          },
+        })
+        const { data } = await worker.recognize(preprocessed)
+        await worker.terminate()
+        const extracted = extractFromLines(cleanOcrLines(data.text))
+        // Fall back to the profile name so the user corrects, not retypes.
+        setDoc({
+          id_number: extracted.id_number ?? undefined,
+          first_name: extracted.first_name ?? kyc?.first_name ?? undefined,
+          last_name: extracted.last_name ?? kyc?.last_name ?? undefined,
+          other_name: extracted.other_name ?? kyc?.other_name ?? undefined,
+          date_of_birth: extracted.date_of_birth ?? undefined,
+        })
+        setStage("review")
+      } catch {
+        setStage("idle")
+        setMode("manual")
+        setError(
+          "OCR couldn't load right now. Enter the NIN manually below — the details on your profile are used for the match."
+        )
+      }
+    })
+  }
+
+  const reset = () => {
+    setStage("idle")
+    setImage(null)
+    setDoc({})
+    setError(null)
+  }
+
+  const submitDoc = () => {
+    setError(null)
+    const idNumber = (doc.id_number ?? "").replace(/\D/g, "")
+    if (idNumber.length !== 11) {
+      setError("NIN must be an 11-digit number.")
+      return
+    }
+    const extracted = {
+      id_number: idNumber,
+      first_name: doc.first_name ?? undefined,
+      last_name: doc.last_name ?? undefined,
+      other_name: doc.other_name ?? undefined,
+      date_of_birth: doc.date_of_birth ?? undefined,
+      country: doc.country ?? undefined,
+      state: doc.state ?? undefined,
+      city: doc.city ?? undefined,
+      address: doc.address ?? undefined,
+    }
+    startTransition(async () => {
+      const res = await submitKycIdentity({
+        email,
+        id_type: "nin",
+        id_number: idNumber,
+        extracted,
+      })
+      if (res.ok && res.profile) {
+        onDone(res.profile)
+      } else {
+        setError(res.error ?? "Could not submit your identity.")
+      }
+    })
+  }
+
+  const submitManual = () => {
+    setError(null)
+    const idNumber = nin.replace(/\D/g, "")
+    if (idNumber.length !== 11) {
       setError("NIN must be an 11-digit number.")
       return
     }
@@ -548,7 +661,14 @@ const IdentityStep = ({
       const res = await submitKycIdentity({
         email,
         id_type: "nin",
-        id_number: nin.trim(),
+        id_number: idNumber,
+        // The match checks the card's name against the profile — in manual
+        // mode the card isn't scanned, so the profile name stands in.
+        extracted: {
+          id_number: idNumber,
+          first_name: kyc?.first_name ?? undefined,
+          last_name: kyc?.last_name ?? undefined,
+        },
       })
       if (res.ok && res.profile) {
         onDone(res.profile)
@@ -560,25 +680,175 @@ const IdentityStep = ({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-ink-muted">
-        Enter your National Identification Number (NIN). Only the last 4 digits
-        are stored — nothing else is kept.
-      </p>
-      <input
-        value={nin}
-        onChange={(e) => setNin(e.target.value.replace(/[^\d]/g, "").slice(0, 11))}
-        inputMode="numeric"
-        placeholder="11-digit NIN"
-        className={inputClass}
-      />
-      <button
-        type="button"
-        disabled={nin.length !== 11 || isPending}
-        onClick={submit}
-        className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-      >
-        {isPending ? "Submitting…" : "Submit NIN"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setMode("upload")}
+          className={`rounded-medium px-3 py-1.5 text-sm font-medium ${
+            mode === "upload"
+              ? "bg-ink text-white"
+              : "border border-ink-strong text-ink hover:bg-ink hover:text-white"
+          }`}
+        >
+          Scan ID card
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("manual")}
+          className={`rounded-medium px-3 py-1.5 text-sm font-medium ${
+            mode === "manual"
+              ? "bg-ink text-white"
+              : "border border-ink-strong text-ink hover:bg-ink hover:text-white"
+          }`}
+        >
+          Enter NIN manually
+        </button>
+      </div>
+
+      {mode === "upload" && stage === "idle" && (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">
+            Take a photo of your National ID card. The card is read in your
+            browser — only the extracted details are sent, never the photo.
+          </p>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={onFile}
+            className="block w-full text-sm text-ink file:mr-3 file:rounded-medium file:border-0 file:bg-ink/5 file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
+          />
+          {image && (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image}
+                alt="Selected ID card"
+                className="h-24 w-40 rounded-medium border border-ink-hairline object-cover"
+              />
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={scan}
+                className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+              >
+                Scan ID card
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === "upload" && stage === "scanning" && (
+        <div className="space-y-2">
+          <p className="text-sm text-ink-muted">Reading the ID card…</p>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-ink/10">
+            <div
+              className="h-full rounded-full bg-ink transition-all"
+              style={{ width: `${progress ?? 0}%` }}
+            />
+          </div>
+          <p className="text-xs text-ink-muted">{progress ?? 0}%</p>
+        </div>
+      )}
+
+      {mode === "upload" && stage === "review" && (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">
+            Confirm the details read off your card — fix anything the scanner
+            got wrong, then submit.
+          </p>
+          <div className="grid grid-cols-1 gap-3 small:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">NIN</label>
+              <input
+                value={doc.id_number ?? ""}
+                onChange={setDocField("id_number")}
+                inputMode="numeric"
+                placeholder="11-digit NIN"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">Date of birth (optional)</label>
+              <input
+                value={doc.date_of_birth ?? ""}
+                onChange={setDocField("date_of_birth")}
+                placeholder="e.g. 12/05/1990"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">First name</label>
+              <input
+                value={doc.first_name ?? ""}
+                onChange={setDocField("first_name")}
+                placeholder="First name"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">Last name</label>
+              <input
+                value={doc.last_name ?? ""}
+                onChange={setDocField("last_name")}
+                placeholder="Last name"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">Other name (optional)</label>
+              <input
+                value={doc.other_name ?? ""}
+                onChange={setDocField("other_name")}
+                placeholder="Middle name"
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={submitDoc}
+              className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+            >
+              {isPending ? "Submitting…" : "Submit identity"}
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              className="rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white"
+            >
+              Rescan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === "manual" && (
+        <div className="space-y-3">
+          <p className="text-sm text-ink-muted">
+            Enter your National Identification Number (NIN). Only the last 4
+            digits are stored — nothing else is kept.
+          </p>
+          <input
+            value={nin}
+            onChange={(e) => setNin(e.target.value.replace(/[^\d]/g, "").slice(0, 11))}
+            inputMode="numeric"
+            placeholder="11-digit NIN"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            disabled={nin.length !== 11 || isPending}
+            onClick={submitManual}
+            className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+          >
+            {isPending ? "Submitting…" : "Submit NIN"}
+          </button>
+        </div>
+      )}
+
       {error && <p className="text-sm text-rose-600">{error}</p>}
     </div>
   )
@@ -663,7 +933,11 @@ const VerificationClient = ({
                   />
                 )}
                 {step.key === "identity" && (
-                  <IdentityStep email={email} onDone={(p) => setProfile(p)} />
+                  <IdentityStep
+                    email={email}
+                    kyc={profile}
+                    onDone={(p) => setProfile(p)}
+                  />
                 )}
               </div>
             )}

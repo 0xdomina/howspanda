@@ -7,9 +7,10 @@ import { syncSellerVerificationStatus } from "../../../lib/sellers/verification-
 
 type Body = z.infer<typeof PostKycIdentitySchema>
 
-// Submit an identity document (NIN). Enters the ladder as "pending" — an
-// admin review or future NIN provider flips it to verified. Mirrors the
-// identity state onto the owning sellers' verification status.
+// Submit an identity document (NIN). Off (default) it enters the ladder as
+// "pending"; when FEATURE_NIN_VERIFICATION is on, the extracted JSON is matched
+// against the profile and the submission is auto-verified — no admin review.
+// The identity state is mirrored onto the owning sellers' verification status.
 export const POST = async (
   req: MedusaRequest<Body>,
   res: MedusaResponse
@@ -22,12 +23,13 @@ export const POST = async (
     phone: body.phone,
     id_type: body.id_type,
     id_number: body.id_number,
+    extracted: body.extracted,
   })
 
   await syncSellerVerificationStatus(
     req.scope,
     { email: body.email, phone: body.phone },
-    "pending"
+    result.profile.id_status === "verified" ? "verified" : "pending"
   )
 
   res.status(201).json({ ok: result.ok, profile: result.profile })

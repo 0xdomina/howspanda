@@ -250,6 +250,85 @@ medusaIntegrationTestRunner({
         expect(reviewed.profile.level).toEqual("identity_verified")
       })
 
+      it("auto-verifies a matching extracted NIN when the feature is on", async () => {
+        process.env.FEATURE_NIN_VERIFICATION = "true"
+        try {
+          // a complete profile (Test User) so the extracted name can be matched
+          await completeKycLadder(
+            getContainer,
+            "nin-auto@howsu.local",
+            "+2348012300016"
+          )
+          const submitted = await api.post("/kyc/identity", {
+            email: "nin-auto@howsu.local",
+            id_type: "nin",
+            id_number: "98765432101",
+            extracted: {
+              id_number: "98765432101",
+              first_name: "Test",
+              last_name: "User",
+              country: "NG",
+              state: "Lagos",
+              city: "Ikeja",
+            },
+          })
+          expect(submitted.status).toEqual(201)
+          expect(submitted.data.profile.id_status).toEqual("verified")
+          expect(submitted.data.profile.level).toEqual("identity_verified")
+        } finally {
+          process.env.FEATURE_NIN_VERIFICATION = "false"
+        }
+      })
+
+      it("rejects a mismatched extracted NIN when the feature is on", async () => {
+        process.env.FEATURE_NIN_VERIFICATION = "true"
+        try {
+          await completeKycLadder(
+            getContainer,
+            "nin-mismatch@howsu.local",
+            "+2348012300017"
+          )
+          await expect(
+            api.post("/kyc/identity", {
+              email: "nin-mismatch@howsu.local",
+              id_type: "nin",
+              id_number: "98765432102",
+              extracted: {
+                id_number: "98765432102",
+                first_name: "Someone",
+                last_name: "Else",
+              },
+            })
+          ).rejects.toMatchObject({
+            response: { status: 400, data: { code: "nin_match_failed" } },
+          })
+        } finally {
+          process.env.FEATURE_NIN_VERIFICATION = "false"
+        }
+      })
+
+      it("rejects a NIN with no extracted document when the feature is on", async () => {
+        process.env.FEATURE_NIN_VERIFICATION = "true"
+        try {
+          await completeKycLadder(
+            getContainer,
+            "nin-raw@howsu.local",
+            "+2348012300018"
+          )
+          await expect(
+            api.post("/kyc/identity", {
+              email: "nin-raw@howsu.local",
+              id_type: "nin",
+              id_number: "98765432103",
+            })
+          ).rejects.toMatchObject({
+            response: { status: 400, data: { code: "nin_match_failed" } },
+          })
+        } finally {
+          process.env.FEATURE_NIN_VERIFICATION = "false"
+        }
+      })
+
       it("never exposes the full ID number", async () => {
         await api.post("/kyc/identity", {
           email: "mask-kyc@howsu.local",

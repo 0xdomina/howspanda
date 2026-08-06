@@ -594,6 +594,21 @@ export const PostKycIdentitySchema = z
     phone: z.string().min(7).optional(),
     id_type: z.enum(["nin"]),
     id_number: z.string().min(11).max(11),
+    // Fields OCR'd client-side from the ID card. Optional — the backend match
+    // (on when FEATURE_NIN_VERIFICATION is true) needs the name at minimum.
+    extracted: z
+      .object({
+        id_number: z.string().max(11).optional(),
+        first_name: z.string().trim().max(100).optional(),
+        last_name: z.string().trim().max(100).optional(),
+        other_name: z.string().trim().max(100).optional(),
+        date_of_birth: z.string().trim().max(20).optional(),
+        country: z.string().trim().max(80).optional(),
+        state: z.string().trim().max(80).optional(),
+        city: z.string().trim().max(80).optional(),
+        address: z.string().trim().max(300).optional(),
+      })
+      .optional(),
   })
   .refine((b) => b.email || b.phone, {
     message: "Provide at least an email or a phone number",
