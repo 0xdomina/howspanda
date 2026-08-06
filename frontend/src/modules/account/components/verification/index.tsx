@@ -1,20 +1,29 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 
+import { NIGERIAN_BANKS, bankNameToCode } from "@lib/data/banks"
+import { reverseGeocode } from "@lib/data/delivery"
 import {
   requestKycOtp,
   verifyKycOtp,
   submitKycIdentity,
+  type KycFeatures,
   type KycProfileView,
 } from "@lib/data/kyc"
+import { saveMyKycProfile } from "@lib/data/kyc-profile"
+import { addWithdrawalAccount } from "@lib/data/wallet"
 
-const steps: {
-  key: "email" | "phone" | "identity"
+type StepKey = "email" | "phone" | "profile" | "identity"
+
+type StepDef = {
+  key: StepKey
   label: string
   done: (kyc: KycProfileView | null) => boolean
   unlocks: string
-}[] = [
+}
+
+const baseSteps: StepDef[] = [
   {
     key: "email",
     label: "Verify your email",
@@ -23,17 +32,34 @@ const steps: {
   },
   {
     key: "phone",
-    label: "Add your phone number",
+    label: "Verify your phone number",
     done: (kyc) => !!kyc?.phone_verified,
-    unlocks: "Make delivery offers and pickups",
+    unlocks: "The first rung toward selling and delivering",
   },
   {
-    key: "identity",
-    label: "Verify your identity",
-    done: (kyc) => !!kyc?.id_status,
-    unlocks: "Become a seller and take larger payouts",
+    key: "profile",
+    label: "Complete your profile",
+    done: (kyc) =>
+      kyc?.level === "profile_completed" || kyc?.level === "identity_verified",
+    unlocks: "Sell, deliver, and withdraw earnings",
   },
 ]
+
+// The identity rung is shown only while NIN verification is enabled on the
+// server. Flipping FEATURE_NIN_VERIFICATION raises the unlock level for selling
+// + delivering to identity_verified, so this step becomes mandatory.
+const identityStep: StepDef = {
+  key: "identity",
+  label: "Verify your identity (NIN)",
+  done: (kyc) => !!kyc?.id_status,
+  unlocks: "Keep selling and delivering while NIN verification is on",
+}
+
+const buildSteps = (features: KycFeatures): StepDef[] =>
+  features.nin_verification ? [...baseSteps, identityStep] : baseSteps
+
+const inputClass =
+  "w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
 
 const EmailStep = ({
   email,
@@ -109,7 +135,7 @@ const EmailStep = ({
             }
             inputMode="numeric"
             placeholder="••••••"
-            className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+            className={inputClass}
           />
           <button
             type="button"
@@ -192,7 +218,7 @@ const PhoneStep = ({
         onChange={(e) => setNumber(e.target.value)}
         inputMode="tel"
         placeholder="+234…"
-        className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+        className={inputClass}
       />
       {!sent ? (
         <button
@@ -212,7 +238,7 @@ const PhoneStep = ({
             }
             inputMode="numeric"
             placeholder="••••••"
-            className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+            className={inputClass}
           />
           <button
             type="button"
@@ -226,6 +252,277 @@ const PhoneStep = ({
       )}
       {hint && <p className="text-xs text-ink-muted">{hint}</p>}
       {error && <p className="text-sm text-rose-600">{error}</p>}
+    </div>
+  )
+}
+
+// Personal profile rung: names exactly as on the ID card plus residence
+// address. Filling these (after phone verification) reaches profile_completed,
+// which unlocks selling + couriering. The optional bank account is where
+// withdrawals land; postal code is suggested from the device location but can
+// be overridden or left blank.
+const ProfileStep = ({
+  email,
+  kyc,
+  customerName,
+  onDone,
+}: {
+  email: string
+  kyc: KycProfileView | null
+  customerName?: { first_name?: string | null; last_name?: string | null }
+  onDone: (p: KycProfileView) => void
+}) => {
+  const nameParts = (customerName?.first_name ?? "").trim().split(/\s+/)
+  const [form, setForm] = useState({
+    first_name: kyc?.first_name ?? nameParts[0] ?? "",
+    last_name: kyc?.last_name ?? (customerName?.last_name ?? nameParts.slice(1).join(" ")),
+    other_name: kyc?.other_name ?? "",
+    address: kyc?.address ?? "",
+    country: kyc?.country ?? "",
+    state: kyc?.state ?? "",
+    city: kyc?.city ?? "",
+    postal_code: kyc?.postal_code ?? "",
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [locHint, setLocHint] = useState<string | null>(null)
+  const [bankName, setBankName] = useState("")
+  const [accountNumber, setAccountNumber] = useState("")
+  const [bankError, setBankError] = useState<string | null>(null)
+  const [bankHint, setBankHint] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const set =
+    (key: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  const suggestPostal = () => {
+    setLocHint(null)
+    if (!("geolocation" in navigator)) {
+      setLocHint(
+        "Location is not available on this device — enter the postal code manually or leave it blank."
+      )
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords
+        const result = await reverseGeocode(latitude, longitude)
+        if (result?.postcode) {
+          setForm((f) => ({ ...f, postal_code: result.postcode! }))
+          setLocHint(
+            `Suggested postal code ${result.postcode}. You can change or clear it.`
+          )
+        } else {
+          setLocHint(
+            "Couldn't detect a postal code from your location — enter it manually or leave it blank."
+          )
+        }
+      },
+      () => {
+        setLocHint(
+          "Location access was denied — enter the postal code manually or leave it blank."
+        )
+      }
+    )
+  }
+
+  const submitProfile = () => {
+    setError(null)
+    startTransition(async () => {
+      const res = await saveMyKycProfile(form)
+      if (res.ok && res.profile) {
+        onDone(res.profile)
+      } else {
+        setError(res.error ?? "Could not save your profile.")
+      }
+    })
+  }
+
+  const addBank = () => {
+    setBankError(null)
+    const bankCode = bankNameToCode(bankName)
+    if (!bankCode) {
+      setBankError("Choose your bank from the list.")
+      return
+    }
+    if (accountNumber.replace(/\D/g, "").length !== 10) {
+      setBankError("Account number must be 10 digits.")
+      return
+    }
+    startTransition(async () => {
+      const res = await addWithdrawalAccount(email, {
+        type: "bank_account",
+        bank_code: bankCode,
+        account_number: accountNumber.trim(),
+      })
+      if (res.success) {
+        setBankName("")
+        setAccountNumber("")
+        setBankHint("Bank account added — this is where withdrawals will land.")
+      } else {
+        setBankError(res.error)
+      }
+    })
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 small:grid-cols-3">
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">First name (as on ID)</label>
+          <input
+            value={form.first_name}
+            onChange={set("first_name")}
+            placeholder="First name"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">Last name (as on ID)</label>
+          <input
+            value={form.last_name}
+            onChange={set("last_name")}
+            placeholder="Last name"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">Other name (optional)</label>
+          <input
+            value={form.other_name}
+            onChange={set("other_name")}
+            placeholder="Middle name"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs text-ink-muted">Residence address</label>
+        <input
+          value={form.address}
+          onChange={set("address")}
+          placeholder="Street, area"
+          className={inputClass}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 small:grid-cols-3">
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">Country</label>
+          <input
+            value={form.country}
+            onChange={set("country")}
+            placeholder="e.g. NG"
+            list="kyc-countries"
+            className={inputClass}
+          />
+          <datalist id="kyc-countries">
+            <option value="NG" />
+            <option value="GH" />
+            <option value="KE" />
+            <option value="ZA" />
+            <option value="US" />
+            <option value="GB" />
+            <option value="CA" />
+          </datalist>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">State / region</label>
+          <input
+            value={form.state}
+            onChange={set("state")}
+            placeholder="e.g. Lagos"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-ink-muted">City</label>
+          <input
+            value={form.city}
+            onChange={set("city")}
+            placeholder="e.g. Ikeja"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs text-ink-muted">Postal code (optional)</label>
+        <div className="flex gap-2">
+          <input
+            value={form.postal_code}
+            onChange={set("postal_code")}
+            placeholder="e.g. 100281"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={suggestPostal}
+            className="shrink-0 rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white"
+          >
+            Use my location
+          </button>
+        </div>
+        {locHint && <p className="mt-1 text-xs text-ink-muted">{locHint}</p>}
+      </div>
+
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={submitProfile}
+        className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+      >
+        {isPending ? "Saving…" : "Save profile"}
+      </button>
+      {error && <p className="text-sm text-rose-600">{error}</p>}
+
+      <div className="mt-4 border-t border-ink-hairline pt-4">
+        <p className="text-sm font-medium text-ink">Bank account for withdrawals</p>
+        <p className="mt-1 text-xs text-ink-muted">
+          Optional — add the bank where your earnings and payouts should land.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-3 small:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs text-ink-muted">Bank name</label>
+            <select
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select your bank…</option>
+              {NIGERIAN_BANKS.map((bank) => (
+                <option key={bank.code} value={bank.name}>
+                  {bank.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-ink-muted">Account number</label>
+            <input
+              value={accountNumber}
+              onChange={(e) =>
+                setAccountNumber(e.target.value.replace(/[^\d]/g, "").slice(0, 10))
+              }
+              placeholder="10-digit NUBAN"
+              inputMode="numeric"
+              className={inputClass}
+            />
+          </div>
+        </div>
+        {bankError && <p className="mt-2 text-sm text-rose-600">{bankError}</p>}
+        {bankHint && <p className="mt-2 text-sm text-emerald-700">{bankHint}</p>}
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={addBank}
+          className="mt-3 rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+        >
+          Add bank account
+        </button>
+      </div>
     </div>
   )
 }
@@ -272,7 +569,7 @@ const IdentityStep = ({
         onChange={(e) => setNin(e.target.value.replace(/[^\d]/g, "").slice(0, 11))}
         inputMode="numeric"
         placeholder="11-digit NIN"
-        className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+        className={inputClass}
       />
       <button
         type="button"
@@ -291,14 +588,19 @@ const VerificationClient = ({
   email,
   phone,
   kyc,
+  features,
+  customerName,
 }: {
   email: string
   phone: string
   kyc: KycProfileView | null
+  features: KycFeatures
+  customerName?: { first_name?: string | null; last_name?: string | null }
 }) => {
   const [profile, setProfile] = useState<KycProfileView | null>(kyc)
+  const steps = useMemo(() => buildSteps(features), [features])
 
-  const done = (step: (typeof steps)[number]["key"]) =>
+  const done = (step: StepKey) =>
     steps.find((s) => s.key === step)!.done(profile)
 
   return (
@@ -307,8 +609,8 @@ const VerificationClient = ({
         Verification
       </h2>
       <p className="text-sm text-ink-muted">
-        Progressively verify your identity. Each level unlocks more ways to take
-        part in the marketplace — order, deliver, then sell.
+        Progressively verify your account. Complete your profile after verifying
+        your phone to start selling and delivering, then withdraw your earnings.
       </p>
 
       <ol className="space-y-4">
@@ -333,8 +635,7 @@ const VerificationClient = ({
               </div>
               {done(step.key) && (
                 <span className="shrink-0 rounded-full bg-emerald-600/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                  {step.key === "identity" &&
-                  profile?.id_status === "pending"
+                  {step.key === "identity" && profile?.id_status === "pending"
                     ? "Pending review"
                     : "Done"}
                 </span>
@@ -344,15 +645,20 @@ const VerificationClient = ({
             {!done(step.key) && (
               <div className="mt-4">
                 {step.key === "email" && (
-                  <EmailStep
-                    email={email}
-                    onDone={(p) => setProfile(p)}
-                  />
+                  <EmailStep email={email} onDone={(p) => setProfile(p)} />
                 )}
                 {step.key === "phone" && (
                   <PhoneStep
                     email={email}
                     phone={phone}
+                    onDone={(p) => setProfile(p)}
+                  />
+                )}
+                {step.key === "profile" && (
+                  <ProfileStep
+                    email={email}
+                    kyc={profile}
+                    customerName={customerName}
                     onDone={(p) => setProfile(p)}
                   />
                 )}

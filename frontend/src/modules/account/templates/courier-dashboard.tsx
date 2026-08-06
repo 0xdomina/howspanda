@@ -113,7 +113,9 @@ const CourierDashboard = ({
   void refreshKey
 
   const courier = me?.courier ?? null
-  const kycVerified = !!me?.kyc?.phone_verified
+  const kycLevel = me?.kyc?.level ?? "unverified"
+  const kycVerified =
+    kycLevel === "profile_completed" || kycLevel === "identity_verified"
   const suspended = courier?.status === "suspended"
   const active = kycVerified && !suspended
   const earnings = me?.earnings ?? 0
@@ -125,8 +127,9 @@ const CourierDashboard = ({
       <div>
         <h1 className="font-display text-2xl font-medium text-ink">Courier</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Sign in with an account and verify your phone — the KYC level itself
-          activates courierhood. Then earn by delivering packages.
+          Sign in with an account, verify your phone, and complete your profile
+          — the KYC level itself activates courierhood. Then earn by delivering
+          packages.
         </p>
       </div>
 
@@ -150,15 +153,17 @@ const CourierDashboard = ({
           )}
           {active && (
             <p className="mt-1 text-xs text-ink-muted">
-              Phone verified — you can make offers.
+              Profile complete — you can make offers.
             </p>
           )}
         </div>
         <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
           <p className="text-xs text-ink-muted">KYC level</p>
-          <p className="mt-1 text-sm font-medium text-ink">{me?.kyc?.level ?? "unverified"}</p>
+          <p className="mt-1 text-sm font-medium text-ink">{kycLevel}</p>
           <p className="mt-1 text-xs text-ink-muted">
-            {active ? "Courierhood is active." : "Verify your phone to activate courierhood."}
+            {active
+              ? "Courierhood is active."
+              : "Complete the KYC profile step to activate courierhood."}
           </p>
         </div>
         <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
@@ -245,8 +250,9 @@ const CourierDashboard = ({
         <div className="rounded-large border border-amber-300 bg-amber-50 p-4">
           <h2 className="font-display text-lg font-medium text-amber-900">Activate courierhood</h2>
           <p className="mt-1 text-sm text-amber-800">
-            Verify your phone number (the phone KYC level) and you&apos;ll be an
-            active courier — no application or approval needed.
+            Verify your phone and complete your profile (the profile_completed
+            KYC level) and you&apos;ll be an active courier — no application or
+            approval needed.
           </p>
           <LocalizedClientLink
             href="/account/verification"

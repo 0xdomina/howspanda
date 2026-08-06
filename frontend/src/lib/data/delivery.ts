@@ -88,6 +88,7 @@ export type GeocodeResult = {
   displayName: string
   city?: string | null
   country?: string | null
+  postcode?: string | null
 }
 
 /** Forward geocode an address via Nominatim (public route). */

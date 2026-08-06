@@ -17,6 +17,7 @@ export type GeocodeResult = {
   displayName: string
   city?: string | null
   country?: string | null
+  postcode?: string | null
 }
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org"
@@ -69,6 +70,7 @@ function toResult(place: any): GeocodeResult {
     displayName: place.display_name ?? "",
     city: address.city ?? address.town ?? address.village ?? null,
     country: address.country ?? null,
+    postcode: address.postcode ?? null,
   }
 }
 
