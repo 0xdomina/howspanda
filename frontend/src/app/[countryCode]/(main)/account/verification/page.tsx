@@ -2,7 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveCustomer } from "@lib/data/customer"
-import { retrieveKycStatus } from "@lib/data/kyc"
+import { retrieveMyKyc } from "@lib/data/kyc"
 import VerificationClient from "@modules/account/components/verification"
 
 export const metadata: Metadata = {
@@ -17,7 +17,9 @@ export default async function VerificationPage() {
     notFound()
   }
 
-  const kyc = await retrieveKycStatus(customer.email).catch(() => null)
+  const kyc = await retrieveMyKyc(customer.email, customer.phone).catch(
+    () => null
+  )
 
   return (
     <VerificationClient

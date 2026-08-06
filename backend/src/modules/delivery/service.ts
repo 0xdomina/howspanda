@@ -268,26 +268,41 @@ class DeliveryModuleService extends MedusaService({
   }
 
   /**
-   * Gate check for courier actions (offers, pickup). Throws when the email is
-   * not an approved courier. Phone KYC is asserted separately by the KYC
-   * module at the route layer.
+   * Courier activation is the KYC ladder itself: the route asserts the actor is
+   * at least phone-verified BEFORE this runs, and reaching that level is what
+   * makes someone a courier — there is no separate manual approval. This method
+   * keeps the courier metadata row truthful by seeding/approving it for any
+   * phone-verified actor, and still blocks suspended couriers.
    */
   async assertCourierCanOffer(courierEmail: string): Promise<void> {
-    const profile = await this.getCourierProfile(courierEmail)
-    if (!profile) {
+    const email = courierEmail.trim().toLowerCase()
+    const profile = await this.getCourierProfile(email)
+    if (profile?.status === "suspended") {
       throw new MedusaError(
         MedusaError.Types.UNAUTHORIZED,
-        "Apply to be a courier before making delivery offers",
-        "courier_required"
+        "Your courier account is suspended",
+        "courier_suspended"
       )
     }
-    if (profile.status !== "approved") {
-      throw new MedusaError(
-        MedusaError.Types.UNAUTHORIZED,
-        "Your courier application is not approved yet",
-        "courier_not_approved"
-      )
+    if (profile?.status === "approved") {
+      return
     }
+    // Auto-activation: the KYC level was asserted by the route — seed an
+    // approved profile (or re-approve an "applied" one) so the dashboard has
+    // a record and the courier can offer immediately.
+    if (profile) {
+      await this.updateDeliveryCouriers({
+        id: profile.id,
+        status: "approved",
+        approved_at: new Date(),
+      })
+      return
+    }
+    await this.createDeliveryCouriers({
+      courier_email: email,
+      status: "approved",
+      approved_at: new Date(),
+    })
   }
 
   /**

@@ -10,11 +10,11 @@ import { KYC_MODULE } from "../../../../modules/kyc"
 import { resolveActorEmail } from "../../../../lib/accounts/resolve-actor-email"
 import { resolveActorProfile } from "../../../../lib/accounts/resolve-actor-profile"
 
-// Apply to become a courier. Only signed-in account holders (customer or
-// seller) can apply — the courier's identity comes from the authenticated
-// actor, never from the request body. Phone KYC is the minimum bar: an
-// application is only approved once the applicant's phone number is verified,
-// so courierhood always traces back to a real, reachable account.
+// Enter or update courier details (metadata only). Courierhood itself is
+// activated by the KYC ladder — a signed-in customer or seller account that
+// reaches phone-verified can already offer; this endpoint just records the
+// name/city/vehicle the delivery board shows. The courier's identity always
+// comes from the authenticated actor, never from the request body.
 export const PostCourierApplySchema = z.strictObject({
   name: z.string().min(1).max(100).optional(),
   phone: z.string().min(7).max(32).optional(),

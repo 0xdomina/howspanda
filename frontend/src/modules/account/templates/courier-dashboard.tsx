@@ -21,24 +21,24 @@ const statusLabel: Record<string, string> = {
   cancelled: "Cancelled",
 }
 
-const badge = (status: string) => {
-  if (status === "approved") return "bg-emerald-50 text-emerald-700"
-  if (status === "suspended") return "bg-rose-50 text-rose-700"
-  return "bg-ink/10 text-ink"
-}
-
-const ApplyForm = ({
-  kycVerified,
+// Courierhood is activated by the KYC ladder itself — reaching the
+// phone-verified level makes any signed-in account an active courier.
+const DetailsForm = ({
+  active,
   onDone,
   initialName = "",
+  initialCity = "",
+  initialVehicle = "",
 }: {
-  kycVerified: boolean
+  active: boolean
   onDone: () => void
   initialName?: string
+  initialCity?: string
+  initialVehicle?: string
 }) => {
   const [name, setName] = useState(initialName)
-  const [city, setCity] = useState("")
-  const [vehicle, setVehicle] = useState("")
+  const [city, setCity] = useState(initialCity)
+  const [vehicle, setVehicle] = useState(initialVehicle)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -62,21 +62,6 @@ const ApplyForm = ({
 
   return (
     <div className="space-y-3">
-      {!kycVerified && (
-        <div className="rounded-medium border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          <p className="font-medium">Verify your phone number first</p>
-          <p className="mt-1 text-xs">
-            Couriers need a verified phone number (minimum KYC level). Verify it
-            in the Verification tab, then come back to apply.
-          </p>
-          <LocalizedClientLink
-            href="/account/verification"
-            className="mt-2 inline-block text-xs font-medium text-amber-900 underline hover:text-amber-950"
-          >
-            Go to Verification →
-          </LocalizedClientLink>
-        </div>
-      )}
       <div>
         <label className="mb-1 block text-xs text-ink-muted">Full name (optional)</label>
         <input
@@ -106,11 +91,11 @@ const ApplyForm = ({
       </div>
       <button
         type="button"
-        disabled={isPending || !kycVerified}
+        disabled={isPending || !active}
         onClick={submit}
         className="w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
       >
-        {isPending ? "Applying…" : "Apply to be a courier"}
+        {isPending ? "Saving…" : "Save courier details"}
       </button>
       {message && <p className="text-xs text-ink-muted">{message}</p>}
     </div>
@@ -129,6 +114,8 @@ const CourierDashboard = ({
 
   const courier = me?.courier ?? null
   const kycVerified = !!me?.kyc?.phone_verified
+  const suspended = courier?.status === "suspended"
+  const active = kycVerified && !suspended
   const earnings = me?.earnings ?? 0
   const jobs = me?.jobs ?? []
   const displayName = getDisplayName(customer)
@@ -138,35 +125,40 @@ const CourierDashboard = ({
       <div>
         <h1 className="font-display text-2xl font-medium text-ink">Courier</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Sign in with an account, verify your phone, and apply to earn by
-          delivering packages.
+          Sign in with an account and verify your phone — the KYC level itself
+          activates courierhood. Then earn by delivering packages.
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 small:grid-cols-3">
         <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
-          <p className="text-xs text-ink-muted">Application</p>
-          {courier ? (
+          <p className="text-xs text-ink-muted">Courier status</p>
+          {suspended ? (
             <p className="mt-1 flex items-center gap-2">
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge(courier.status)}`}
-              >
-                {courier.status}
+              <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
+                Suspended
+              </span>
+            </p>
+          ) : active ? (
+            <p className="mt-1 flex items-center gap-2">
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                Active
               </span>
             </p>
           ) : (
-            <p className="mt-1 text-sm text-ink">Not applied</p>
+            <p className="mt-1 text-sm text-ink">Not active</p>
           )}
-          {courier?.city && <p className="mt-1 text-xs text-ink-muted">{courier.city}</p>}
-          {courier?.vehicle && (
-            <p className="text-xs text-ink-muted">{courier.vehicle}</p>
+          {active && (
+            <p className="mt-1 text-xs text-ink-muted">
+              Phone verified — you can make offers.
+            </p>
           )}
         </div>
         <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
           <p className="text-xs text-ink-muted">KYC level</p>
           <p className="mt-1 text-sm font-medium text-ink">{me?.kyc?.level ?? "unverified"}</p>
           <p className="mt-1 text-xs text-ink-muted">
-            {kycVerified ? "Phone verified — you can courier." : "Verify your phone to courier."}
+            {active ? "Courierhood is active." : "Verify your phone to activate courierhood."}
           </p>
         </div>
         <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
@@ -176,26 +168,15 @@ const CourierDashboard = ({
         </div>
       </div>
 
-      {!courier ? (
-        <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
-          <h2 className="font-display text-lg font-medium text-ink">Become a courier</h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Apply once, then browse the delivery board and make offers on jobs
-            near you. Pickup and delivery payouts land in your wallet.
+      {suspended ? (
+        <div className="rounded-large border border-rose-300 bg-rose-50 p-4">
+          <h2 className="font-display text-lg font-medium text-rose-800">Courier account suspended</h2>
+          <p className="mt-1 text-sm text-rose-700">
+            You can still browse the delivery board, but offers and pickups are
+            disabled. Contact support if you think this is a mistake.
           </p>
-          <div className="mt-4">
-            <ApplyForm
-              key={customer?.email ?? "guest"}
-              kycVerified={kycVerified}
-              initialName={displayName ?? ""}
-              onDone={() => {
-                setRefreshKey((k) => k + 1)
-                window.location.reload()
-              }}
-            />
-          </div>
         </div>
-      ) : (
+      ) : active ? (
         <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-medium text-ink">My jobs</h2>
@@ -239,6 +220,40 @@ const CourierDashboard = ({
               ))}
             </ul>
           )}
+
+          <div className="mt-5 border-t border-ink-hairline pt-4">
+            <h2 className="font-display text-lg font-medium text-ink">Courier details</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Set the city and vehicle the delivery board shows for your offers.
+            </p>
+            <div className="mt-4">
+              <DetailsForm
+                key={customer?.email ?? "guest"}
+                active={active}
+                initialName={displayName ?? courier?.name ?? ""}
+                initialCity={courier?.city ?? ""}
+                initialVehicle={courier?.vehicle ?? ""}
+                onDone={() => {
+                  setRefreshKey((k) => k + 1)
+                  window.location.reload()
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-large border border-amber-300 bg-amber-50 p-4">
+          <h2 className="font-display text-lg font-medium text-amber-900">Activate courierhood</h2>
+          <p className="mt-1 text-sm text-amber-800">
+            Verify your phone number (the phone KYC level) and you&apos;ll be an
+            active courier — no application or approval needed.
+          </p>
+          <LocalizedClientLink
+            href="/account/verification"
+            className="mt-3 inline-block text-sm font-medium text-amber-900 underline hover:text-amber-950"
+          >
+            Go to Verification →
+          </LocalizedClientLink>
         </div>
       )}
     </div>

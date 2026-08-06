@@ -47,6 +47,8 @@ export const GET = async (
   }
 
   const kycProfile = await kyc.getProfileView({
+    userType: "seller",
+    userId: sellerAdmin.id,
     email: sellerAdmin.email,
     phone: sellerAdmin.phone,
   })

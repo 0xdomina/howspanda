@@ -22,8 +22,8 @@ export function verificationStatusFromKyc(
 
 /**
  * Derive a seller's verification status from its KYC identity state. The
- * seller_admin signup identifier (email/phone) keys the KYC profile, so the
- * status always reflects what was actually verified — never a stale column.
+ * KYC profile is anchored to the seller_admin account, so the status always
+ * reflects what was actually verified for that user — never a stale column.
  */
 export async function resolveSellerVerificationStatus(
   container: MedusaContainer,
@@ -32,7 +32,7 @@ export async function resolveSellerVerificationStatus(
   const query = container.resolve(ContainerRegistrationKeys.QUERY)
   const { data: admins } = await query.graph({
     entity: "seller_admin",
-    fields: ["email", "phone"],
+    fields: ["id", "email", "phone"],
     filters: { seller_id: sellerId },
   })
   const admin = admins?.[0]
@@ -40,6 +40,8 @@ export async function resolveSellerVerificationStatus(
 
   const kyc = container.resolve<KycModuleService>(KYC_MODULE)
   const profile = await kyc.getProfileView({
+    userType: "seller",
+    userId: admin.id,
     email: admin.email,
     phone: admin.phone,
   })

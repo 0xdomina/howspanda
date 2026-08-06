@@ -76,6 +76,7 @@ const createSellerWorkflow = createWorkflow(
     seedSellerKycStep({
       email: input.admin.email,
       phone: input.admin.phone,
+      sellerAdminId: sellerAdmin.id,
     })
 
     provisionSellerWalletStep({

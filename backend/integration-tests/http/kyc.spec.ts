@@ -1,5 +1,8 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
-import { Modules } from "@medusajs/framework/utils"
+import {
+  Modules,
+  ContainerRegistrationKeys,
+} from "@medusajs/framework/utils"
 import { KYC_MODULE } from "../../src/modules/kyc"
 import KycModuleService from "../../src/modules/kyc/service"
 import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
@@ -22,6 +25,7 @@ medusaIntegrationTestRunner({
     describe("KYC — progressive identity ladder (Phase 14)", () => {
       let kyc: KycModuleService
       let marketplace: MarketplaceModuleService
+      let query: any
       let token: string
       let sellerAuth: () => { headers: Record<string, string> }
       let storeHeaders: { headers: Record<string, string> }
@@ -38,6 +42,7 @@ medusaIntegrationTestRunner({
       beforeAll(async () => {
         kyc = getContainer().resolve(KYC_MODULE)
         marketplace = getContainer().resolve(MARKETPLACE_MODULE)
+        query = getContainer().resolve(ContainerRegistrationKeys.QUERY)
 
         const apiKeyModule = getContainer().resolve(Modules.API_KEY)
         const [pubKey] = await apiKeyModule.createApiKeys([
@@ -284,38 +289,43 @@ medusaIntegrationTestRunner({
         expect(ok.data.offer.courier_email).toEqual("courier-verify-kyc@howsu.local")
       })
 
-      it("requires an approved courier application, not just phone KYC", async () => {
+      it("auto-activates courierhood at the phone-verified KYC level", async () => {
         const job = await api.post(
           "/store/delivery-jobs",
-          { ...POST_JOB_BODY, orderId: "order_kyc_apply" },
+          { ...POST_JOB_BODY, orderId: "order_kyc_auto" },
           sellerAuth()
         )
         const jobId = job.data.job.id
 
-        // phone KYC completed, but never applied to be a courier
+        // phone KYC completed, but NEVER applied to be a courier — the ladder
+        // level alone is the activation, there is no separate approval step
         const phone = "+2348088888888"
-        const customer = await createCustomer("applied-nogate@howsu.local")
+        const customer = await createCustomer("auto-activate@howsu.local")
         const requested = await api.post("/kyc/request", {
-          email: "applied-nogate@howsu.local",
+          email: "auto-activate@howsu.local",
           channel: "phone",
           destination: phone,
         })
         await api.post("/kyc/verify", {
-          email: "applied-nogate@howsu.local",
+          email: "auto-activate@howsu.local",
           channel: "phone",
           destination: phone,
           code: requested.data.code,
         })
 
-        await expect(
-          api.post(
-            `/store/delivery-jobs/${jobId}/offers`,
-            { offeredPrice: 4500 },
-            customer
-          )
-        ).rejects.toMatchObject({
-          response: { status: 401, data: { code: "courier_required" } },
-        })
+        const ok = await api.post(
+          `/store/delivery-jobs/${jobId}/offers`,
+          { offeredPrice: 4500 },
+          customer
+        )
+        expect(ok.status).toEqual(201)
+        expect(ok.data.offer.courier_email).toEqual("auto-activate@howsu.local")
+
+        // the courier dashboard reflects the auto-seeded approved profile
+        const me = await api.get("/store/couriers/me", customer)
+        expect(me.data.courier).not.toBeNull()
+        expect(me.data.courier.status).toEqual("approved")
+        expect(me.data.kyc.phone_verified).toBe(true)
       })
 
       it("surfaces the seller's KYC level on /sellers/me", async () => {
@@ -332,6 +342,55 @@ medusaIntegrationTestRunner({
         expect(res.data.kyc).not.toBeNull()
         expect(res.data.kyc.email).toEqual("kyc-seller@howsu.local")
         expect(res.data.kyc.level).toEqual("unverified")
+      })
+
+      it("anchors KYC to the user profile, not just a contact string", async () => {
+        // a public, email-keyed submission creates the profile first
+        await api.post("/kyc/identity", {
+          email: "kyc-seller@howsu.local",
+          id_type: "nin",
+          id_number: "12345678901",
+        })
+
+        // /sellers/me reads (and links) it to the seller_admin account
+        const me = await api.get("/sellers/me", sellerAuth())
+        expect(me.data.kyc.id_status).toEqual("pending")
+
+        const [sellerAdminRow] = await query.graph({
+          entity: "seller_admin",
+          fields: ["id"],
+          filters: { email: "kyc-seller@howsu.local" },
+        }).then((r: any) => r.data)
+
+        const profiles = await kyc.listKycProfiles({})
+        const linked = profiles.find(
+          (p) => p.email === "kyc-seller@howsu.local"
+        )
+        expect(linked?.user_type).toEqual("seller")
+        expect(linked?.user_id).toEqual(sellerAdminRow.id)
+
+        // /store/kyc/me is the user-profile KYC surface for any actor
+        const actorKyc = await api.get("/store/kyc/me", sellerAuth())
+        expect(actorKyc.data.kyc).not.toBeNull()
+        expect(actorKyc.data.kyc.id_status).toEqual("pending")
+
+        // customers get the same surface: verify a phone, read it back
+        const phone = "+2348077777777"
+        const customer = await createCustomer("profile-kyc@howsu.local")
+        const requested = await api.post("/kyc/request", {
+          email: "profile-kyc@howsu.local",
+          channel: "phone",
+          destination: phone,
+        })
+        await api.post("/kyc/verify", {
+          email: "profile-kyc@howsu.local",
+          channel: "phone",
+          destination: phone,
+          code: requested.data.code,
+        })
+        const customerKyc = await api.get("/store/kyc/me", customer)
+        expect(customerKyc.data.kyc).not.toBeNull()
+        expect(customerKyc.data.kyc.phone_verified).toBe(true)
       })
 
       it("reflects the seller's KYC identity state on the public store page", async () => {

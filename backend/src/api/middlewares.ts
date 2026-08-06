@@ -1097,9 +1097,16 @@ export default defineMiddlewares({
       middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
     },
     {
+      // KYC lives on the user profile: any signed-in account reads its own
+      // platform-wide KYC state here.
+      matcher: "/store/kyc/me",
+      methods: ["GET"],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
+    },
+    {
       // Offers are courier actions: the courier identity comes from the signed
       // in customer/seller actor (never from the body), and the route enforces
-      // an approved courier application + phone KYC.
+      // the phone-verified KYC level that activates courierhood.
       matcher: "/store/delivery-jobs/:id/offers",
       methods: ["POST"],
       middlewares: [

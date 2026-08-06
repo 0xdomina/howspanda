@@ -10,10 +10,11 @@ import KycModuleService from "../../../../../modules/kyc/service"
 import { KYC_MODULE } from "../../../../../modules/kyc"
 import { resolveActorEmail } from "../../../../../lib/accounts/resolve-actor-email"
 
-// Making an offer is a courier action: only a signed-in account holder with an
-// APPROVED courier application and at least phone-verified KYC can bid. The
-// courier's email is derived from the authenticated actor — a client-supplied
-// email is never trusted (an anonymous visitor cannot pose as a courier).
+// Making an offer is a courier action: any signed-in account holder who has
+// reached the phone-verified KYC level can courier — the ladder IS the
+// activation, there is no separate manual approval. The courier's email is
+// derived from the authenticated actor — a client-supplied email is never
+// trusted (an anonymous visitor cannot pose as a courier).
 export const POST = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
@@ -26,6 +27,7 @@ export const POST = async (
   const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
 
   // Minimum KYC level to courier (unconditional — courier is a real role).
+  // Reaching phone-verified auto-activates courierhood for any user.
   await kyc.assertCourierKyc(email)
   await deliveryService.assertCourierCanOffer(email)
 

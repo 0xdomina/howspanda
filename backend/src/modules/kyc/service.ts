@@ -8,6 +8,14 @@ const CODE_LIFETIME_MS = 15 * 60 * 1000
 
 export type KycLevel = "unverified" | "phone_verified" | "identity_verified"
 
+// The account that owns a KYC profile: a customer or seller_admin id. KYC is
+// platform-wide state that lives on the user profile — email/phone remain the
+// verified contact, but the row is anchored to (user_type, user_id).
+export type KycUserRef = {
+  userType?: "customer" | "seller" | null
+  userId?: string | null
+}
+
 export type KycProfileView = {
   email: string | null
   phone: string | null
@@ -59,26 +67,39 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
   }
 
   /**
-   * Find or create a KYC profile by email and/or phone. The profile is keyed
-   * by whichever identifier the seller signed up with; the other identifier is
-   * filled in later when it is verified during KYC.
+   * Find or create a KYC profile by user and/or email/phone. When the owning
+   * user is known (authenticated actor) the profile is keyed by
+   * (user_type, user_id) — one profile per user. Email/phone still identify
+   * the row for pre-account flows and stay as the verified contact.
    */
   async getOrCreateProfile(input: {
     email?: string | null
     phone?: string | null
+    userType?: "customer" | "seller" | null
+    userId?: string | null
   }) {
     const email = input.email?.trim().toLowerCase() || null
     const phone = input.phone?.trim() || null
 
     let existing: {
       id: string
+      user_type: string | null
+      user_id: string | null
       email: string | null
       phone: string | null
       email_verified_at: Date | null
       phone_verified_at: Date | null
       id_status: string
     } | null = null
-    if (email) {
+
+    if (input.userType && input.userId) {
+      const byUser = await this.listKycProfiles(
+        { user_type: input.userType, user_id: input.userId },
+        { take: 1 }
+      )
+      existing = byUser[0] ?? null
+    }
+    if (!existing && email) {
       const byEmail = await this.listKycProfiles({ email }, { take: 1 })
       existing = byEmail[0] ?? null
     }
@@ -94,22 +115,82 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       if (phone && !existing.phone && phone !== existing.phone) {
         return this.updateKycProfiles({ id: existing.id, phone })
       }
+      // Anchor an unlinked profile to its owner when the user is now known.
+      if (
+        input.userType &&
+        input.userId &&
+        (existing.user_type !== input.userType ||
+          existing.user_id !== input.userId)
+      ) {
+        return this.updateKycProfiles({
+          id: existing.id,
+          user_type: input.userType,
+          user_id: input.userId,
+        })
+      }
       return existing
     }
     return this.createKycProfiles({
       email,
       phone,
+      user_type: input.userType ?? null,
+      user_id: input.userId ?? null,
+    })
+  }
+
+  /**
+   * The owning user for an authenticated actor, resolved from the auth context
+   * (customer or seller). Returns null when the actor isn't KYC-relevant.
+   */
+  private userRefFor(
+    auth?: { actor_type?: string | null; actor_id?: string | null } | null
+  ): KycUserRef {
+    if (
+      auth?.actor_id &&
+      (auth.actor_type === "customer" || auth.actor_type === "seller")
+    ) {
+      return { userType: auth.actor_type, userId: auth.actor_id }
+    }
+    return { userType: null, userId: null }
+  }
+
+  /**
+   * Resolve the authenticated actor's KYC state (customer or seller). This is
+   * the "KYC on the user profile" accessor — every user's KYC is a single row
+   * anchored to their account. `email` is an optional fallback contact for
+   * profiles created through public email-keyed flows before linking.
+   */
+  async getProfileForUser(
+    auth: {
+      actor_type?: string | null
+      actor_id?: string | null
+    },
+    email?: string | null
+  ): Promise<KycProfileView | null> {
+    const ref = this.userRefFor(auth)
+    if (!ref.userType || !ref.userId) {
+      return null
+    }
+    return this.getProfileView({
+      userType: ref.userType,
+      userId: ref.userId,
+      email: email ?? null,
     })
   }
 
   async getProfileView(input: {
     email?: string | null
     phone?: string | null
+    userType?: "customer" | "seller" | null
+    userId?: string | null
   }): Promise<KycProfileView | null> {
     const email = input.email?.trim().toLowerCase() || null
     const phone = input.phone?.trim() || null
 
     let profile: {
+      id: string
+      user_type: string | null
+      user_id: string | null
       email: string | null
       phone: string | null
       email_verified_at: Date | null
@@ -120,7 +201,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       id_submitted_at: Date | null
       id_reviewed_at: Date | null
     } | null = null
-    if (email) {
+    if (input.userType && input.userId) {
+      const byUser = await this.listKycProfiles(
+        { user_type: input.userType, user_id: input.userId },
+        { take: 1 }
+      )
+      profile = byUser[0] ?? null
+    }
+    if (!profile && email) {
       const byEmail = await this.listKycProfiles({ email }, { take: 1 })
       profile = byEmail[0] ?? null
     }
@@ -130,6 +218,21 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
     }
     if (!profile) {
       return null
+    }
+    // Anchor an unlinked profile to its owner when the user is known now
+    // (e.g. the profile was created through a public email-keyed flow first).
+    if (
+      input.userType &&
+      input.userId &&
+      (profile.user_type !== input.userType ||
+        profile.user_id !== input.userId)
+    ) {
+      const linked = await this.updateKycProfiles({
+        id: profile.id,
+        user_type: input.userType,
+        user_id: input.userId,
+      })
+      profile = linked as typeof profile
     }
     return {
       email: profile.email,
@@ -370,10 +473,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
   async seedSignupIdentifier(input: {
     email?: string | null
     phone?: string | null
+    userType?: "customer" | "seller" | null
+    userId?: string | null
   }): Promise<KycProfileView> {
     const profile = await this.getOrCreateProfile({
       email: input.email,
       phone: input.phone,
+      userType: input.userType,
+      userId: input.userId,
     })
     if (input.phone) {
       await this.updateKycProfiles({
@@ -391,6 +498,8 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
     return (await this.getProfileView({
       email: profile.email ?? input.email,
       phone: profile.phone ?? input.phone,
+      userType: input.userType,
+      userId: input.userId,
     }))!
   }
 }
