@@ -11,6 +11,7 @@ import RedeemablesModuleService from "../../../../modules/redeemables/service"
 import { FOLLOWS_MODULE } from "../../../../modules/follows"
 import FollowsModuleService from "../../../../modules/follows/service"
 import { getTrustScore } from "../../../../lib/reviews/trust-score"
+import { resolveSellerVerificationStatus } from "../../../../lib/sellers/verification-status"
 
 // The seller's public front door: /store/<handle> renders this. Profile +
 // published products + instruments listed FOR SALE (never their codes —
@@ -30,7 +31,6 @@ export const GET = async (
       "handle",
       "logo",
       "description",
-      "verification_status",
       "products.*",
     ],
     filters: { handle: req.params.handle },
@@ -38,6 +38,12 @@ export const GET = async (
   if (!seller) {
     throw new MedusaError(MedusaError.Types.NOT_FOUND, "Store not found")
   }
+
+  // Derived from the seller's KYC identity state, never the stored column.
+  const verification_status = await resolveSellerVerificationStatus(
+    req.scope,
+    seller.id
+  )
 
   const redeemablesModule =
     req.scope.resolve<RedeemablesModuleService>(REDEEMABLES_MODULE)
@@ -68,7 +74,7 @@ export const GET = async (
       handle: seller.handle,
       logo: seller.logo,
       description: seller.description,
-      verification_status: seller.verification_status,
+      verification_status,
     },
     follower_count,
     followed_by_viewer,

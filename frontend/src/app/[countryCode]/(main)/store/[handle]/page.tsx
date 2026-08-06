@@ -59,6 +59,11 @@ export default async function StorePage({
                   Verified
                 </span>
               )}
+              {seller.verification_status === "pending" && (
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  Verification pending
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-ink-muted">@{seller.handle}</p>
             {seller.description && (

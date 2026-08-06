@@ -599,6 +599,16 @@ export const PostKycIdentitySchema = z
     message: "Provide at least an email or a phone number",
   })
 
+export const PostKycReviewSchema = z
+  .object({
+    email: z.string().email().optional(),
+    phone: z.string().min(7).optional(),
+    decision: z.enum(["verified", "rejected"]),
+  })
+  .refine((b) => b.email || b.phone, {
+    message: "Provide at least an email or a phone number",
+  })
+
 export default defineMiddlewares({
   routes: [
     {
@@ -943,6 +953,14 @@ export default defineMiddlewares({
       middlewares: [
         ADMIN_RATE_LIMIT,
         validateAndTransformBody(PostChallengeSettleSchema),
+      ],
+    },
+    {
+      matcher: "/admin/kyc/review",
+      methods: ["POST"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostKycReviewSchema),
       ],
     },
     {

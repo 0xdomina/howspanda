@@ -2,6 +2,8 @@ import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
 import { Modules } from "@medusajs/framework/utils"
 import { KYC_MODULE } from "../../src/modules/kyc"
 import KycModuleService from "../../src/modules/kyc/service"
+import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
+import type MarketplaceModuleService from "../../src/modules/marketplace/service"
 
 jest.setTimeout(240 * 1000)
 
@@ -19,6 +21,7 @@ medusaIntegrationTestRunner({
   testSuite: ({ api, getContainer }) => {
     describe("KYC — progressive identity ladder (Phase 14)", () => {
       let kyc: KycModuleService
+      let marketplace: MarketplaceModuleService
       let token: string
       let sellerAuth: () => { headers: Record<string, string> }
       let storeHeaders: { headers: Record<string, string> }
@@ -34,6 +37,7 @@ medusaIntegrationTestRunner({
 
       beforeAll(async () => {
         kyc = getContainer().resolve(KYC_MODULE)
+        marketplace = getContainer().resolve(MARKETPLACE_MODULE)
 
         const apiKeyModule = getContainer().resolve(Modules.API_KEY)
         const [pubKey] = await apiKeyModule.createApiKeys([
@@ -328,6 +332,45 @@ medusaIntegrationTestRunner({
         expect(res.data.kyc).not.toBeNull()
         expect(res.data.kyc.email).toEqual("kyc-seller@howsu.local")
         expect(res.data.kyc.level).toEqual("unverified")
+      })
+
+      it("reflects the seller's KYC identity state on the public store page", async () => {
+        // fresh per-test DB: no identity submitted -> unverified
+        const before = await api.get("/store/sellers/kyc-seller", storeHeaders)
+        expect(before.data.seller.verification_status).toEqual("unverified")
+
+        // submitting a NIN moves the store to pending
+        const submitted = await api.post("/kyc/identity", {
+          email: "kyc-seller@howsu.local",
+          id_type: "nin",
+          id_number: "12345678901",
+        })
+        expect(submitted.status).toEqual(201)
+        const pending = await api.get("/store/sellers/kyc-seller", storeHeaders)
+        expect(pending.data.seller.verification_status).toEqual("pending")
+        // the persisted column is written too (the "never written" fix)
+        const synced = await marketplace.listSellers({
+          handle: "kyc-seller",
+        })
+        expect(synced[0].verification_status).toEqual("pending")
+
+        // admin review approving flips the store to verified (service layer —
+        // the thin-wrapper convention; admin routes need an admin JWT)
+        const approved = await kyc.reviewIdentity({
+          email: "kyc-seller@howsu.local",
+          decision: "verified",
+        })
+        expect(approved.profile.id_status).toEqual("verified")
+        const verified = await api.get("/store/sellers/kyc-seller", storeHeaders)
+        expect(verified.data.seller.verification_status).toEqual("verified")
+
+        // rejecting the reviewed identity sends the store back to unverified
+        await kyc.reviewIdentity({
+          email: "kyc-seller@howsu.local",
+          decision: "rejected",
+        })
+        const rejected = await api.get("/store/sellers/kyc-seller", storeHeaders)
+        expect(rejected.data.seller.verification_status).toEqual("unverified")
       })
     })
   },

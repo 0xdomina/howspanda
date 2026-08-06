@@ -3,11 +3,13 @@ import KycModuleService from "../../../modules/kyc/service"
 import { KYC_MODULE } from "../../../modules/kyc"
 import { z } from "@medusajs/framework/zod"
 import { PostKycIdentitySchema } from "../../middlewares"
+import { syncSellerVerificationStatus } from "../../../lib/sellers/verification-status"
 
 type Body = z.infer<typeof PostKycIdentitySchema>
 
 // Submit an identity document (NIN). Enters the ladder as "pending" — an
-// admin review or future NIN provider flips it to verified.
+// admin review or future NIN provider flips it to verified. Mirrors the
+// identity state onto the owning sellers' verification status.
 export const POST = async (
   req: MedusaRequest<Body>,
   res: MedusaResponse
@@ -21,6 +23,12 @@ export const POST = async (
     id_type: body.id_type,
     id_number: body.id_number,
   })
+
+  await syncSellerVerificationStatus(
+    req.scope,
+    { email: body.email, phone: body.phone },
+    "pending"
+  )
 
   res.status(201).json({ ok: result.ok, profile: result.profile })
 }
