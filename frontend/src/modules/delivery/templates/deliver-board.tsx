@@ -4,7 +4,6 @@ import { useTransition, useState } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import {
   listOpenDeliveryJobs,
-  makeOffer,
   reverseGeocode,
 } from "@lib/data/delivery"
 
@@ -25,64 +24,6 @@ const statusLabel: Record<string, string> = {
   in_transit: "In transit",
   delivered: "Delivered",
   cancelled: "Cancelled",
-}
-
-const OfferForm = ({ jobId }: { jobId: string }) => {
-  const [email, setEmail] = useState("")
-  const [price, setPrice] = useState("")
-  const [message, setMessage] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-
-  const submit = () => {
-    setMessage(null)
-    if (!email.includes("@")) {
-      setMessage("Enter your email to make an offer.")
-      return
-    }
-    const amount = Number(price)
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setMessage("Enter a valid offer amount.")
-      return
-    }
-    startTransition(async () => {
-      const res = await makeOffer(jobId, email.trim(), amount)
-      setMessage(
-        res.success
-          ? "Offer sent! The store owner can accept it from their delivery dashboard."
-          : res.error
-      )
-    })
-  }
-
-  return (
-    <div className="rounded-medium border border-ink-hairline bg-paper-surface p-3">
-      <p className="text-sm font-medium text-ink">Make an offer</p>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Your email"
-        className="mt-2 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-      />
-      <input
-        type="number"
-        min="1"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-        placeholder="Your price (₦)"
-        className="mt-2 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-      />
-      <button
-        type="button"
-        disabled={isPending}
-        onClick={submit}
-        className="mt-2 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-      >
-        {isPending ? "Sending…" : "Send offer"}
-      </button>
-      {message && <p className="mt-2 text-xs text-ink-muted">{message}</p>}
-    </div>
-  )
 }
 
 const JobCard = ({ job }: { job: any }) => (
@@ -194,7 +135,8 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
         </h1>
         <p className="mt-2 max-w-xl text-sm text-ink-muted">
           Browse open delivery jobs near you. Make an offer, pick up the package,
-          and get paid on confirmed delivery — no seller account needed.
+          and get paid on confirmed delivery. Couriers are verified account holders —
+          sign in, verify your phone, and apply to deliver.
         </p>
       </div>
 

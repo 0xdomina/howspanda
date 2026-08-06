@@ -2,7 +2,7 @@
 
 import { Plus } from "@medusajs/icons"
 import { Button, Heading } from "@medusajs/ui"
-import { useEffect, useState, useActionState } from "react"
+import { useActionState } from "react"
 
 import useToggleState from "@lib/hooks/use-toggle-state"
 import CountrySelect from "@modules/checkout/components/country-select"
@@ -19,32 +19,24 @@ const AddAddress = ({
   region: HttpTypes.StoreRegion
   addresses: HttpTypes.StoreCustomerAddress[]
 }) => {
-  const [successState, setSuccessState] = useState(false)
   const { state, open, close: closeModal } = useToggleState(false)
 
-  const [formState, formAction] = useActionState(addCustomerAddress, {
-    isDefaultShipping: addresses.length === 0,
-    success: false,
-    error: null,
-  })
+  const close = () => closeModal()
 
-  const close = () => {
-    setSuccessState(false)
-    closeModal()
-  }
-
-  useEffect(() => {
-    if (successState) {
-      close()
+  const [formState, formAction] = useActionState(
+    async (currentState: Record<string, unknown>, formData: FormData) => {
+      const res = await addCustomerAddress(currentState, formData)
+      if (res.success) {
+        closeModal()
+      }
+      return res
+    },
+    {
+      isDefaultShipping: addresses.length === 0,
+      success: false,
+      error: null,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successState])
-
-  useEffect(() => {
-    if (formState.success) {
-      setSuccessState(true)
-    }
-  }, [formState])
+  )
 
   return (
     <>

@@ -15,7 +15,7 @@ async function getRegionMap(cacheId: string) {
 
   if (!BACKEND_URL) {
     throw new Error(
-      "Middleware.ts: Error fetching regions. Did you set up regions in your Medusa Admin and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
+      "proxy.ts: Error fetching regions. Did you set up regions in your Medusa Admin and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
     )
   }
 
@@ -94,16 +94,16 @@ async function getCountryCode(
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error(
-        "Middleware.ts: Error getting the country code. Did you set up regions in your Medusa Admin and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
+        "proxy.ts: Error getting the country code. Did you set up regions in your Medusa Admin and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
       )
     }
   }
 }
 
 /**
- * Middleware to handle region selection and onboarding status.
+ * Proxy to handle region selection and onboarding status.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let redirectUrl = request.nextUrl.href
 
   let response = NextResponse.redirect(redirectUrl, 307)

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useActionState } from "react"
+import React, { useMemo, useActionState } from "react"
 
 import Input from "@modules/common/components/input"
 import NativeSelect from "@modules/common/components/native-select"
@@ -31,7 +31,7 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
     )
   }, [regions])
 
-  const [successState, setSuccessState] = React.useState(false)
+  const [successDismissed, setSuccessDismissed] = React.useState(false)
 
   const billingAddress = customer.addresses?.find(
     (addr) => addr.is_default_billing
@@ -53,13 +53,18 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
     initialState
   )
 
-  const clearState = () => {
-    setSuccessState(false)
+  const [prevActionState, setPrevActionState] = React.useState(state)
+
+  if (state !== prevActionState) {
+    setPrevActionState(state)
+    setSuccessDismissed(false)
   }
 
-  useEffect(() => {
-    setSuccessState(state.success)
-  }, [state])
+  const isSuccess = state.success && !successDismissed
+
+  const clearState = () => {
+    setSuccessDismissed(true)
+  }
 
   const currentInfo = useMemo(() => {
     if (!billingAddress) {
@@ -95,7 +100,7 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
       <AccountInfo
         label="Billing address"
         currentInfo={currentInfo}
-        isSuccess={successState}
+        isSuccess={isSuccess}
         isError={!!state.error}
         clearState={clearState}
         data-testid="account-billing-address-editor"

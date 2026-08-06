@@ -239,7 +239,7 @@ const MallDetailClient = ({
               </>
             ) : alreadyJoined ? (
               <p className="mt-2 text-sm text-ink-muted">
-                You're a member of this mall. Every purchase counts toward the
+                You&apos;re a member of this mall. Every purchase counts toward the
                 prize draws.
               </p>
             ) : (

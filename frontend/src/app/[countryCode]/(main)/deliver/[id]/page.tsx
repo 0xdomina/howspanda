@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveDeliveryJob } from "@lib/data/delivery"
+import { retrieveCustomer } from "@lib/data/customer"
 import DeliverJobDetailClient from "@modules/delivery/templates/deliver-job-detail"
 
 export const metadata: Metadata = {
@@ -15,11 +16,14 @@ export default async function DeliverJobDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const job = await retrieveDeliveryJob(id).catch(() => null)
+  const [job, customer] = await Promise.all([
+    retrieveDeliveryJob(id).catch(() => null),
+    retrieveCustomer().catch(() => null),
+  ])
 
   if (!job) {
     notFound()
   }
 
-  return <DeliverJobDetailClient job={job} />
+  return <DeliverJobDetailClient job={job} customer={customer} />
 }

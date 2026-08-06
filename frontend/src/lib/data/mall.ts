@@ -51,6 +51,15 @@ export type MallPrize = {
   claimed: boolean
 }
 
+export type MallWin = {
+  id: string
+  mall_id: string
+  mall_name: string
+  winner_buyer_email: string
+  amount_ngn: number | string
+  won_at: string
+}
+
 export const listActiveMalls = async (): Promise<Mall[]> => {
   try {
     return await sdk.client
@@ -59,6 +68,20 @@ export const listActiveMalls = async (): Promise<Mall[]> => {
         cache: "no-store",
       })
       .then(({ malls }) => malls ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
+export const listRecentMallWins = async (): Promise<MallWin[]> => {
+  try {
+    return await sdk.client
+      .fetch<{ wins: MallWin[] }>("/store/malls/wins", {
+        method: "GET",
+        cache: "no-store",
+      })
+      .then(({ wins }) => wins ?? [])
       .catch(() => [])
   } catch {
     return []
@@ -181,7 +204,7 @@ export const createMall = async (input: {
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -206,7 +229,56 @@ export const joinMallAsSeller = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString() }
+  }
+}
+
+// Author-only mall lifecycle after expiry.
+export const relaunchMall = async (
+  mallId: string,
+  durationDays?: number
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) {
+      return { success: false, error: "Not signed in as a seller." }
+    }
+
+    await sdk.client.fetch(`/store/malls/${mallId}/relaunch`, {
+      method: "POST",
+      headers,
+      body: durationDays ? { durationDays } : {},
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString() }
+  }
+}
+
+export const cancelMall = async (
+  mallId: string
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) {
+      return { success: false, error: "Not signed in as a seller." }
+    }
+
+    await sdk.client.fetch(`/store/malls/${mallId}/cancel`, {
+      method: "POST",
+      headers,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {

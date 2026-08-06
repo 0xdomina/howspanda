@@ -18,5 +18,5 @@ export default async function SellerMallsPage() {
     notFound()
   }
 
-  return <SellerMallsClient malls={malls} />
+  return <SellerMallsClient malls={malls} sellerId={seller.seller?.id ?? null} />
 }

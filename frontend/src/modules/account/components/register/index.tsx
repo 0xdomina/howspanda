@@ -17,8 +17,11 @@ type Props = {
 
 const Register = ({ setCurrentView }: Props) => {
   const router = useRouter()
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [phone, setPhone] = useState("")
   const [code, setCode] = useState("")
   const [step, setStep] = useState<"credentials" | "code">("credentials")
   const [sent, setSent] = useState(false)
@@ -80,6 +83,9 @@ const Register = ({ setCurrentView }: Props) => {
       formData.set("email", email.trim())
       formData.set("password", password)
       formData.set("proof", res.proof)
+      if (firstName.trim()) formData.set("first_name", firstName.trim())
+      if (lastName.trim()) formData.set("last_name", lastName.trim())
+      if (phone.trim()) formData.set("phone", phone.trim())
 
       const result = await signup(null, formData)
       if (typeof result === "string") {
@@ -95,16 +101,34 @@ const Register = ({ setCurrentView }: Props) => {
       className="max-w-sm flex flex-col items-center"
       data-testid="register-page"
     >
-      <h1 className="text-large-semi uppercase mb-6">
-        Become a Medusa Store Member
-      </h1>
+      <h1 className="text-large-semi uppercase mb-6">Join How&rsquo;s u</h1>
       <p className="text-center text-base-regular text-ui-fg-base mb-4">
-        Create your Medusa Store Member profile, and get access to an enhanced
-        shopping experience.
+        Create your account, set up your profile, and get access to an enhanced
+        shopping, selling, and delivery experience.
       </p>
       <div className="w-full flex flex-col">
         {step === "credentials" ? (
           <div className="flex flex-col gap-y-2">
+            <div className="grid grid-cols-2 gap-x-4">
+              <Input
+                label="First name"
+                name="first_name"
+                required
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                data-testid="first-name-input"
+              />
+              <Input
+                label="Last name"
+                name="last_name"
+                required
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                data-testid="last-name-input"
+              />
+            </div>
             <Input
               label="Email"
               name="email"
@@ -124,6 +148,15 @@ const Register = ({ setCurrentView }: Props) => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               data-testid="password-input"
+            />
+            <Input
+              label="Phone (optional)"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              data-testid="phone-input"
             />
             <ErrorMessage error={error} data-testid="register-error" />
             <Button
@@ -197,7 +230,7 @@ const Register = ({ setCurrentView }: Props) => {
           </div>
         )}
         <span className="text-center text-ui-fg-base text-small-regular mt-6">
-          By creating an account, you agree to Medusa Store&apos;s{" "}
+          By creating an account, you agree to our{" "}
           <LocalizedClientLink
             href="/content/privacy-policy"
             className="underline"

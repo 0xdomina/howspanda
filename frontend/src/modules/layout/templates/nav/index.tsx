@@ -53,6 +53,13 @@ export default async function Nav() {
               </LocalizedClientLink>
               <LocalizedClientLink
                 className="hover:text-ink"
+                href="/challenges"
+                data-testid="nav-challenges-link"
+              >
+                Challenges
+              </LocalizedClientLink>
+              <LocalizedClientLink
+                className="hover:text-ink"
                 href="/deliver"
                 data-testid="nav-deliver-link"
               >

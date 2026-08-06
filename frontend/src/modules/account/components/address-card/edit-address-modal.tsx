@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useActionState } from "react"
+import React, { useState, useActionState } from "react"
 import { PencilSquare as Edit, Trash } from "@medusajs/icons"
 import { Button, Heading, Text, clx } from "@medusajs/ui"
 
@@ -28,32 +28,24 @@ const EditAddress: React.FC<EditAddressProps> = ({
   isActive = false,
 }) => {
   const [removing, setRemoving] = useState(false)
-  const [successState, setSuccessState] = useState(false)
   const { state, open, close: closeModal } = useToggleState(false)
 
-  const [formState, formAction] = useActionState(updateCustomerAddress, {
-    success: false,
-    error: null,
-    addressId: address.id,
-  })
+  const close = () => closeModal()
 
-  const close = () => {
-    setSuccessState(false)
-    closeModal()
-  }
-
-  useEffect(() => {
-    if (successState) {
-      close()
+  const [formState, formAction] = useActionState(
+    async (currentState: Record<string, unknown>, formData: FormData) => {
+      const res = await updateCustomerAddress(currentState, formData)
+      if (res.success) {
+        closeModal()
+      }
+      return res
+    },
+    {
+      success: false,
+      error: null,
+      addressId: address.id,
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [successState])
-
-  useEffect(() => {
-    if (formState.success) {
-      setSuccessState(true)
-    }
-  }, [formState])
+  )
 
   const removeAddress = async () => {
     setRemoving(true)

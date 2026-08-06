@@ -11,9 +11,11 @@ import Package from "@modules/common/icons/package"
 import Wallet from "@modules/common/icons/wallet"
 import ShieldCheck from "@modules/common/icons/shield-check"
 import Bell from "@modules/common/icons/bell"
+import FastDelivery from "@modules/common/icons/fast-delivery"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { HttpTypes } from "@medusajs/types"
 import { signout } from "@lib/data/customer"
+import { getDisplayName } from "@lib/util/name"
 
 const AccountNav = ({
   customer,
@@ -44,7 +46,7 @@ const AccountNav = ({
         ) : (
           <>
             <div className="text-xl-semi mb-4 px-8">
-              Hello {customer?.first_name}
+              Hello {getDisplayName(customer) ?? "there"}
             </div>
             <div className="text-base-regular">
               <ul>
@@ -100,6 +102,19 @@ const AccountNav = ({
                     <div className="flex items-center gap-x-2">
                       <Wallet size={20} />
                       <span>Wallet</span>
+                    </div>
+                    <ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                <li>
+                  <LocalizedClientLink
+                    href="/account/courier"
+                    className="flex items-center justify-between py-4 border-b border-ink-hairline px-8"
+                    data-testid="courier-link"
+                  >
+                    <div className="flex items-center gap-x-2">
+                      <FastDelivery size={20} />
+                      <span>Courier</span>
                     </div>
                     <ChevronDown className="transform -rotate-90" />
                   </LocalizedClientLink>
@@ -199,6 +214,15 @@ const AccountNav = ({
                   data-testid="wallet-link"
                 >
                   Wallet
+                </AccountNavLink>
+              </li>
+              <li>
+                <AccountNavLink
+                  href="/account/courier"
+                  route={route!}
+                  data-testid="courier-link"
+                >
+                  Courier
                 </AccountNavLink>
               </li>
               <li>

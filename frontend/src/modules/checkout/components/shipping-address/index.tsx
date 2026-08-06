@@ -2,8 +2,9 @@ import { HttpTypes } from "@medusajs/types"
 import { Container } from "@medusajs/ui"
 import Checkbox from "@modules/common/components/checkbox"
 import Input from "@modules/common/components/input"
+import { getDisplayName } from "@lib/util/name"
 import { mapKeys } from "lodash"
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useMemo, useState } from "react"
 import AddressSelect from "../address-select"
 import CountrySelect from "../country-select"
 
@@ -70,16 +71,19 @@ const ShippingAddress = ({
       }))
   }
 
-  useEffect(() => {
-    // Ensure cart is not null and has a shipping_address before setting form data
+  const [prevCart, setPrevCart] = useState(cart)
+
+  // Adjust the form when the cart prop changes (e.g. shipping address added).
+  if (cart !== prevCart) {
+    setPrevCart(cart)
     if (cart && cart.shipping_address) {
-      setFormAddress(cart?.shipping_address, cart?.email)
+      setFormAddress(cart.shipping_address, cart.email)
     }
 
     if (cart && !cart.email && customer?.email) {
       setFormAddress(undefined, customer.email)
     }
-  }, [cart]) // Add cart as a dependency
+  }
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -97,7 +101,9 @@ const ShippingAddress = ({
       {customer && (addressesInRegion?.length || 0) > 0 && (
         <Container className="mb-6 flex flex-col gap-y-4 p-5">
           <p className="text-small-regular">
-            {`Hi ${customer.first_name}, do you want to use one of your saved addresses?`}
+            {getDisplayName(customer)
+              ? `Hi ${getDisplayName(customer)}, do you want to use one of your saved addresses?`
+              : "Do you want to use one of your saved addresses?"}
           </p>
           <AddressSelect
             addresses={customer.addresses}

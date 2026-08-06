@@ -1,6 +1,6 @@
 import { Metadata } from "next"
 
-import { listActiveMalls } from "@lib/data/mall"
+import { listActiveMalls, listRecentMallWins } from "@lib/data/mall"
 import { retrieveCustomer } from "@lib/data/customer"
 import MallsClient from "@modules/mall/templates/malls-list"
 
@@ -10,10 +10,13 @@ export const metadata: Metadata = {
 }
 
 export default async function MallsPage() {
-  const [malls, customer] = await Promise.all([
+  const [malls, customer, wins] = await Promise.all([
     listActiveMalls().catch(() => []),
     retrieveCustomer().catch(() => null),
+    listRecentMallWins().catch(() => []),
   ])
 
-  return <MallsClient malls={malls} customerEmail={customer?.email ?? null} />
+  return (
+    <MallsClient malls={malls} wins={wins} customerEmail={customer?.email ?? null} />
+  )
 }

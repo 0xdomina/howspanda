@@ -16,6 +16,7 @@ type SellerAdmin = {
   last_name?: string
   email?: string
   phone?: string
+  role?: "owner" | "staff"
   seller?: {
     id: string
     name?: string
@@ -115,7 +116,7 @@ export async function sellerRegister(
     await setSellerAuthToken(loginToken as string)
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return null
   } catch (error: any) {
@@ -135,7 +136,7 @@ export async function sellerLogin(_currentState: unknown, formData: FormData) {
     await setSellerAuthToken(token as string)
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return null
   } catch (error: any) {
@@ -212,7 +213,7 @@ export const markOrderDelivered = async (orderId: string): Promise<string | null
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return null
   } catch (error: any) {
@@ -233,7 +234,7 @@ export const confirmReturnReceived = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return null
   } catch (error: any) {
@@ -282,7 +283,7 @@ export const createPayoutAccount = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -322,7 +323,7 @@ export const requestSellerPayout = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -379,7 +380,7 @@ export const createSellerReferral = async (
     )
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null, code: res.referral?.code }
   } catch (error: any) {
@@ -466,7 +467,7 @@ export const createSellerRedeemable = async (
     )
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null, code: res.redeemables?.[0]?.code }
   } catch (error: any) {
@@ -487,7 +488,7 @@ export const cancelSellerRedeemable = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -510,7 +511,7 @@ export const redeemInStore = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -679,7 +680,7 @@ export const updateSellerProduct = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return null
   } catch (error: any) {
@@ -733,7 +734,7 @@ export const createSellerProduct = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -923,5 +924,113 @@ export const retrieveSellerTrustScore = async (): Promise<SellerTrustScore | nul
       .catch(() => null)
   } catch {
     return null
+  }
+}
+
+// --- Store team (staff/employees) ----------------------------------------
+
+export type SellerTeamMember = {
+  id: string
+  role: "owner" | "staff"
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  created_at?: string | null
+}
+
+export const listSellerTeam = async (): Promise<SellerTeamMember[]> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return []
+
+    return await sdk.client
+      .fetch<{ team: SellerTeamMember[] }>("/sellers/team", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .then(({ team }) => team ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
+export const addSellerTeamMember = async (body: {
+  email: string
+  password: string
+  first_name?: string
+  last_name?: string
+}): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers))
+      return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch("/sellers/team", {
+      method: "POST",
+      headers,
+      body,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString?.() ?? String(error) }
+  }
+}
+
+export const removeSellerTeamMember = async (
+  id: string
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers))
+      return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch(`/sellers/team/${id}`, {
+      method: "DELETE",
+      headers,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString?.() ?? String(error) }
+  }
+}
+
+// --- Store settings -------------------------------------------------------
+
+export const updateSellerStore = async (body: {
+  name?: string
+  handle?: string
+  logo?: string | null
+  description?: string | null
+  first_name?: string
+  last_name?: string
+}): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers))
+      return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch("/sellers/me", {
+      method: "PATCH",
+      headers,
+      body,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString?.() ?? String(error) }
   }
 }

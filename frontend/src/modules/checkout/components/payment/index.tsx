@@ -9,7 +9,7 @@ import ErrorMessage from "@modules/checkout/components/error-message"
 import PaymentContainer from "@modules/checkout/components/payment-container"
 import Divider from "@modules/common/components/divider"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 
 const Payment = ({
   cart,
@@ -24,7 +24,9 @@ const Payment = ({
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("")
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
+    () => activeSession?.provider_id ?? ""
+  )
   const [cardComplete, setCardComplete] = useState(false)
 
   const searchParams = useSearchParams()
@@ -32,6 +34,17 @@ const Payment = ({
   const pathname = usePathname()
 
   const isOpen = searchParams.get("step") === "payment"
+
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    if (isOpen) {
+      setError(null)
+    } else if (activeSession?.provider_id) {
+      setSelectedPaymentMethod(activeSession.provider_id)
+    }
+  }
 
   const setPaymentMethod = async (method: string) => {
     setError(null)
@@ -89,17 +102,6 @@ const Payment = ({
       setIsLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (!isOpen && activeSession?.provider_id) {
-      setSelectedPaymentMethod(activeSession.provider_id)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen])
-
-  useEffect(() => {
-    setError(null)
-  }, [isOpen])
 
   return (
     <div className="bg-paper">

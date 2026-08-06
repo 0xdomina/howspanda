@@ -7,7 +7,7 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react"
-import { Fragment, useEffect, useMemo, useState, useTransition } from "react"
+import { Fragment, useMemo, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import ReactCountryFlag from "react-country-flag"
 
@@ -73,7 +73,6 @@ const LanguageSelect = ({
   locales,
   currentLocale,
 }: LanguageSelectProps) => {
-  const [current, setCurrent] = useState<LanguageOption | undefined>(undefined)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -93,15 +92,15 @@ const LanguageSelect = ({
     return [DEFAULT_OPTION, ...localeOptions]
   }, [locales, currentLocale])
 
-  useEffect(() => {
+  const current = useMemo(() => {
     if (currentLocale) {
-      const option = options.find(
-        (o) => o.code.toLowerCase() === currentLocale.toLowerCase()
+      return (
+        options.find(
+          (o) => o.code.toLowerCase() === currentLocale.toLowerCase()
+        ) ?? DEFAULT_OPTION
       )
-      setCurrent(option ?? DEFAULT_OPTION)
-    } else {
-      setCurrent(DEFAULT_OPTION)
     }
+    return DEFAULT_OPTION
   }, [options, currentLocale])
 
   const handleChange = (option: LanguageOption) => {

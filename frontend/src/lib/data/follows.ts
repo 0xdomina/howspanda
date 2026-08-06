@@ -232,7 +232,7 @@ export const createSellerBroadcast = async (body: {
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
     return { success: true, error: null }
   } catch (error: any) {
     return { success: false, error: error?.message ?? error?.toString?.() ?? String(error) }

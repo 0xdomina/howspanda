@@ -5,10 +5,10 @@ import { createTransferRequest } from "@lib/data/orders"
 import { Text, Heading, Input, Button, IconButton, Toaster } from "@medusajs/ui"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
 import { CheckCircleMiniSolid, XCircleSolid } from "@medusajs/icons"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 export default function TransferRequestForm() {
-  const [showSuccess, setShowSuccess] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
 
   const [state, formAction] = useActionState(createTransferRequest, {
     success: false,
@@ -16,11 +16,14 @@ export default function TransferRequestForm() {
     order: null,
   })
 
-  useEffect(() => {
-    if (state.success && state.order) {
-      setShowSuccess(true)
-    }
-  }, [state.success, state.order])
+  const [prevActionState, setPrevActionState] = useState(state)
+
+  if (state !== prevActionState) {
+    setPrevActionState(state)
+    setDismissed(false)
+  }
+
+  const showSuccess = state.success && !!state.order && !dismissed
 
   return (
     <div className="flex flex-col gap-y-4 w-full">
@@ -70,7 +73,7 @@ export default function TransferRequestForm() {
           <IconButton
             variant="transparent"
             className="h-fit"
-            onClick={() => setShowSuccess(false)}
+            onClick={() => setDismissed(true)}
           >
             <XCircleSolid className="w-4 h-4 text-neutral-500" />
           </IconButton>

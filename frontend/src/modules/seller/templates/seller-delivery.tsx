@@ -301,7 +301,9 @@ const JobCard = ({
             {offers.map((o: any) => (
               <li key={o.id} className="flex items-center justify-between py-2 text-sm">
                 <div className="min-w-0">
-                  <p className="truncate text-ink-muted">{o.courier_email}</p>
+                  <p className="truncate text-ink-muted">
+                    {o.courier_name ?? "Courier"}
+                  </p>
                   <p className="font-mono tabular-nums text-ink">{ngn(o.offered_price)}</p>
                 </div>
                 <div className="flex items-center gap-2">

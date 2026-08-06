@@ -2,7 +2,12 @@
 
 import { useTransition, useState } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { createMall, joinMallAsSeller } from "@lib/data/mall"
+import {
+  createMall,
+  joinMallAsSeller,
+  relaunchMall,
+  cancelMall,
+} from "@lib/data/mall"
 
 const ngn = (v: number | string | undefined) =>
   new Intl.NumberFormat("en-NG", {
@@ -128,6 +133,11 @@ const CreateMallForm = ({ onDone }: { onDone: () => void }) => {
             />
           </div>
         </div>
+        <p className="text-xs text-ink-muted">
+          Your contribution funds the prize pool net of a 20% platform fee —{" "}
+          {ngn(Number(prizePoolNgn) * 0.8)} of the pledge goes in, shown as the
+          pool&apos;s displayed value.
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-xs text-ink-muted">Duration (days)</label>
@@ -219,6 +229,10 @@ const JoinMallForm = ({ onDone }: { onDone: () => void }) => {
             className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
           />
         </div>
+        <p className="text-xs text-ink-muted">
+          {ngn(Number(contribution) * 0.8)} goes into the prize pool; the
+          platform keeps a 20% fee. Refunds are full if the mall never launches.
+        </p>
         {error && <p className="text-sm text-rose-600">{error}</p>}
         <button
           type="button"
@@ -233,7 +247,83 @@ const JoinMallForm = ({ onDone }: { onDone: () => void }) => {
   )
 }
 
-const SellerMallsClient = ({ malls }: { malls: any[] }) => {
+const LifecycleActions = ({
+  mall,
+  sellerId,
+  onDone,
+}: {
+  mall: any
+  sellerId: string | null
+  onDone: () => void
+}) => {
+  const [message, setMessage] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  // Only the mall creator can re-launch or cancel it.
+  if (!sellerId || mall.created_by_seller_id !== sellerId) {
+    return null
+  }
+  if (mall.status !== "expired" && mall.status !== "pending") {
+    return null
+  }
+
+  const relaunch = () => {
+    setMessage(null)
+    startTransition(async () => {
+      const res = await relaunchMall(mall.id)
+      setMessage(res.success ? "Mall re-launched and live again." : res.error)
+      if (res.success) onDone()
+    })
+  }
+
+  const cancel = () => {
+    setMessage(null)
+    const note =
+      mall.starts_at
+        ? "Cancelling refunds the remaining prize pool pro-rata to sellers."
+        : "Cancelling refunds every seller's full contribution."
+    if (!window.confirm(`Cancel “${mall.name}”? ${note}`)) return
+    startTransition(async () => {
+      const res = await cancelMall(mall.id)
+      setMessage(res.success ? "Mall cancelled." : res.error)
+      if (res.success) onDone()
+    })
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex gap-2">
+        {mall.status === "expired" && (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={relaunch}
+            className="rounded-medium bg-ink px-3 py-1.5 text-xs font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+          >
+            {isPending ? "Working…" : "Re-launch"}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={cancel}
+          className="rounded-medium border border-ink-strong px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+      {message && <p className="text-xs text-ink-muted">{message}</p>}
+    </div>
+  )
+}
+
+const SellerMallsClient = ({
+  malls,
+  sellerId,
+}: {
+  malls: any[]
+  sellerId: string | null
+}) => {
   const [refresh, setRefresh] = useState(0)
   const reload = () => {
     setRefresh((r) => r + 1)
@@ -287,6 +377,7 @@ const SellerMallsClient = ({ malls }: { malls: any[] }) => {
                     {ngn(mall.remaining_ngn)} left
                   </span>
                 </div>
+                <LifecycleActions mall={mall} sellerId={sellerId} onDone={reload} />
               </li>
             ))}
           </ul>

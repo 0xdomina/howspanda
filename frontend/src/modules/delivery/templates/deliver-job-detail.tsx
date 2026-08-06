@@ -3,6 +3,7 @@
 import { useTransition, useState } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import RouteMap from "@modules/delivery/components/route-map"
+import { getDisplayName } from "@lib/util/name"
 import {
   makeOffer,
   markPickedUp,
@@ -43,8 +44,31 @@ const Section = ({
   </div>
 )
 
-const DeliverJobDetailClient = ({ job }: { job: any }) => {
-  const [email, setEmail] = useState("")
+const SignInPrompt = ({ children }: { children: React.ReactNode }) => (
+  <div className="rounded-medium border border-ink-hairline bg-paper-surface p-3">
+    <p className="text-xs text-ink-muted">{children}</p>
+    <LocalizedClientLink
+      href="/account"
+      className="mt-2 block w-full rounded-medium bg-ink px-3 py-2 text-center text-sm font-medium text-white hover:bg-ink/90"
+    >
+      Sign in to continue
+    </LocalizedClientLink>
+  </div>
+)
+
+// Identity comes from the signed-in account (customer or seller), never from a
+// free-text email. Offer and pickup are courier actions gated on an approved
+// courier application + phone KYC server-side.
+const DeliverJobDetailClient = ({
+  job,
+  customer,
+}: {
+  job: any
+  customer: { email?: string | null; first_name?: string | null; last_name?: string | null } | null
+}) => {
+  const email = customer?.email?.trim().toLowerCase() ?? ""
+  const isSignedIn = !!email
+  const displayName = getDisplayName(customer)
   const [price, setPrice] = useState("")
   const [code, setCode] = useState("")
   const [codePurpose, setCodePurpose] = useState<"pickup" | "delivery">("pickup")
@@ -57,39 +81,64 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
 
   const parties = job.parties ?? []
   const offers = job.offers ?? []
-  const myParty = parties.find((p: any) => p.email === email.trim().toLowerCase())
+  const myParty = parties.find((p: any) => p.email === email)
   const acceptedOffer = offers.find((o: any) => o.status === "accepted")
   const isCourier = myParty?.role === "courier"
   const isSender = myParty?.role === "sender"
   const isRecipient = myParty?.role === "recipient"
 
+  // People are identified by their proper name — never by any part of their
+  // email. Without a name we fall back to the party's role, and own messages
+  // are always labelled "You".
+  const partyLabel = (partyEmail: string) => {
+    const e = partyEmail.trim().toLowerCase()
+    if (e === email) return "You"
+    const party = parties.find(
+      (p: any) => (p.email ?? "").trim().toLowerCase() === e
+    )
+    if (party?.name) return party.name
+    const roleLabel: Record<string, string> = {
+      courier: "Courier",
+      sender: "Sender",
+      recipient: "Recipient",
+    }
+    return roleLabel[party?.role] ?? "Participant"
+  }
+
   const setMsg = (s: string | null) => setMessage(s)
+  const guard = () => {
+    if (!isSignedIn) {
+      setMsg("Sign in with your account first.")
+      return false
+    }
+    return true
+  }
 
   const offer = () => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email first.")
+    if (!guard()) return
     const amount = Number(price)
     if (!Number.isFinite(amount) || amount <= 0) return setMsg("Enter a valid amount.")
     startTransition(async () => {
-      const res = await makeOffer(job.id, email.trim(), amount)
+      const res = await makeOffer(job.id, amount)
       setMsg(res.success ? "Offer sent! Waiting on the store owner." : res.error)
     })
   }
 
   const pickup = () => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email first.")
+    if (!guard()) return
     startTransition(async () => {
-      const res = await markPickedUp(job.id, email.trim())
+      const res = await markPickedUp(job.id)
       setMsg(res.success ? "Pickup confirmed — package in transit." : res.error)
     })
   }
 
   const genCode = (purpose: "pickup" | "delivery") => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email first.")
+    if (!guard()) return
     startTransition(async () => {
-      const res = await generateVerification(job.id, purpose, email.trim())
+      const res = await generateVerification(job.id, purpose, email)
       if (res.success && res.code) {
         setGeneratedCode(`${purpose === "pickup" ? "Pickup" : "Delivery"} code: ${res.code}`)
         setMsg("Show this code to the other party — it expires in 15 minutes.")
@@ -102,22 +151,22 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
 
   const verify = () => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email first.")
+    if (!guard()) return
     if (!/^\d{6}$/.test(code)) return setMsg("The code is 6 digits.")
     startTransition(async () => {
-      const res = await submitVerification(job.id, email.trim(), code, codePurpose)
+      const res = await submitVerification(job.id, email, code, codePurpose)
       setMsg(res.success ? "Verified!" : res.error)
     })
   }
 
   const confirm = () => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email first.")
+    if (!guard()) return
     startTransition(async () => {
       const res = await confirmDelivery(
         job.id,
-        email.trim(),
-        isCourier ? email.trim() : undefined
+        email,
+        isCourier ? email : undefined
       )
       setMsg(
         res.success
@@ -129,32 +178,32 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
 
   const cancel = () => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email first.")
+    if (!guard()) return
     if (!cancelReason.trim()) return setMsg("Add a reason to cancel.")
     startTransition(async () => {
-      const res = await cancelDeliveryJob(job.id, email.trim(), cancelReason.trim())
+      const res = await cancelDeliveryJob(job.id, email, cancelReason.trim())
       setMsg(res.success ? "Job cancelled." : res.error)
     })
   }
 
   const loadChat = () => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email to load the chat.")
+    if (!guard()) return
     startTransition(async () => {
-      const msgs = await listDeliveryMessages(job.id, email.trim())
+      const msgs = await listDeliveryMessages(job.id, email)
       setMessages(msgs)
     })
   }
 
   const sendMsg = () => {
     setMsg(null)
-    if (!email.includes("@")) return setMsg("Enter your email first.")
+    if (!guard()) return
     if (!chatBody.trim()) return setMsg("Write a message first.")
     startTransition(async () => {
-      const res = await sendDeliveryMessage(job.id, email.trim(), chatBody.trim())
+      const res = await sendDeliveryMessage(job.id, email, chatBody.trim())
       if (res.success) {
         setChatBody("")
-        const msgs = await listDeliveryMessages(job.id, email.trim())
+        const msgs = await listDeliveryMessages(job.id, email)
         setMessages(msgs)
       } else {
         setMsg(res.error)
@@ -256,7 +305,12 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
               <ul className="divide-y divide-ink-hairline">
                 {offers.map((o: any) => (
                   <li key={o.id} className="flex items-center justify-between py-2 text-sm">
-                    <span className="truncate text-ink-muted">{o.courier_email}</span>
+                    <span className="truncate text-ink-muted">
+                      {o.courier_name ??
+                        (o.courier_email?.trim().toLowerCase() === email
+                          ? "You"
+                          : "Courier")}
+                    </span>
                     <span className="ml-2 flex items-center gap-2">
                       <span className="font-mono tabular-nums text-ink">
                         {ngn(o.offered_price)}
@@ -285,7 +339,14 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
                       <p className="italic text-ink-muted">{m.body}</p>
                     ) : (
                       <p className="text-ink">
-                        <span className="font-medium text-ink-muted">{m.sender_email}:</span>{" "}
+                        <span className="font-medium text-ink-muted">
+                          {m.is_system
+                            ? "System"
+                            : m.sender_name
+                            ? m.sender_name
+                            : partyLabel(m.sender_email)}
+                          :
+                        </span>{" "}
                         {m.body}
                       </p>
                     )}
@@ -293,98 +354,116 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
                 ))
               )}
             </div>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Your email to join the chat"
-              className="mt-3 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-            />
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={loadChat}
-                className="rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
-              >
-                Load
-              </button>
-              <input
-                type="text"
-                value={chatBody}
-                onChange={(e) => setChatBody(e.target.value)}
-                placeholder="Write a message…"
-                className="flex-1 rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-              />
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={sendMsg}
-                className="rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-              >
-                Send
-              </button>
-            </div>
+            {isSignedIn ? (
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={loadChat}
+                  className="rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+                >
+                  Load
+                </button>
+                <input
+                  type="text"
+                  value={chatBody}
+                  onChange={(e) => setChatBody(e.target.value)}
+                  placeholder="Write a message…"
+                  className="flex-1 rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                />
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={sendMsg}
+                  className="rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3">
+                <SignInPrompt>Sign in to load or send messages.</SignInPrompt>
+              </div>
+            )}
           </Section>
         </div>
 
         <div className="w-full space-y-4 small:max-w-sm">
           <Section title="Your identity">
             <p className="text-xs text-ink-muted">
-              Delivery uses your email as your identity — no separate account.
+              Your signed-in account is your courier identity.
             </p>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Your email"
-              className="mt-3 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-            />
-            {myParty ? (
+            {isSignedIn ? (
               <p className="mt-2 text-sm text-ink">
-                You're the <span className="font-medium">{myParty.role}</span> on this job.
+                You&apos;re on the job as{" "}
+                <span className="font-medium">{displayName ?? "a participant"}</span>
+                {myParty && (
+                  <>
+                    {" "}— your role is{" "}
+                    <span className="font-medium">{myParty.role}</span>.
+                  </>
+                )}
               </p>
             ) : (
-              <p className="mt-2 text-sm text-ink-muted">
-                Not a party yet — make an offer to join.
-              </p>
+              <div className="mt-3">
+                <SignInPrompt>
+                  Sign in with a customer or seller account to make offers and
+                  coordinate deliveries.
+                </SignInPrompt>
+              </div>
             )}
           </Section>
 
           {(job.status === "open" || job.status === "negotiating") && (
             <Section title="Make an offer">
-              <input
-                type="number"
-                min="1"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="Your price (₦)"
-                className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-              />
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={offer}
-                className="mt-2 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-              >
-                {isPending ? "Sending…" : "Send offer"}
-              </button>
+              {isSignedIn ? (
+                <>
+                  <input
+                    type="number"
+                    min="1"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="Your price (₦)"
+                    className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                  />
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={offer}
+                    className="mt-2 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+                  >
+                    {isPending ? "Sending…" : "Send offer"}
+                  </button>
+                  <p className="mt-2 text-xs text-ink-muted">
+                    You&apos;ll need an approved courier application and a verified
+                    phone number to send an offer.
+                  </p>
+                </>
+              ) : (
+                <SignInPrompt>Sign in to make an offer.</SignInPrompt>
+              )}
             </Section>
           )}
 
           {job.status === "accepted" && (
             <Section title="Pickup">
-              <p className="text-xs text-ink-muted">
-                Couriers mark the package picked up here.
-              </p>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={pickup}
-                className="mt-3 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-              >
-                {isPending ? "Updating…" : "Mark picked up"}
-              </button>
+              {isSignedIn ? (
+                <>
+                  <p className="text-xs text-ink-muted">
+                    The accepted courier marks the package picked up here.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={pickup}
+                    className="mt-3 w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+                  >
+                    {isPending ? "Updating…" : "Mark picked up"}
+                  </button>
+                </>
+              ) : (
+                <SignInPrompt>Sign in to mark pickup.</SignInPrompt>
+              )}
             </Section>
           )}
 
@@ -394,90 +473,106 @@ const DeliverJobDetailClient = ({ job }: { job: any }) => {
                 The courier generates a code and shows it to the sender/recipient,
                 who enters it here to confirm pickup or delivery.
               </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => genCode("pickup")}
-                  className="flex-1 rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
-                >
-                  Pickup code
-                </button>
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => genCode("delivery")}
-                  className="flex-1 rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
-                >
-                  Delivery code
-                </button>
-              </div>
-              {generatedCode && (
-                <p className="mt-2 rounded-medium bg-emerald-50 p-2 text-center font-mono text-sm text-emerald-700">
-                  {generatedCode}
-                </p>
+              {isSignedIn ? (
+                <>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => genCode("pickup")}
+                      className="flex-1 rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+                    >
+                      Pickup code
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => genCode("delivery")}
+                      className="flex-1 rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+                    >
+                      Delivery code
+                    </button>
+                  </div>
+                  {generatedCode && (
+                    <p className="mt-2 rounded-medium bg-emerald-50 p-2 text-center font-mono text-sm text-emerald-700">
+                      {generatedCode}
+                    </p>
+                  )}
+                  <select
+                    value={codePurpose}
+                    onChange={(e) => setCodePurpose(e.target.value as "pickup" | "delivery")}
+                    className="mt-3 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                  >
+                    <option value="pickup">Verify pickup</option>
+                    <option value="delivery">Verify delivery</option>
+                  </select>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="6-digit code"
+                    className="mt-2 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                  />
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={verify}
+                    className="mt-2 w-full rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+                  >
+                    {isPending ? "Verifying…" : "Verify code"}
+                  </button>
+                </>
+              ) : (
+                <SignInPrompt>Sign in to generate or verify codes.</SignInPrompt>
               )}
-              <select
-                value={codePurpose}
-                onChange={(e) => setCodePurpose(e.target.value as "pickup" | "delivery")}
-                className="mt-3 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-              >
-                <option value="pickup">Verify pickup</option>
-                <option value="delivery">Verify delivery</option>
-              </select>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="6-digit code"
-                className="mt-2 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-              />
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={verify}
-                className="mt-2 w-full rounded-medium border border-ink-strong px-3 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
-              >
-                {isPending ? "Verifying…" : "Verify code"}
-              </button>
             </Section>
           )}
 
           {(job.status === "accepted" || job.status === "in_transit") && (
             <Section title="Confirm delivery">
               <p className="text-xs text-ink-muted">
-                The recipient confirms the drop-off to release the courier's payment.
+                The recipient confirms the drop-off to release the courier&apos;s payment.
               </p>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={confirm}
-                className="mt-3 w-full rounded-medium bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {isPending ? "Confirming…" : "Confirm delivered"}
-              </button>
+              {isSignedIn ? (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={confirm}
+                  className="mt-3 w-full rounded-medium bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {isPending ? "Confirming…" : "Confirm delivered"}
+                </button>
+              ) : (
+                <SignInPrompt>Sign in to confirm delivery.</SignInPrompt>
+              )}
             </Section>
           )}
 
           {["open", "negotiating", "accepted", "in_transit"].includes(job.status) && (
             <Section title="Cancel job">
-              <input
-                type="text"
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Reason"
-                className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
-              />
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={cancel}
-                className="mt-2 w-full rounded-medium border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-600 hover:text-white disabled:opacity-50"
-              >
-                {isPending ? "Cancelling…" : "Cancel job"}
-              </button>
+              {isSignedIn ? (
+                <>
+                  <input
+                    type="text"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="Reason"
+                    className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                  />
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={cancel}
+                    className="mt-2 w-full rounded-medium border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-600 hover:text-white disabled:opacity-50"
+                  >
+                    {isPending ? "Cancelling…" : "Cancel job"}
+                  </button>
+                </>
+              ) : (
+                <SignInPrompt>Sign in to cancel this job.</SignInPrompt>
+              )}
             </Section>
           )}
 

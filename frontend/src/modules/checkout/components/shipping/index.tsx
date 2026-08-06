@@ -58,10 +58,17 @@ const Shipping: React.FC<ShippingProps> = ({
   availableShippingMethods,
 }) => {
   const [isLoading, setIsLoading] = useState(false)
-  const [isLoadingPrices, setIsLoadingPrices] = useState(true)
 
-  const [showPickupOptions, setShowPickupOptions] =
-    useState<string>(PICKUP_OPTION_OFF)
+  const [showPickupOptions, setShowPickupOptions] = useState<string>(() => {
+    const selectedMethodId = cart.shipping_methods?.at(-1)?.shipping_option_id
+    const isPickup =
+      availableShippingMethods?.some(
+        (sm) =>
+          sm.id === selectedMethodId &&
+          sm.service_zone?.fulfillment_set?.type === "pickup"
+      ) ?? false
+    return isPickup ? PICKUP_OPTION_ON : PICKUP_OPTION_OFF
+  })
   const [calculatedPricesMap, setCalculatedPricesMap] = useState<
     Record<string, number>
   >({})
@@ -86,9 +93,39 @@ const Shipping: React.FC<ShippingProps> = ({
 
   const hasPickupOptions = !!_pickupMethods?.length
 
-  useEffect(() => {
-    setIsLoadingPrices(true)
+  const isPickupMethodSelected = _pickupMethods?.some(
+    (m) => m.id === shippingMethodId
+  )
 
+  // Derived loading state: loading until every calculated method has a price.
+  const isLoadingPrices =
+    _shippingMethods?.some(
+      (sm) =>
+        sm.price_type === "calculated" &&
+        typeof calculatedPricesMap[sm.id] !== "number"
+    ) ?? false
+
+  const [prevShippingOptions, setPrevShippingOptions] = useState(
+    availableShippingMethods
+  )
+
+  if (availableShippingMethods !== prevShippingOptions) {
+    setPrevShippingOptions(availableShippingMethods)
+    if (isPickupMethodSelected) {
+      setShowPickupOptions(PICKUP_OPTION_ON)
+    }
+  }
+
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    if (isOpen) {
+      setError(null)
+    }
+  }
+
+  useEffect(() => {
     if (_shippingMethods?.length) {
       const promises = _shippingMethods
         .filter((sm) => sm.price_type === "calculated")
@@ -101,14 +138,9 @@ const Shipping: React.FC<ShippingProps> = ({
             .filter((r) => r.status === "fulfilled")
             .forEach((p) => (pricesMap[p.value?.id || ""] = p.value?.amount!))
 
-          setCalculatedPricesMap(pricesMap)
-          setIsLoadingPrices(false)
+          setCalculatedPricesMap((prev) => ({ ...prev, ...pricesMap }))
         })
       }
-    }
-
-    if (_pickupMethods?.find((m) => m.id === shippingMethodId)) {
-      setShowPickupOptions(PICKUP_OPTION_ON)
     }
   }, [availableShippingMethods])
 
@@ -149,10 +181,6 @@ const Shipping: React.FC<ShippingProps> = ({
         setIsLoading(false)
       })
   }
-
-  useEffect(() => {
-    setError(null)
-  }, [isOpen])
 
   return (
     <div className="bg-white">

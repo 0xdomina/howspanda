@@ -3,6 +3,7 @@
 import { sdk } from "@lib/config"
 import { revalidateTag } from "next/cache"
 import { getSellerAuthHeaders, getSellerCacheTag } from "./seller-cookies"
+import { getAuthHeaders } from "./cookies"
 
 export type DeliveryJob = {
   id: string
@@ -42,6 +43,37 @@ export type DeliveryOffer = {
   offered_price: number | string
   status: string
   created_at?: string
+}
+
+export type CourierProfile = {
+  id: string
+  courier_email: string
+  auth_identity_id?: string | null
+  actor_type?: "customer" | "seller" | null
+  name?: string | null
+  phone?: string | null
+  city?: string | null
+  vehicle?: string | null
+  status: "applied" | "approved" | "suspended"
+  approved_at?: string | null
+}
+
+export type CourierMe = {
+  courier: CourierProfile | null
+  kyc: {
+    level: string
+    phone_verified: boolean
+    email_verified: boolean
+    [key: string]: unknown
+  } | null
+  jobs: {
+    offer_id: string
+    offered_price: number | string
+    offer_status: string
+    created_at: string
+    job: Omit<DeliveryJob, "destination_phone"> | null
+  }[]
+  earnings: number
 }
 
 type AuthHeaders = { authorization: string } | {}
@@ -133,13 +165,17 @@ export const retrieveDeliveryJob = async (
 
 export const makeOffer = async (
   jobId: string,
-  courierEmail: string,
   offeredPrice: number
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) {
+      return { success: false, error: "Sign in with your account to make a delivery offer." }
+    }
     await sdk.client.fetch(`/store/delivery-jobs/${jobId}/offers`, {
       method: "POST",
-      body: { courierEmail, offeredPrice },
+      headers,
+      body: { offeredPrice },
     })
     return { success: true, error: null }
   } catch (error: any) {
@@ -148,17 +184,61 @@ export const makeOffer = async (
 }
 
 export const markPickedUp = async (
-  jobId: string,
-  courierEmail: string
+  jobId: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) {
+      return { success: false, error: "Sign in with your account to mark pickup." }
+    }
     await sdk.client.fetch(`/store/delivery-jobs/${jobId}/pickup`, {
       method: "POST",
-      body: { courierEmail },
+      headers,
+      body: {},
     })
     return { success: true, error: null }
   } catch (error: any) {
     return { success: false, error: error?.message ?? error?.toString() }
+  }
+}
+
+// --- courier role (authenticated customer/seller account) ---
+
+export const applyCourier = async (input: {
+  name?: string
+  phone?: string
+  city?: string
+  vehicle?: string
+}): Promise<{ success: boolean; error: string | null; code?: string }> => {
+  try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) {
+      return { success: false, error: "Sign in with your account to apply." }
+    }
+    await sdk.client.fetch("/store/couriers/apply", {
+      method: "POST",
+      headers,
+      body: input,
+    })
+    return { success: true, error: null }
+  } catch (error: any) {
+    return { success: false, error: error?.message ?? error?.toString(), code: error?.code }
+  }
+}
+
+export const getCourierMe = async (): Promise<CourierMe | null> => {
+  try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) return null
+    return await sdk.client
+      .fetch<CourierMe>("/store/couriers/me", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .catch(() => null)
+  } catch {
+    return null
   }
 }
 
@@ -308,7 +388,7 @@ export const postDeliveryJob = async (input: {
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -332,7 +412,7 @@ export const acceptOffer = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag)
+    revalidateTag(tag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {

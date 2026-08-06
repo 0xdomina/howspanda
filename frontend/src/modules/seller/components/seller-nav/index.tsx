@@ -18,6 +18,7 @@ const SellerNav = () => {
     { href: "/seller", label: "Overview" },
     { href: "/seller/products", label: "Products" },
     { href: "/seller/orders", label: "Orders" },
+    { href: "/seller/followers", label: "Followers" },
     { href: "/seller/money", label: "Money" },
     { href: "/seller/malls", label: "Malls" },
     { href: "/seller/delivery", label: "Delivery" },
@@ -25,6 +26,8 @@ const SellerNav = () => {
     { href: "/seller/referrals", label: "Referrals" },
     { href: "/seller/redeemables", label: "Redeemables" },
     { href: "/seller/broadcasts", label: "Broadcasts" },
+    { href: "/seller/team", label: "Team" },
+    { href: "/seller/settings", label: "Settings" },
     { href: "/seller/ai", label: "AI tools" },
   ]
 
