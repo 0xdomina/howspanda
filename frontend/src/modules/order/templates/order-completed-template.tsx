@@ -4,7 +4,6 @@ import CartTotals from "@modules/common/components/cart-totals"
 import BuyerOrderActions from "@modules/order/components/buyer-actions"
 import Help from "@modules/order/components/help"
 import Items from "@modules/order/components/items"
-import OnboardingCta from "@modules/order/components/onboarding-cta"
 import OrderDetails from "@modules/order/components/order-details"
 import ShareButton from "@modules/common/components/share-button"
 import ShippingDetails from "@modules/order/components/shipping-details"
@@ -21,16 +20,11 @@ export default async function OrderCompletedTemplate({
   order,
   countryCode = "en",
 }: OrderCompletedTemplateProps) {
-  const cookies = await nextCookies()
-
-  const isOnboarding = cookies.get("_medusa_onboarding")?.value === "true"
-
   const shareText = `My order on How's u is confirmed.`
 
   return (
     <div className="py-6 min-h-[calc(100vh-64px)]">
       <div className="content-container flex flex-col justify-center items-center gap-y-10 max-w-4xl h-full w-full">
-        {isOnboarding && <OnboardingCta orderId={order.id} />}
         <div
           className="flex flex-col gap-4 max-w-4xl h-full bg-paper-surface w-full py-10"
           data-testid="order-complete-container"

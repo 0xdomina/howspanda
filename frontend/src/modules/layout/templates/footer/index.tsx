@@ -152,7 +152,7 @@ export default async function Footer() {
             <LocalizedClientLink href="/" className="hover:text-ui-fg-base">
               How&rsquo;s u
             </LocalizedClientLink>
-            . A peer-to-peer resale market for how-to guides.
+            . Shop more. Sell more.
           </Text>
         </div>
       </div>

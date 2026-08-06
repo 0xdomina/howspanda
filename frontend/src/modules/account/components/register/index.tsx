@@ -103,8 +103,8 @@ const Register = ({ setCurrentView }: Props) => {
     >
       <h1 className="text-large-semi uppercase mb-6">Join How&rsquo;s u</h1>
       <p className="text-center text-base-regular text-ui-fg-base mb-4">
-        Create your account, set up your profile, and get access to an enhanced
-        shopping, selling, and delivery experience.
+        Create your account and set up your profile to shop from people, sell
+        what you make, and deliver orders around you.
       </p>
       <div className="w-full flex flex-col">
         {step === "credentials" ? (

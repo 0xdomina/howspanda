@@ -12,8 +12,8 @@ const EmptyCartMessage = () => {
         Cart
       </Heading>
       <Text className="text-base-regular text-ink-muted mt-4 mb-6 max-w-[32rem]">
-        You don&apos;t have anything in your cart. Let&apos;s change that, use
-        the link below to start browsing our products.
+        You don&apos;t have anything in your cart yet. Ready to shop more and
+        sell more? Browse the store and build a cart.
       </Text>
       <div>
         <InteractiveLink href="/store">Explore products</InteractiveLink>
