@@ -5,6 +5,8 @@ import {
   AuthenticatedMedusaRequest,
 } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
+import express from "express"
+import path from "path"
 import { rateLimit } from "../lib/security/rate-limit"
 import { PostSellerCreateSchema } from "./sellers/route"
 import { PostSellerTeamSchema } from "./sellers/team/route"
@@ -1288,6 +1290,22 @@ export default defineMiddlewares({
       matcher: "/sellers/broadcasts",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostBroadcastSchema)],
+    },
+    {
+      // Uploaded media is served publicly (product photos render in <img> tags
+      // on store pages) but only as the exact bytes we wrote: whitelisted
+      // extension → whitelisted Content-Type, nosniff so the browser never
+      // sniff-executes, and immutable cache headers. The files are written by
+      // POST /sellers/uploads after magic-byte validation.
+      matcher: "/uploads",
+      middlewares: [
+        express.static(path.join(process.cwd(), "uploads"), {
+          setHeaders: (res) => {
+            res.setHeader("X-Content-Type-Options", "nosniff")
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable")
+          },
+        }),
+      ],
     },
   ],
 })

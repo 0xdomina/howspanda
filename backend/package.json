@@ -29,6 +29,7 @@
     "@medusajs/framework": "2.18.0",
     "@medusajs/medusa": "2.18.0",
     "ai": "^5.0.222",
+    "multer": "^2.2.0",
     "viem": "^2.55.10",
     "zod": "^3.25.76"
   },
