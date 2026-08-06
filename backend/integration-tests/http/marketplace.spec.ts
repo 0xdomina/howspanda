@@ -1,6 +1,7 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
 import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
 import MarketplaceModuleService from "../../src/modules/marketplace/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(120 * 1000)
 
@@ -88,6 +89,8 @@ medusaIntegrationTestRunner({
           })
 
           expect(register.status).toEqual(200)
+
+          await completeKycLadder(getContainer, "api-seller@howsu.local", "+2348012300006")
 
           const created = await api.post(
             "/sellers",

@@ -16,6 +16,17 @@ const KycProfile = model.define("kyc_profile", {
   // legacy/unlinked rows are still allowed.
   user_type: model.text().nullable(),
   user_id: model.text().nullable(),
+  // Personal profile collected as part of the ladder (names exactly as on the
+  // ID card + residence address). Filling these after phone verification bumps
+  // the ladder to profile_completed, which unlocks seller + courier features.
+  first_name: model.text().nullable(),
+  last_name: model.text().nullable(),
+  other_name: model.text().nullable(),
+  address: model.text().nullable(),
+  country: model.text().nullable(),
+  state: model.text().nullable(),
+  city: model.text().nullable(),
+  postal_code: model.text().nullable(),
   // Uniqueness on email is enforced by a partial unique index (migration) so
   // NULL emails (phone-first sellers) are allowed alongside unique emails.
   email: model.text().nullable(),

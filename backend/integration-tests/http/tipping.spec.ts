@@ -9,6 +9,7 @@ import { TIPPING_MODULE } from "../../src/modules/tipping"
 import TippingModuleService from "../../src/modules/tipping/service"
 import { REDEEMABLES_MODULE } from "../../src/modules/redeemables"
 import RedeemablesModuleService from "../../src/modules/redeemables/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(120 * 1000)
 
@@ -80,6 +81,7 @@ medusaIntegrationTestRunner({
           email: "tipping-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "tipping-seller@howsu.local", "+2348012300011")
         const created = await api.post(
           "/sellers",
           {
@@ -123,8 +125,8 @@ medusaIntegrationTestRunner({
         expect(Number(res.data.tip.amount)).toEqual(2500)
         expect(res.data.tip.commission_line_id).toBeTruthy()
 
-        // 0% commission → the full tip lands in the seller's available balance
-        expect(await availableNgn()).toBeCloseTo(before + 2500, 2)
+        // 10% platform fee → net 2250 lands in the seller's available balance
+        expect(await availableNgn()).toBeCloseTo(before + 2250, 2)
       })
 
       it("rejects a buyer→seller tip when the email does not own the order (404)", async () => {
@@ -257,6 +259,7 @@ medusaIntegrationTestRunner({
           email: "other-tip-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "other-tip-seller@howsu.local", "+2348012300012")
         const created = await api.post(
           "/sellers",
           {

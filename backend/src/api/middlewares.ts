@@ -609,6 +609,20 @@ export const PostKycReviewSchema = z
     message: "Provide at least an email or a phone number",
   })
 
+// Personal profile rung of the KYC ladder. Fields are optional individually —
+// the ladder is progressive — but profile_completed only unlocks once the
+// required fields (name, address, country, state, city) are all present.
+export const PostKycProfileSchema = z.object({
+  first_name: z.string().trim().min(1).max(100).optional(),
+  last_name: z.string().trim().min(1).max(100).optional(),
+  other_name: z.string().trim().min(1).max(100).optional(),
+  address: z.string().trim().min(1).max(300).optional(),
+  country: z.string().trim().min(1).max(80).optional(),
+  state: z.string().trim().min(1).max(80).optional(),
+  city: z.string().trim().min(1).max(80).optional(),
+  postal_code: z.string().trim().min(1).max(20).optional(),
+})
+
 export default defineMiddlewares({
   routes: [
     {
@@ -1102,6 +1116,17 @@ export default defineMiddlewares({
       matcher: "/store/kyc/me",
       methods: ["GET"],
       middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
+    },
+    {
+      // Save the personal profile rung of the KYC ladder for the signed-in
+      // user. The actor is the profile owner — no identifiers come from the
+      // body, everything is anchored to their account.
+      matcher: "/store/kyc/profile",
+      methods: ["POST"],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        validateAndTransformBody(PostKycProfileSchema),
+      ],
     },
     {
       // Offers are courier actions: the courier identity comes from the signed

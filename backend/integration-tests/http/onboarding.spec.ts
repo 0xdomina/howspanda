@@ -1,4 +1,5 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(240 * 1000)
 
@@ -10,7 +11,7 @@ process.env.KYC_VERIFICATION_CHANNEL = "mock"
 medusaIntegrationTestRunner({
   inApp: true,
   env: {},
-  testSuite: ({ api, dbUtils }) => {
+  testSuite: ({ api, dbUtils, getContainer }) => {
     describe("Phase 14 — frictionless onboarding (phone or email)", () => {
       describe("phone-first seller", () => {
         let token: string
@@ -22,6 +23,9 @@ medusaIntegrationTestRunner({
             password: "supersecret",
           })
           expect(register.status).toEqual(200)
+
+          // store creation is ladder-gated: complete phone + profile first
+          await completeKycLadder(getContainer, "", "+2348012345001")
 
           const created = await api.post(
             "/sellers",
@@ -121,6 +125,7 @@ medusaIntegrationTestRunner({
             email: "email-onboard@howsu.local",
             password: "supersecret",
           })
+          await completeKycLadder(getContainer, "email-onboard@howsu.local", "+2348012345002")
           const created = await api.post(
             "/sellers",
             {

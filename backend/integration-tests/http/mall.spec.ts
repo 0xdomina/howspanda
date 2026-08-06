@@ -4,6 +4,7 @@ import { MALL_MODULE } from "../../src/modules/mall"
 import MallModuleService from "../../src/modules/mall/service"
 import { BUYER_WALLET_MODULE } from "../../src/modules/buyer-wallet"
 import BuyerWalletModuleService from "../../src/modules/buyer-wallet/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(240 * 1000)
 
@@ -56,6 +57,7 @@ medusaIntegrationTestRunner({
           email: "mall-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "mall-seller@howsu.local", "+2348012300002")
         const created = await api.post(
           "/sellers",
           {
@@ -80,6 +82,7 @@ medusaIntegrationTestRunner({
           "/auth/seller/emailpass/register",
           { email: "mall-seller-two@howsu.local", password: "supersecret" }
         )
+        await completeKycLadder(getContainer, "mall-seller-two@howsu.local", "+2348012300003")
         await api.post(
           "/sellers",
           {
@@ -154,7 +157,8 @@ medusaIntegrationTestRunner({
         expect(res.data.mall.created_by_seller_id).toEqual(sellerId)
         expect(res.data.mall.target_sellers).toEqual(5)
         expect(res.data.mall.target_buyers).toEqual(10)
-        expect(Number(res.data.mall.prize_pool_ngn)).toEqual(30000)
+        // the pool holds the net-of-tax amount (gross pledge × 0.8 platform tax)
+        expect(Number(res.data.mall.prize_pool_ngn)).toEqual(24000)
       })
 
       it("lists the malls created or joined by the seller", async () => {

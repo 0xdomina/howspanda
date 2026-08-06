@@ -4,6 +4,7 @@ import { DELIVERY_MODULE } from "../../src/modules/delivery"
 import DeliveryModuleService from "../../src/modules/delivery/service"
 import { BUYER_WALLET_MODULE } from "../../src/modules/buyer-wallet"
 import BuyerWalletModuleService from "../../src/modules/buyer-wallet/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(240 * 1000)
 
@@ -82,17 +83,7 @@ medusaIntegrationTestRunner({
         courierSeq += 1
         const phone = `+2348${String(90000000 + courierSeq).padStart(8, "0")}`
         const customer = await createCustomer(email)
-        const requested = await api.post("/kyc/request", {
-          email,
-          channel: "phone",
-          destination: phone,
-        })
-        await api.post("/kyc/verify", {
-          email,
-          channel: "phone",
-          destination: phone,
-          code: requested.data.code,
-        })
+        await completeKycLadder(getContainer, email, phone)
         await api.post(
           "/store/couriers/apply",
           { city: "Lagos", vehicle: "motorcycle" },
@@ -115,6 +106,7 @@ medusaIntegrationTestRunner({
           email: "delivery-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "delivery-seller@howsu.local", "+2348012300013")
         const created = await api.post(
           "/sellers",
           {
@@ -368,6 +360,7 @@ medusaIntegrationTestRunner({
           email: "seller-b@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "seller-b@howsu.local", "+2348012300014")
         await api.post(
           "/sellers",
           {

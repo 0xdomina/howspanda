@@ -1,6 +1,7 @@
 import { medusaIntegrationTestRunner } from "@medusajs/test-utils"
 import { AI_MODULE } from "../../src/modules/ai"
 import AiModuleService from "../../src/modules/ai/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(120 * 1000)
 
@@ -10,7 +11,13 @@ jest.setTimeout(120 * 1000)
 process.env.AI_PROVIDER = "mock"
 process.env.AI_FREE_TIER_MONTHLY_LIMIT = "5"
 
-const onboardSeller = async (api: any, email: string, handle: string) => {
+const onboardSeller = async (
+  api: any,
+  getContainer: any,
+  email: string,
+  handle: string
+) => {
+  await completeKycLadder(getContainer, email, `+234801${email.slice(0, 8)}`)
   const register = await api.post("/auth/seller/emailpass/register", {
     email,
     password: "supersecret",
@@ -48,8 +55,8 @@ medusaIntegrationTestRunner({
       })
 
       it("onboards two sellers with one owned product each", async () => {
-        tokenA = await onboardSeller(api, "ai-a@howsu.local", "ai-seller-a")
-        tokenB = await onboardSeller(api, "ai-b@howsu.local", "ai-seller-b")
+        tokenA = await onboardSeller(api, getContainer, "ai-a@howsu.local", "ai-seller-a")
+        tokenB = await onboardSeller(api, getContainer, "ai-b@howsu.local", "ai-seller-b")
 
         for (const [token, title] of [
           [tokenA, "Seller A Secret Scarf"],

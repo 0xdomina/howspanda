@@ -5,6 +5,7 @@ import {
 } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
 import MarketplaceModuleService from "../../src/modules/marketplace/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(120 * 1000)
 
@@ -105,6 +106,7 @@ medusaIntegrationTestRunner({
           email: "escrow-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "escrow-seller@howsu.local", "+2348012300004")
         const created = await api.post(
           "/sellers",
           {
@@ -177,6 +179,7 @@ medusaIntegrationTestRunner({
           email: "escrow-intruder@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "escrow-intruder@howsu.local", "+2348012300005")
         await api.post(
           "/sellers",
           {

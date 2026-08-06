@@ -7,6 +7,8 @@ import { z } from "@medusajs/framework/zod"
 import createSellerWorkflow, {
   CreateSellerWorkflowInput,
 } from "../../workflows/marketplace/create-seller"
+import KycModuleService from "../../modules/kyc/service"
+import { KYC_MODULE } from "../../modules/kyc"
 
 export const PostSellerCreateSchema = z.strictObject({
   name: z.string(),
@@ -43,6 +45,16 @@ export const POST = async (
   }
 
   const sellerData = req.validatedBody
+
+  // Creating a store is a ladder-gated action: the user must first reach the
+  // current unlock level (phone + complete profile; identity once NIN is on)
+  // before they can become a seller. The signup identifier keys the check.
+  const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
+  await kyc.assertLevel({
+    email: sellerData.admin.email,
+    phone: sellerData.admin.phone,
+    required: kyc.requiredUnlockLevel(),
+  })
 
   const { result } = await createSellerWorkflow(req.scope)
     .run({

@@ -7,6 +7,7 @@ import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
 import MarketplaceModuleService from "../../src/modules/marketplace/service"
 import { REVIEWS_MODULE } from "../../src/modules/reviews"
 import ReviewsModuleService from "../../src/modules/reviews/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 import {
   computeTrustScore,
   reconcileLines,
@@ -90,6 +91,7 @@ medusaIntegrationTestRunner({
           email: "reviews-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "reviews-seller@howsu.local", "+2348012300007")
         const created = await api.post(
           "/sellers",
           {

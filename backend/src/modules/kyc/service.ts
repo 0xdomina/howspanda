@@ -6,7 +6,11 @@ import { sendOtp } from "../../lib/kyc/send-otp"
 
 const CODE_LIFETIME_MS = 15 * 60 * 1000
 
-export type KycLevel = "unverified" | "phone_verified" | "identity_verified"
+export type KycLevel =
+  | "unverified"
+  | "phone_verified"
+  | "profile_completed"
+  | "identity_verified"
 
 // The account that owns a KYC profile: a customer or seller_admin id. KYC is
 // platform-wide state that lives on the user profile — email/phone remain the
@@ -22,6 +26,14 @@ export type KycProfileView = {
   level: KycLevel
   email_verified: boolean
   phone_verified: boolean
+  first_name: string | null
+  last_name: string | null
+  other_name: string | null
+  address: string | null
+  country: string | null
+  state: string | null
+  city: string | null
+  postal_code: string | null
   id_type: string | null
   id_tail: string | null
   id_status: string
@@ -31,17 +43,57 @@ export type KycProfileView = {
   id_reviewed_at: string | null
 }
 
+// Which personal fields must be present (and non-empty) for the ladder to count
+// the profile as complete. Postal code is optional — not everyone knows theirs
+// (the UI suggests it from the address but the user can skip it).
+export const PROFILE_REQUIRED_FIELDS = [
+  "first_name",
+  "last_name",
+  "address",
+  "country",
+  "state",
+  "city",
+] as const
+
+export function profileComplete(profile: {
+  first_name?: string | null
+  last_name?: string | null
+  address?: string | null
+  country?: string | null
+  state?: string | null
+  city?: string | null
+}): boolean {
+  return PROFILE_REQUIRED_FIELDS.every((f) => !!profile[f]?.trim())
+}
+
 export function computeLevel(profile: {
   id_status: string
   phone_verified_at: Date | null
+  first_name?: string | null
+  last_name?: string | null
+  address?: string | null
+  country?: string | null
+  state?: string | null
+  city?: string | null
 }): KycLevel {
   if (profile.id_status === "verified") {
     return "identity_verified"
   }
   if (profile.phone_verified_at) {
+    if (profileComplete(profile)) {
+      return "profile_completed"
+    }
     return "phone_verified"
   }
   return "unverified"
+}
+
+// Numeric ordering of the ladder for gate comparisons.
+export const KYC_LEVEL_ORDER: Record<KycLevel, number> = {
+  unverified: 0,
+  phone_verified: 1,
+  profile_completed: 2,
+  identity_verified: 3,
 }
 
 // Default identity threshold: NIN is an 11-digit number. Reject anything that
@@ -64,6 +116,31 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    */
   courierGateEnabled(): boolean {
     return process.env.KYC_COURIER_GATE_ENABLED === "true"
+  }
+
+  /**
+   * Whether NIN document verification is switched on (FEATURE_NIN_VERIFICATION).
+   * Off by default — phone + complete profile unlocks selling + couriering. When
+   * on, identity verification becomes a mandatory rung of the same ladder.
+   */
+  ninVerificationEnabled(): boolean {
+    return process.env.FEATURE_NIN_VERIFICATION === "true"
+  }
+
+  /**
+   * The ladder level a user must reach to unlock selling + couriering. With NIN
+   * verification off (default) it's profile_completed; flipping the NIN feature
+   * on raises the bar to identity_verified automatically.
+   */
+  requiredUnlockLevel(): KycLevel {
+    return this.ninVerificationEnabled() ? "identity_verified" : "profile_completed"
+  }
+
+  private unlockMessage(required: KycLevel): string {
+    if (required === "identity_verified") {
+      return "Verify your identity (NIN) to unlock selling and delivering."
+    }
+    return "Complete your KYC profile (verified phone + personal details) to unlock selling and delivering."
   }
 
   /**
@@ -195,6 +272,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       phone: string | null
       email_verified_at: Date | null
       phone_verified_at: Date | null
+      first_name: string | null
+      last_name: string | null
+      other_name: string | null
+      address: string | null
+      country: string | null
+      state: string | null
+      city: string | null
+      postal_code: string | null
       id_type: string | null
       id_tail: string | null
       id_status: string
@@ -240,6 +325,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       level: computeLevel(profile),
       email_verified: !!profile.email_verified_at,
       phone_verified: !!profile.phone_verified_at,
+      first_name: profile.first_name,
+      last_name: profile.last_name,
+      other_name: profile.other_name,
+      address: profile.address,
+      country: profile.country,
+      state: profile.state,
+      city: profile.city,
+      postal_code: profile.postal_code,
       id_type: profile.id_type,
       id_tail: profile.id_tail,
       id_status: profile.id_status,
@@ -256,6 +349,79 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
         ? profile.id_reviewed_at.toISOString()
         : null,
     }
+  }
+
+  /**
+   * Save the personal profile portion of the ladder: the names exactly as they
+   * appear on the ID card, plus the residence address. When the required fields
+   * are filled and the phone is verified, the ladder reaches profile_completed
+   * — the level that unlocks seller + courier features.
+   */
+  async saveProfile(input: {
+    email?: string | null
+    phone?: string | null
+    userType?: "customer" | "seller" | null
+    userId?: string | null
+    first_name?: string | null
+    last_name?: string | null
+    other_name?: string | null
+    address?: string | null
+    country?: string | null
+    state?: string | null
+    city?: string | null
+    postal_code?: string | null
+  }): Promise<KycProfileView> {
+    const profile = await this.getOrCreateProfile({
+      email: input.email,
+      phone: input.phone,
+      userType: input.userType,
+      userId: input.userId,
+    })
+    await this.updateKycProfiles({
+      id: profile.id,
+      first_name: input.first_name?.trim() || null,
+      last_name: input.last_name?.trim() || null,
+      other_name: input.other_name?.trim() || null,
+      address: input.address?.trim() || null,
+      country: input.country?.trim() || null,
+      state: input.state?.trim() || null,
+      city: input.city?.trim() || null,
+      postal_code: input.postal_code?.trim() || null,
+    })
+    return (await this.getProfileView({
+      userType: input.userType,
+      userId: input.userId,
+      email: input.email,
+      phone: input.phone,
+    }))!
+  }
+
+  /**
+   * Gate a feature (selling, couriering) on a minimum ladder level. Resolves the
+   * actor's profile by user anchor or email/phone and throws a friendly error
+   * when the level isn't reached yet.
+   */
+  async assertLevel(input: {
+    email?: string | null
+    phone?: string | null
+    userType?: "customer" | "seller" | null
+    userId?: string | null
+    required: KycLevel
+  }): Promise<KycProfileView> {
+    const view = await this.getProfileView({
+      email: input.email,
+      phone: input.phone,
+      userType: input.userType,
+      userId: input.userId,
+    })
+    if (!view || KYC_LEVEL_ORDER[view.level] < KYC_LEVEL_ORDER[input.required]) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        this.unlockMessage(input.required),
+        "kyc_required"
+      )
+    }
+    return view
   }
 
   /**
@@ -450,15 +616,17 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
   }
 
   /**
-   * Gate check used by the courier offer route. Throws a friendly error when
-   * the gate is enabled and the courier is not at least phone-verified.
+   * Gate check used by the courier offer route. Couriering is a real role and
+   * is unlocked by the KYC ladder itself: the route enforces the current unlock
+   * level (profile_completed today, identity_verified once NIN is flipped on).
    */
   async assertCourierKyc(email: string): Promise<void> {
     const profile = await this.getProfileView({ email })
-    if (!profile || !profile.phone_verified) {
+    const required = this.requiredUnlockLevel()
+    if (!profile || KYC_LEVEL_ORDER[profile.level] < KYC_LEVEL_ORDER[required]) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Verify your phone number before making a delivery offer",
+        this.unlockMessage(required),
         "kyc_required"
       )
     }

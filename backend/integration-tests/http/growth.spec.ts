@@ -7,6 +7,7 @@ import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
 import MarketplaceModuleService from "../../src/modules/marketplace/service"
 import { GROWTH_MODULE } from "../../src/modules/growth"
 import GrowthModuleService from "../../src/modules/growth/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(120 * 1000)
 
@@ -78,6 +79,7 @@ medusaIntegrationTestRunner({
           email: "growth-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "growth-seller@howsu.local", "+2348012300001")
         const created = await api.post(
           "/sellers",
           {

@@ -7,6 +7,9 @@ import { KYC_MODULE } from "../../src/modules/kyc"
 import KycModuleService from "../../src/modules/kyc/service"
 import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
 import type MarketplaceModuleService from "../../src/modules/marketplace/service"
+import { DELIVERY_MODULE } from "../../src/modules/delivery"
+import type DeliveryModuleService from "../../src/modules/delivery/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(240 * 1000)
 
@@ -25,23 +28,16 @@ medusaIntegrationTestRunner({
     describe("KYC — progressive identity ladder (Phase 14)", () => {
       let kyc: KycModuleService
       let marketplace: MarketplaceModuleService
+      let delivery: DeliveryModuleService
       let query: any
       let token: string
       let sellerAuth: () => { headers: Record<string, string> }
       let storeHeaders: { headers: Record<string, string> }
 
-      const POST_JOB_BODY = {
-        packageDescription: "A box of handmade soaps",
-        packageWeight: "2kg",
-        pickupAddress: "12 Adeola Odeku St, Victoria Island, Lagos",
-        destinationAddress: "4 Allen Ave, Ikeja, Lagos",
-        destinationPhone: "08012345678",
-        postedPrice: 5000,
-      }
-
       beforeAll(async () => {
         kyc = getContainer().resolve(KYC_MODULE)
         marketplace = getContainer().resolve(MARKETPLACE_MODULE)
+        delivery = getContainer().resolve(DELIVERY_MODULE)
         query = getContainer().resolve(ContainerRegistrationKeys.QUERY)
 
         const apiKeyModule = getContainer().resolve(Modules.API_KEY)
@@ -54,6 +50,7 @@ medusaIntegrationTestRunner({
           email: "kyc-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "kyc-seller@howsu.local", "+2348012300015")
         await api.post(
           "/sellers",
           {
@@ -108,23 +105,30 @@ medusaIntegrationTestRunner({
         }
       }
 
+      // Seed an open delivery job straight through the delivery module: the
+      // route geocodes via live Nominatim, which isn't reachable offline. The
+      // KYC gate under test applies to courier offers, not job creation.
+      const createJob = async (orderId: string) => {
+        const job = await delivery.createDeliveryJobs({
+          order_id: orderId,
+          package_description: "A box of handmade soaps",
+          package_weight: "2kg",
+          pickup_address: "12 Adeola Odeku St, Victoria Island, Lagos",
+          destination_address: "4 Allen Ave, Ikeja, Lagos",
+          destination_phone: "08012345678",
+          posted_price: 5000,
+          status: "open",
+        })
+        return job.id
+      }
+
       // Couriers are real roles: account + phone KYC + approved application.
       let courierSeq = 0
       const makeCourier = async (email: string) => {
         courierSeq += 1
         const phone = `+2348${String(90000000 + courierSeq).padStart(8, "0")}`
         const customer = await createCustomer(email)
-        const requested = await api.post("/kyc/request", {
-          email,
-          channel: "phone",
-          destination: phone,
-        })
-        await api.post("/kyc/verify", {
-          email,
-          channel: "phone",
-          destination: phone,
-          code: requested.data.code,
-        })
+        await completeKycLadder(getContainer, email, phone)
         await api.post(
           "/store/couriers/apply",
           { city: "Lagos", vehicle: "motorcycle" },
@@ -258,13 +262,8 @@ medusaIntegrationTestRunner({
         expect(status.data.profile.id_tail).toEqual("6554")
       })
 
-      it("requires phone KYC before a courier can offer (always on)", async () => {
-        const job = await api.post(
-          "/store/delivery-jobs",
-          { ...POST_JOB_BODY, orderId: "order_kyc_gate" },
-          sellerAuth()
-        )
-        const jobId = job.data.job.id
+      it("requires the profile_completed KYC level before a courier can offer", async () => {
+        const jobId = await createJob("order_kyc_gate")
 
         // an account with no phone verification cannot offer
         const unverified = await createCustomer("unverified-kyc@howsu.local")
@@ -278,7 +277,31 @@ medusaIntegrationTestRunner({
           response: { status: 400, data: { code: "kyc_required" } },
         })
 
-        // phone-verified + approved courier can offer
+        // phone-verified but no profile is still below the unlock level
+        const phone = "+2348076543210"
+        const phoneOnly = await createCustomer("phone-only-kyc@howsu.local")
+        const requested = await api.post("/kyc/request", {
+          email: "phone-only-kyc@howsu.local",
+          channel: "phone",
+          destination: phone,
+        })
+        await api.post("/kyc/verify", {
+          email: "phone-only-kyc@howsu.local",
+          channel: "phone",
+          destination: phone,
+          code: requested.data.code,
+        })
+        await expect(
+          api.post(
+            `/store/delivery-jobs/${jobId}/offers`,
+            { offeredPrice: 4500 },
+            phoneOnly
+          )
+        ).rejects.toMatchObject({
+          response: { status: 400, data: { code: "kyc_required" } },
+        })
+
+        // full ladder (phone + profile) + approved courier can offer
         const courier = await makeCourier("courier-verify-kyc@howsu.local")
         const ok = await api.post(
           `/store/delivery-jobs/${jobId}/offers`,
@@ -289,16 +312,11 @@ medusaIntegrationTestRunner({
         expect(ok.data.offer.courier_email).toEqual("courier-verify-kyc@howsu.local")
       })
 
-      it("auto-activates courierhood at the phone-verified KYC level", async () => {
-        const job = await api.post(
-          "/store/delivery-jobs",
-          { ...POST_JOB_BODY, orderId: "order_kyc_auto" },
-          sellerAuth()
-        )
-        const jobId = job.data.job.id
+      it("auto-activates courierhood at the profile_completed KYC level", async () => {
+        const jobId = await createJob("order_kyc_auto")
 
-        // phone KYC completed, but NEVER applied to be a courier — the ladder
-        // level alone is the activation, there is no separate approval step
+        // phone KYC + profile completed, but NEVER applied to be a courier —
+        // the ladder level alone is the activation, there is no approval step
         const phone = "+2348088888888"
         const customer = await createCustomer("auto-activate@howsu.local")
         const requested = await api.post("/kyc/request", {
@@ -312,6 +330,23 @@ medusaIntegrationTestRunner({
           destination: phone,
           code: requested.data.code,
         })
+        // the profile step is authenticated on the user profile: filling it
+        // pushes the level to profile_completed, which unlocks courierhood
+        const profile = await api.post(
+          "/store/kyc/profile",
+          {
+            first_name: "Auto",
+            last_name: "Activate",
+            address: "1 Test Street",
+            country: "NG",
+            state: "Lagos",
+            city: "Ikeja",
+          },
+          customer
+        )
+        expect(profile.status).toEqual(200)
+        expect(profile.data.profile.level).toEqual("profile_completed")
+        expect(profile.data.profile.country).toEqual("NG")
 
         const ok = await api.post(
           `/store/delivery-jobs/${jobId}/offers`,
@@ -329,19 +364,14 @@ medusaIntegrationTestRunner({
       })
 
       it("surfaces the seller's KYC level on /sellers/me", async () => {
-        // the runner restores the DB before every test, so build the profile
-        // (and its level) within this test
-        await api.post("/kyc/request", {
-          email: "kyc-seller@howsu.local",
-          channel: "phone",
-          destination: "+2348011122233",
-        })
-
+        // the seller completed the profile ladder in beforeAll, so the
+        // profile_completed level is what the seller surface reports
         const res = await api.get("/sellers/me", sellerAuth())
         expect(res.status).toEqual(200)
         expect(res.data.kyc).not.toBeNull()
         expect(res.data.kyc.email).toEqual("kyc-seller@howsu.local")
-        expect(res.data.kyc.level).toEqual("unverified")
+        expect(res.data.kyc.level).toEqual("profile_completed")
+        expect(res.data.kyc.phone_verified).toBe(true)
       })
 
       it("anchors KYC to the user profile, not just a contact string", async () => {

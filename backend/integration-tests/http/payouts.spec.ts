@@ -11,6 +11,7 @@ import { reconcilePayout } from "../../src/lib/payments/payouts/reconcile"
 import { getCryptoSettlement } from "../../src/lib/payments/crypto"
 import { MARKETPLACE_MODULE } from "../../src/modules/marketplace"
 import MarketplaceModuleService from "../../src/modules/marketplace/service"
+import { completeKycLadder } from "./helpers/complete-kyc"
 import {
   PAYSTACK_ID,
   FLUTTERWAVE_ID,
@@ -180,6 +181,7 @@ medusaIntegrationTestRunner({
           email: "payout-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "payout-seller@howsu.local", "+2348012300008")
         const created = await api.post(
           "/sellers",
           {

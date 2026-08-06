@@ -8,6 +8,7 @@ import MarketplaceModuleService from "../../src/modules/marketplace/service"
 import { REDEEMABLES_MODULE } from "../../src/modules/redeemables"
 import RedeemablesModuleService from "../../src/modules/redeemables/service"
 import redeemablesOrderPlacedHandler from "../../src/subscribers/redeemables-order-placed"
+import { completeKycLadder } from "./helpers/complete-kyc"
 
 jest.setTimeout(120 * 1000)
 
@@ -73,6 +74,7 @@ medusaIntegrationTestRunner({
           email: "redeemables-seller@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "redeemables-seller@howsu.local", "+2348012300009")
         const created = await api.post(
           "/sellers",
           {
@@ -350,6 +352,7 @@ medusaIntegrationTestRunner({
           email: "redeemables-intruder@howsu.local",
           password: "supersecret",
         })
+        await completeKycLadder(getContainer, "redeemables-intruder@howsu.local", "+2348012300010")
         await api.post(
           "/sellers",
           {
