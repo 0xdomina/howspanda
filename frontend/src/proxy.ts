@@ -15,7 +15,7 @@ async function getRegionMap(cacheId: string) {
 
   if (!BACKEND_URL) {
     throw new Error(
-      "proxy.ts: Error fetching regions. Did you set up regions in your Medusa Admin and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
+      "proxy.ts: Error fetching regions. Did you set up regions in the How's u backend and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
     )
   }
 
@@ -45,7 +45,7 @@ async function getRegionMap(cacheId: string) {
 
     if (!regions?.length) {
       throw new Error(
-        "No regions found. Please set up regions in your Medusa Admin."
+        "No regions found. Please set up regions in your How's u backend."
       )
     }
 
@@ -94,7 +94,7 @@ async function getCountryCode(
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error(
-        "proxy.ts: Error getting the country code. Did you set up regions in your Medusa Admin and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
+        "proxy.ts: Error getting the country code. Did you set up regions in the How's u backend and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
       )
     }
   }
@@ -150,7 +150,7 @@ export async function proxy(request: NextRequest) {
   } else if (!urlHasCountryCode && !countryCode) {
     // Handle case where no valid country code exists (empty regions)
     return new NextResponse(
-      "No valid regions configured. Please set up regions with countries in your Medusa Admin.",
+      "No valid regions configured. Please set up regions with countries in your How's u backend.",
       { status: 500 }
     )
   }
