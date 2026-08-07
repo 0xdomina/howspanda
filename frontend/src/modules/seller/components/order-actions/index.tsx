@@ -1,6 +1,7 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 
 import { markOrderDelivered, confirmReturnReceived } from "@lib/data/seller"
 
@@ -28,11 +29,26 @@ function escrowSummary(escrow: any): string {
 
 const OrderActions = ({ order }: { order: any }) => {
   const [isPending, startTransition] = useTransition()
+  const [message, setMessage] = useState<string | null>(null)
+  const router = useRouter()
   const escrow = order.escrow
   const canMarkDelivered =
     escrow?.status === "pending" && !escrow.delivered_at && !escrow.held_at
   const canConfirmReturn =
     escrow?.status === "pending" && escrow.held_at && !escrow.delivered_at
+
+  const run = (action: () => Promise<string | null>, successText: string) => {
+    setMessage(null)
+    startTransition(async () => {
+      const error = await action()
+      if (error) {
+        setMessage(error)
+      } else {
+        setMessage(successText)
+        router.refresh()
+      }
+    })
+  }
 
   return (
     <div className="text-right">
@@ -43,15 +59,14 @@ const OrderActions = ({ order }: { order: any }) => {
         }).format(Number(escrow?.net_amount ?? order.total ?? 0))}
       </p>
       <p className="mt-1 text-xs text-ink-muted">{escrowSummary(escrow)}</p>
+      {message && (
+        <p className="mt-2 text-xs text-rose-600">{message}</p>
+      )}
       {canMarkDelivered && (
         <button
           type="button"
           disabled={isPending}
-          onClick={() =>
-            startTransition(async () => {
-              await markOrderDelivered(order.id)
-            })
-          }
+          onClick={() => run(() => markOrderDelivered(order.id), "Marked as delivered.")}
           className="mt-2 rounded-medium border border-ink-strong px-3 py-1.5 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
         >
           {isPending ? "Marking…" : "Mark delivered"}
@@ -61,11 +76,7 @@ const OrderActions = ({ order }: { order: any }) => {
         <button
           type="button"
           disabled={isPending}
-          onClick={() =>
-            startTransition(async () => {
-              await confirmReturnReceived(order.id)
-            })
-          }
+          onClick={() => run(() => confirmReturnReceived(order.id), "Return confirmed.")}
           className="mt-2 rounded-medium border border-ink-strong px-3 py-1.5 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
         >
           {isPending ? "Confirming…" : "Return received"}

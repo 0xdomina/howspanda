@@ -68,7 +68,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                     className="flex flex-col h-full bg-paper-surface rounded-rounded shadow-modal justify-between p-6 border border-ink-hairline"
                   >
                     <div className="flex justify-end" id="xmark">
-                      <button data-testid="close-menu-button" onClick={close}>
+                      <button data-testid="close-menu-button" onClick={close} aria-label="Close menu">
                         <XMark />
                       </button>
                     </div>

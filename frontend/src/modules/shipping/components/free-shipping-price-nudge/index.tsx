@@ -211,6 +211,7 @@ function FreeShippingPopup({
       <div>
         <Button
           className="rounded-full bg-neutral-900 shadow-none outline-none border-none text-[15px] p-2"
+          aria-label="Dismiss free shipping notice"
           onClick={() => setIsClosed(true)}
         >
           <XMark />

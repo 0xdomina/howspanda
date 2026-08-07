@@ -8,7 +8,7 @@ import {
   listPayoutAccounts,
   listSellerPayouts,
 } from "@lib/data/seller"
-import { getPaymentRails } from "@lib/data/payment-rails"
+import { getEnabledRailKeys, getPaymentRails } from "@lib/data/payment-rails"
 import SellerMoneyClient from "@modules/seller/templates/seller-money"
 
 export const metadata: Metadata = {
@@ -29,7 +29,8 @@ export default async function SellerMoneyPage() {
   }
 
   // Only surface payout rails that are toggled ON (admin-runtime switch).
-  const enabledRails = rails.filter((r) => r.enabled).map((r) => r.key)
+  // An empty rails list (fetch failure) keeps every rail available.
+  const enabledRails = getEnabledRailKeys(rails)
 
   return (
     <SellerMoneyClient

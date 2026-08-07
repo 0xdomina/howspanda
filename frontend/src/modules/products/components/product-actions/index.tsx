@@ -43,6 +43,7 @@ export default function ProductActions({
         : {}
   )
   const [isAdding, setIsAdding] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const countryCode = useParams().countryCode as string
 
   const [prevProductId, setPrevProductId] = useState(product.id)
@@ -133,15 +134,20 @@ export default function ProductActions({
   const handleAddToCart = async () => {
     if (!selectedVariant?.id) return null
 
+    setAddError(null)
     setIsAdding(true)
 
-    await addToCart({
-      variantId: selectedVariant.id,
-      quantity: 1,
-      countryCode,
-    })
-
-    setIsAdding(false)
+    try {
+      await addToCart({
+        variantId: selectedVariant.id,
+        quantity: 1,
+        countryCode,
+      })
+    } catch (error: any) {
+      setAddError(error?.message ?? "Could not add to cart. Please try again.")
+    } finally {
+      setIsAdding(false)
+    }
   }
 
   return (
@@ -170,6 +176,12 @@ export default function ProductActions({
         </div>
 
         <ProductPrice product={product} variant={selectedVariant} />
+
+        {addError && (
+          <p className="text-sm text-rose-600" data-testid="add-product-error">
+            {addError}
+          </p>
+        )}
 
         <Button
           onClick={handleAddToCart}

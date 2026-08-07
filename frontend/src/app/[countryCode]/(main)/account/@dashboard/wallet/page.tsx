@@ -1,7 +1,7 @@
 import { Metadata } from "next"
 
 import { retrieveCustomer } from "@lib/data/customer"
-import { getPaymentRails } from "@lib/data/payment-rails"
+import { getEnabledRailKeys, getPaymentRails } from "@lib/data/payment-rails"
 import { notFound } from "next/navigation"
 
 import WalletClient from "@modules/account/components/wallet"
@@ -34,7 +34,8 @@ export default async function WalletPage() {
   ])
 
   // Only surface withdrawal rails that are toggled ON (admin-runtime switch).
-  const enabledRails = rails.filter((r) => r.enabled).map((r) => r.key)
+  // An empty rails list (fetch failure) keeps every rail available.
+  const enabledRails = getEnabledRailKeys(rails)
 
   return (
     <div className="space-y-6">

@@ -51,7 +51,7 @@ const TrustScoreCard = async () => {
           </p>
           {trust.review_count > 0 && (
             <p className="mt-1 text-xs text-ink-muted">
-              {trust.avg_rating.toFixed(1)}★ from {trust.review_count} review
+              {trust.avg_rating != null ? `${trust.avg_rating.toFixed(1)}★` : ""} from {trust.review_count} review
               {trust.review_count === 1 ? "" : "s"}
             </p>
           )}
@@ -122,22 +122,41 @@ export default async function SellerDashboardPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
-          <h3 className="font-display text-xl font-medium text-ink mb-2">
-            Add your first product
-          </h3>
-          <p className="text-sm text-ink-muted mb-4">
-            List what you make with a photo and price. It appears in your store
-            right away.
-          </p>
-          <Button asChild>
-            <LocalizedClientLink href="/seller/products/new">
-              Add a product
-            </LocalizedClientLink>
-          </Button>
+      {products.length === 0 && (
+        <div className="flex flex-col gap-4">
+          <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+            <h3 className="font-display text-xl font-medium text-ink mb-2">
+              Add your first product
+            </h3>
+            <p className="text-sm text-ink-muted mb-4">
+              List what you make with a photo and price. It appears in your store
+              right away.
+            </p>
+            <Button asChild>
+              <LocalizedClientLink href="/seller/products/new">
+                Add a product
+              </LocalizedClientLink>
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
+      {products.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+            <h3 className="font-display text-xl font-medium text-ink mb-2">
+              Next steps
+            </h3>
+            <p className="text-sm text-ink-muted mb-4">
+              Deliver orders quickly and reply to reviews to grow your trust score.
+            </p>
+            <Button asChild>
+              <LocalizedClientLink href="/seller/products/new">
+                Add another product
+              </LocalizedClientLink>
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
