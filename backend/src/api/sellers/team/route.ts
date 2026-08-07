@@ -171,7 +171,7 @@ export const POST = async (
         filters: { id: context.sellerId },
       })
       const storeName = sellerRows?.[0]?.name ?? "your store"
-      await sendTeamInviteEmail({ to: email, storeName })
+      await sendTeamInviteEmail(req.scope, { to: email, storeName })
     } catch {
       // Best-effort only — the invite itself has already succeeded.
     }

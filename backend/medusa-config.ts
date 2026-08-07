@@ -111,6 +111,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/user-wallet",
     },
     {
+      resolve: "./src/modules/notifications",
+    },
+    {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
         redisUrl: process.env.REDIS_URL,
