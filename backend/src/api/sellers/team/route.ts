@@ -12,6 +12,7 @@ import { z } from "@medusajs/framework/zod"
 import MarketplaceModuleService from "../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import { resolveSellerContext } from "../../../lib/sellers/resolve-seller"
+import { sendTeamInviteEmail } from "../../../lib/notifications/send-team-invite"
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
@@ -160,6 +161,21 @@ export const POST = async (
     id: identity.id,
     app_metadata: appMetadata,
   })
+
+  // Fire-and-forget invite email. A mail failure must never undo the invite.
+  await (async () => {
+    try {
+      const { data: sellerRows } = await query.graph({
+        entity: "seller",
+        fields: ["name"],
+        filters: { id: context.sellerId },
+      })
+      const storeName = sellerRows?.[0]?.name ?? "your store"
+      await sendTeamInviteEmail({ to: email, storeName })
+    } catch {
+      // Best-effort only — the invite itself has already succeeded.
+    }
+  })()
 
   res.json({
     team_member: {

@@ -32,7 +32,7 @@ const AddMemberForm = ({ onDone }: { onDone: () => void }) => {
         last_name: last_name.trim() || undefined,
       })
       if (res.success) {
-        setMessage({ ok: true, text: `${cleanEmail} can now sign in and manage the store.` })
+        setMessage({ ok: true, text: `${cleanEmail} is now on the team and will get an invite email.` })
         setFirstName("")
         setLastName("")
         setEmail("")
