@@ -55,7 +55,7 @@ describe("Payouts — Paystack Transfers client (mock)", () => {
 
   it("initiates a transfer and verifies pending → success", async () => {
     const transfer = await initiateTransfer({
-      amount_major: 10_000,
+      amount: 10_000,
       recipient_code: "RCP_mock_0123456789",
       reference: "po_spec_ok",
     })

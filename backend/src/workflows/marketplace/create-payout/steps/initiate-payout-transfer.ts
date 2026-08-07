@@ -38,7 +38,7 @@ const initiatePayoutTransferStep = createStep(
         )
       }
       const transfer = await initiateTransfer({
-        amount_major: input.amount,
+        amount: input.amount,
         recipient_code: input.destination.recipient_code,
         reference: input.payout_id,
         reason: "How's u seller payout",
@@ -55,7 +55,8 @@ const initiatePayoutTransferStep = createStep(
       const withdrawal = await settlement.createWithdrawal({
         reference: input.payout_id,
         address: input.destination.address,
-        usdc_amount: quoteUsdc(input.amount),
+        // Payout amounts are kobo (minor unit); quoteUsdc expects naira.
+        usdc_amount: quoteUsdc(input.amount / 100),
       })
       providerReference = withdrawal.reference
     }

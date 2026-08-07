@@ -26,7 +26,14 @@ export async function sendOtp(input: {
 
   switch (channel) {
     case "mock":
-      // Dev/staging only: hand the code straight back.
+      // Dev/staging only: hand the code straight back. Refusing in production
+      // prevents a misconfigured deployment from echoing OTPs to callers.
+      if (process.env.NODE_ENV === "production") {
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          "Mock OTP channel is not allowed in production"
+        )
+      }
       return input.code
     case "email":
       return sendEmail(input.destination, input.code)

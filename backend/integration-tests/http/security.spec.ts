@@ -65,5 +65,74 @@ medusaIntegrationTestRunner({
         expect(res.status).toEqual(201)
       })
     })
+
+    describe("Security — auth-otp password reset (account-takeover guard)", () => {
+      it("rejects a reset with an arbitrary code when no OTP was issued", async () => {
+        const victim = `victim-${Date.now()}@howsu.local`
+        await api.post("/auth/seller/emailpass/register", {
+          email: victim,
+          password: "oldpassword1",
+        })
+
+        const res = await api
+          .post("/auth/otp/reset", {
+            email: victim,
+            code: "000000",
+            newPassword: "hackedpassword1",
+          })
+          .catch((e) => e.response)
+        // No active OTP exists for this email → the reset must fail.
+        expect(res.status).toBeGreaterThanOrEqual(400)
+        expect(res.status).toBeLessThan(500)
+
+        // The old credentials still work: the account was not taken over.
+        const login = await api.post("/auth/seller/emailpass", {
+          email: victim,
+          password: "oldpassword1",
+        })
+        expect(login.status).toEqual(200)
+      })
+
+      it("resets the password only with the code actually issued to the email", async () => {
+        const user = `legit-${Date.now()}@howsu.local`
+        await api.post("/auth/seller/emailpass/register", {
+          email: user,
+          password: "oldpassword1",
+        })
+
+        const requested = await api.post("/auth/otp/request", {
+          email: user,
+          purpose: "reset",
+        })
+        expect(requested.status).toEqual(201)
+        const code = requested.data.code
+        expect(code).toMatch(/^\d{6}$/)
+
+        // A different code (not issued) must fail, even with a valid password.
+        const wrongCode = code === "111111" ? "222222" : "111111"
+        const wrong = await api
+          .post("/auth/otp/reset", {
+            email: user,
+            code: wrongCode,
+            newPassword: "newpassword1",
+          })
+          .catch((e) => e.response)
+        expect(wrong.status).toBeGreaterThanOrEqual(400)
+
+        // The issued code succeeds.
+        const ok = await api.post("/auth/otp/reset", {
+          email: user,
+          code,
+          newPassword: "newpassword1",
+        })
+        expect(ok.status).toEqual(200)
+
+        const login = await api.post("/auth/seller/emailpass", {
+          email: user,
+          password: "newpassword1",
+        })
+        expect(login.status).toEqual(200)
+      })
+    })
   },
 })

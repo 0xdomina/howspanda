@@ -9,6 +9,14 @@ import type MarketplaceModuleService from "../../../../../modules/marketplace/se
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
 import { assertOrderEmail } from "../../../../../lib/escrow/order-access"
 
+// A cash tip is booked as an immediately-withdrawable `available` commission
+// line for the seller, so it MUST be treated as money-in: only a signed-in
+// buyer (route middleware enforces this) who owns the order may tip, the
+// amount is bounded, and each order can be tipped once. Without these guards
+// anyone with an order id + email could mint unlimited withdrawable balance.
+const TIP_MIN_NGN = 100
+const TIP_MAX_NGN = 50000
+
 // Buyer → seller cash gratuity. Guests prove ownership with order id + email;
 // authenticated customers are additionally bound to the order email (Phase 6
 // gate, hardened in order-access). Settlement is written here into the
@@ -22,6 +30,26 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
   const orderId = req.params.id
   const access = await assertOrderEmail(req.scope, orderId, email, req)
+
+  if (!(Number.isFinite(amount) && amount >= TIP_MIN_NGN && amount <= TIP_MAX_NGN)) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `Tip amount must be between ${TIP_MIN_NGN} and ${TIP_MAX_NGN}`
+    )
+  }
+
+  const tipping: TippingModuleService = req.scope.resolve(TIPPING_MODULE)
+  const [prior] = await tipping.listTips({
+    order_id: orderId,
+    buyer_email: access.email,
+    direction: "to_seller",
+  })
+  if (prior) {
+    throw new MedusaError(
+      MedusaError.Types.CONFLICT,
+      "This order has already been tipped — one tip per order"
+    )
+  }
 
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
@@ -57,7 +85,6 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     },
   ])
 
-  const tipping: TippingModuleService = req.scope.resolve(TIPPING_MODULE)
   const tip = await tipping.createTip({
     direction: "to_seller",
     orderId,

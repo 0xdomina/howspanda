@@ -29,6 +29,7 @@ medusaIntegrationTestRunner({
       let token: string
       let sellerId: string
       let storeHeaders: { headers: Record<string, string> }
+      let buyerAuth: () => { headers: Record<string, string> }
 
       const auth = () => ({ headers: { Authorization: `Bearer ${token}` } })
 
@@ -108,6 +109,33 @@ medusaIntegrationTestRunner({
         ])
         storeHeaders = { headers: { "x-publishable-api-key": pubKey.token } }
 
+        // Cash tips are auth-gated: register the order's buyer as a real
+        // customer so the tip route's signed-in path is exercised.
+        const reg = await api.post("/auth/customer/emailpass/register", {
+          email: "buyer@howsu.local",
+          password: "supersecret",
+        })
+        await api.post(
+          "/store/customers",
+          { email: "buyer@howsu.local" },
+          {
+            headers: {
+              Authorization: `Bearer ${reg.data.token}`,
+              ...storeHeaders.headers,
+            },
+          }
+        )
+        const buyerLogin = await api.post("/auth/customer/emailpass", {
+          email: "buyer@howsu.local",
+          password: "supersecret",
+        })
+        buyerAuth = () => ({
+          headers: {
+            Authorization: `Bearer ${buyerLogin.data.token}`,
+            ...storeHeaders.headers,
+          },
+        })
+
         await dbUtils.snapshot()
       })
 
@@ -118,7 +146,7 @@ medusaIntegrationTestRunner({
         const res = await api.post(
           `/store/orders/${order.id}/tip`,
           { email: "buyer@howsu.local", amount: 2500, note: "great service!" },
-          storeHeaders
+          buyerAuth()
         )
         expect(res.status).toEqual(200)
         expect(res.data.tip.direction).toEqual("to_seller")
@@ -135,7 +163,7 @@ medusaIntegrationTestRunner({
           api.post(
             `/store/orders/${order.id}/tip`,
             { email: "someone-else@howsu.local", amount: 500 },
-            storeHeaders
+            buyerAuth()
           )
         ).rejects.toMatchObject({ response: { status: 404 } })
       })
@@ -146,9 +174,48 @@ medusaIntegrationTestRunner({
           api.post(
             `/store/orders/${order.id}/tip`,
             { email: "buyer@howsu.local", amount: 0 },
-            storeHeaders
+            buyerAuth()
           )
         ).rejects.toMatchObject({ response: { status: 400 } })
+      })
+
+      it("rejects an unauthenticated buyer tip (401)", async () => {
+        const order = await seedOrder()
+        await expect(
+          api.post(
+            `/store/orders/${order.id}/tip`,
+            { email: "buyer@howsu.local", amount: 500 },
+            storeHeaders
+          )
+        ).rejects.toMatchObject({ response: { status: 401 } })
+      })
+
+      it("rejects a tip above the cap (400)", async () => {
+        const order = await seedOrder()
+        await expect(
+          api.post(
+            `/store/orders/${order.id}/tip`,
+            { email: "buyer@howsu.local", amount: 999999 },
+            buyerAuth()
+          )
+        ).rejects.toMatchObject({ response: { status: 400 } })
+      })
+
+      it("allows only one cash tip per order (409 on replay)", async () => {
+        const order = await seedOrder()
+        const first = await api.post(
+          `/store/orders/${order.id}/tip`,
+          { email: "buyer@howsu.local", amount: 500 },
+          buyerAuth()
+        )
+        expect(first.status).toEqual(200)
+        await expect(
+          api.post(
+            `/store/orders/${order.id}/tip`,
+            { email: "buyer@howsu.local", amount: 500 },
+            buyerAuth()
+          )
+        ).rejects.toMatchObject({ response: { status: 409 } })
       })
 
       it("seller→buyer cash tip deducts from available and issues a buyer credit note", async () => {
@@ -157,7 +224,7 @@ medusaIntegrationTestRunner({
         await api.post(
           `/store/orders/${order.id}/tip`,
           { email: "buyer@howsu.local", amount: 10000 },
-          storeHeaders
+          buyerAuth()
         )
         const before = await availableNgn()
 
@@ -205,7 +272,7 @@ medusaIntegrationTestRunner({
         await api.post(
           `/store/orders/${order.id}/tip`,
           { email: "buyer@howsu.local", amount: 1500 },
-          storeHeaders
+          buyerAuth()
         )
         await api.post(
           "/sellers/tips",

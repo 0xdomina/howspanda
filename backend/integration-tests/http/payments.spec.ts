@@ -152,8 +152,8 @@ describe("Payments — crypto USDC provider (mock)", () => {
     expect(data.address).toContain("mock-base-")
     // per-intent wallet (correlation fix) — no longer a shared network wallet
     expect(data.wallet_id).toEqual(`mock-wallet-${data.reference}`)
-    // ₦17,500 ÷ ₦1,600 = 10.9375 → "10.94"
-    expect(data.usdc_amount).toEqual("10.94")
+    // ₦175 = 17,500 kobo ÷ (₦1,600 × 100) = 0.109375 → "0.11"
+    expect(data.usdc_amount).toEqual("0.11")
   })
 
   it("authorizes pending → authorized as on-chain settlement confirms", async () => {

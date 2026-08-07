@@ -7,9 +7,10 @@ import { PostAuthOtpRequestSchema } from "../../../middlewares"
 type Body = z.infer<typeof PostAuthOtpRequestSchema>
 
 // Request a one-time code for a credential flow (signup verification or
-// forgot-password reset). In dev/staging (mock channel + verification enabled)
-// the raw code is returned so local flows can complete; otherwise the send
-// seam is a no-op and verification accepts any non-empty code.
+// forgot-password reset). The raw code is returned only outside production so
+// dev/staging flows can complete; in production it is delivered via the send
+// seam (email/WhatsApp) and never echoed in the response. Verification always
+// enforces the stored hash — there is no accept-any-code bypass.
 export const POST = async (
   req: MedusaRequest<Body>,
   res: MedusaResponse

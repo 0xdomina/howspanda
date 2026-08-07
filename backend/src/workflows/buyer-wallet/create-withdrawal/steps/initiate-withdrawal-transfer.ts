@@ -39,7 +39,8 @@ const initiateWithdrawalTransferStep = createStep(
         )
       }
       const transfer = await initiateTransfer({
-        amount_major: input.amount,
+        // Buyer-wallet amounts are naira (major unit); Paystack wants kobo.
+        amount: Math.round(input.amount * 100),
         recipient_code: input.destination.recipient_code,
         reference: input.withdrawal_id,
         reason: "How's u buyer wallet withdrawal",

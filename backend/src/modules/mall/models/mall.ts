@@ -2,6 +2,7 @@ import { model } from "@medusajs/framework/utils"
 import MallSeller from "./mall-seller"
 import MallBuyer from "./mall-buyer"
 import MallPrize from "./mall-prize"
+import MallPurchase from "./mall-purchase"
 
 // A digital mall — a gamified, time-boxed marketplace event.
 //
@@ -49,6 +50,9 @@ const Mall = model.define("mkt_mall", {
     mappedBy: "mall",
   }),
   prizes: model.hasMany(() => MallPrize, {
+    mappedBy: "mall",
+  }),
+  purchases: model.hasMany(() => MallPurchase, {
     mappedBy: "mall",
   }),
 })

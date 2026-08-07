@@ -108,8 +108,9 @@ class FlutterwaveProviderService extends AbstractPaymentProvider<FlutterwaveOpti
       `${FLUTTERWAVE_API_BASE}/payments`,
       {
         tx_ref: txRef,
-        // Flutterwave expects the major unit (NGN, not kobo)
-        amount,
+        // Flutterwave expects the major unit (NGN), while Medusa passes the
+        // minor unit (kobo) — convert once here.
+        amount: Math.round(amount / 100),
         currency: currencyCode.toUpperCase(),
         redirect_url: "https://mock.pay/flutterwave/redirect",
         customer: {
@@ -239,7 +240,8 @@ class FlutterwaveProviderService extends AbstractPaymentProvider<FlutterwaveOpti
 
     const response = await postJson(
       `${FLUTTERWAVE_API_BASE}/transactions/${transactionId}/refund`,
-      { amount },
+      // Flutterwave refund amounts are major units (NGN) — convert from kobo.
+      { amount: Math.round(amount / 100) },
       this.authHeaders()
     )
 
@@ -322,8 +324,9 @@ class FlutterwaveProviderService extends AbstractPaymentProvider<FlutterwaveOpti
     const event = String(data.event ?? "")
     const tx = (data.data ?? {}) as Record<string, any>
     const sessionId = tx.meta?.session_id ?? tx.tx_ref ?? ""
-    // Flutterwave webhook amounts are already in major units.
-    const amount = Number(tx.amount ?? 0)
+    // Flutterwave webhook amounts are major units (NGN) — normalize to the
+    // minor unit (kobo) the session uses.
+    const amount = Math.round(Number(tx.amount ?? 0) * 100)
 
     if (event === "charge.completed" && tx.status === "successful") {
       return {

@@ -12,7 +12,8 @@ const money = (amount: number | string, currency: string) =>
   new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency: currency.toUpperCase(),
-  }).format(Number(amount ?? 0))
+    // Backend amounts are minor units (kobo) — divide to major for display.
+  }).format(Number(amount ?? 0) / 100)
 
 const AddBankForm = ({ onDone }: { onDone: () => void }) => {
   const [accountName, setAccountName] = useState("")

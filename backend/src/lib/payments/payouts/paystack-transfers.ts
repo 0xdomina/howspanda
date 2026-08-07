@@ -101,7 +101,7 @@ export async function createRecipient(input: {
 }
 
 export async function initiateTransfer(input: {
-  amount_major: number
+  amount: number
   recipient_code: string
   reference: string
   reason?: string
@@ -120,8 +120,9 @@ export async function initiateTransfer(input: {
     `${PAYSTACK_API_BASE}/transfer`,
     {
       source: "balance",
-      // Paystack expects the minor unit (kobo for NGN = NGN * 100)
-      amount: Math.round(input.amount_major * 100),
+      // Paystack Transfers expects the minor unit (kobo). Callers already pass
+      // kobo (the sum of `net_amount` commission lines) — do NOT scale again.
+      amount: Math.round(input.amount),
       recipient: input.recipient_code,
       reference: input.reference,
       reason: input.reason ?? "How's u seller payout",

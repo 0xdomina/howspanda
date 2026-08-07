@@ -46,11 +46,24 @@ class BuyerWalletModuleService extends MedusaService({
     if (existing) {
       return existing
     }
-    return await this.createWallets({
-      buyer_email: email,
-      currency_code: currencyCode,
-      balance: 0,
-    })
+    try {
+      return await this.createWallets({
+        buyer_email: email,
+        currency_code: currencyCode,
+        balance: 0,
+      })
+    } catch {
+      // Concurrent first-credit: the buyer_email unique index rejected the
+      // second create. Re-read — the other request won the race.
+      const [winner] = await this.listWallets({ buyer_email: email })
+      if (!winner) {
+        throw new MedusaError(
+          MedusaError.Types.UNEXPECTED_STATE,
+          "Failed to create buyer wallet"
+        )
+      }
+      return winner
+    }
   }
 
   /** Read the current balance (0 if the buyer has no wallet yet). */
@@ -90,7 +103,9 @@ class BuyerWalletModuleService extends MedusaService({
 
   /**
    * Debit a buyer (e.g. a future withdrawal). Refuses to overdraw — the balance
-   * can never go negative through this API.
+   * can never go negative through this API. The debit is a single atomic
+   * conditional UPDATE on the balance, so two concurrent withdrawals can never
+   * both pass a read-then-write check and overdraw.
    */
   async debit(input: CreditInput) {
     if (!(Number.isFinite(input.amount) && input.amount > 0)) {
@@ -100,14 +115,36 @@ class BuyerWalletModuleService extends MedusaService({
       )
     }
     const email = input.buyerEmail.trim().toLowerCase()
+    const amount = round2(input.amount)
+
     const [wallet] = await this.listWallets({ buyer_email: email })
-    if (!wallet || Number(wallet.balance) < input.amount - 0.001) {
+    if (!wallet) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "Insufficient buyer wallet balance"
       )
     }
-    const amount = round2(input.amount)
+
+    const manager = (this as any).baseRepository_.getActiveManager() as {
+      execute: (
+        sql: string,
+        params?: Array<string | number>
+      ) => Promise<Array<Record<string, unknown>>>
+    }
+    const updated = await manager.execute(
+      `UPDATE buyer_wallet
+       SET balance = balance - ?, updated_at = now()
+       WHERE id = ? AND balance >= ?
+       RETURNING id`,
+      [amount, wallet.id, amount]
+    )
+    if (!updated.length) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Insufficient buyer wallet balance"
+      )
+    }
+
     const [ledger] = await this.createWalletLedgers([
       {
         wallet: wallet.id,
@@ -116,10 +153,8 @@ class BuyerWalletModuleService extends MedusaService({
         reference: input.reference ?? null,
       },
     ])
-    const [updated] = await this.updateWallets([
-      { id: wallet.id, balance: round2(Number(wallet.balance) - amount) },
-    ])
-    return { wallet: updated, ledger }
+    const [fresh] = await this.listWallets({ id: wallet.id })
+    return { wallet: fresh, ledger }
   }
 
   /** Append-only history for a buyer (newest first). */

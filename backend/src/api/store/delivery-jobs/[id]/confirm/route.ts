@@ -6,14 +6,10 @@ import { BUYER_WALLET_MODULE } from "../../../../../modules/buyer-wallet"
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const { id } = req.params as { id: string }
-  const body = req.validatedBody as { recipientEmail?: string; courierEmail?: string }
+  const body = req.validatedBody as { recipientEmail?: string }
 
   const deliveryService = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)
-  const result = await deliveryService.confirmDelivery(
-    id,
-    body?.recipientEmail || "",
-    body?.courierEmail
-  )
+  const result = await deliveryService.confirmDelivery(id, body?.recipientEmail || "")
 
   // Release the agreed price to the courier's buyer wallet (source
   // `delivery_payout`). The courier wallet is credited lazily on first payout.

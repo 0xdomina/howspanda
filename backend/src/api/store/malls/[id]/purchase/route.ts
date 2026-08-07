@@ -1,15 +1,28 @@
-import { MedusaError, ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import {
+  MedusaError,
+  ContainerRegistrationKeys,
+} from "@medusajs/framework/utils"
+import {
+  AuthenticatedMedusaRequest,
+  MedusaResponse,
+} from "@medusajs/framework/http"
 import MallModuleService from "../../../../../modules/mall/service"
 import BuyerWalletModuleService from "../../../../../modules/buyer-wallet/service"
 import { MALL_MODULE } from "../../../../../modules/mall"
 import { BUYER_WALLET_MODULE } from "../../../../../modules/buyer-wallet"
+import { resolveActorEmail } from "../../../../../lib/accounts/resolve-actor-email"
 
-export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
+export const POST = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) => {
   const { id } = req.params as { id: string }
-  const body = req.validatedBody as { buyerEmail: string; orderId: string }
+  const body = req.validatedBody as { buyerEmail?: string; orderId: string }
 
-  if (!body?.buyerEmail || !body?.orderId) {
+  // Signed-in buyers act as themselves (actor-derived email); guests use the
+  // order-matching email ownership flow.
+  let buyerEmail = body?.buyerEmail?.trim()
+  if (req.auth_context?.actor_id) {
+    buyerEmail = await resolveActorEmail(req)
+  }
+  if (!buyerEmail || !body?.orderId) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       "buyerEmail and orderId are required"
@@ -27,7 +40,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   })
   if (
     !order ||
-    (order.email ?? "").toLowerCase() !== body.buyerEmail.trim().toLowerCase()
+    (order.email ?? "").toLowerCase() !== buyerEmail.toLowerCase()
   ) {
     throw new MedusaError(
       MedusaError.Types.NOT_FOUND,
@@ -38,7 +51,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const mallService = req.scope.resolve<MallModuleService>(MALL_MODULE)
   const result = await mallService.recordPurchase({
     mallId: id,
-    buyerEmail: body.buyerEmail,
+    buyerEmail,
     orderId: body.orderId,
   })
 
@@ -46,14 +59,14 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   if (result?.won) {
     const buyerWalletService = req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
     const { ledger } = await buyerWalletService.credit({
-      buyerEmail: body.buyerEmail,
+      buyerEmail,
       amount: result.prizeAmount,
       source: "mall_prize",
       reference: body.orderId,
     })
     const prizes = await mallService.listMallPrizes({
       mall_id: id,
-      winner_buyer_email: body.buyerEmail,
+      winner_buyer_email: buyerEmail,
     })
     if (prizes.length) {
       await mallService.updateMallPrizes({

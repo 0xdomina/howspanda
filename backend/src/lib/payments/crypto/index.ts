@@ -37,6 +37,11 @@ export function ngnPerUsdc(): number {
   return Number.isFinite(v) && v > 0 ? v : 1600
 }
 
+/**
+ * Quote an amount in USDC. The input is the currency's MAJOR unit (naira),
+ * matching the buyer-wallet ledger convention; callers dealing in minor units
+ * (kobo) must divide by 100 first. Returns a 2-dp string for the adapters.
+ */
 export function quoteUsdc(ngnAmount: number): string {
   return (ngnAmount / ngnPerUsdc()).toFixed(2)
 }

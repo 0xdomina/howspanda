@@ -18,13 +18,7 @@ const reserveCommissionLinesStep = createStep(
     const marketplace: MarketplaceModuleService =
       container.resolve(MARKETPLACE_MODULE)
 
-    await marketplace.updateCommissionLines(
-      line_ids.map((id) => ({
-        id,
-        status: "reserved" as const,
-        payout_id,
-      }))
-    )
+    await marketplace.reserveCommissionLines(line_ids, payout_id)
 
     return new StepResponse(line_ids, line_ids)
   },

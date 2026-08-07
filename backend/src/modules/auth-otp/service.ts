@@ -25,8 +25,10 @@ class AuthOtpModuleService extends MedusaService({ AuthOtp }) {
   /**
    * Request an OTP for a credential flow. The code is always generated and
    * stored (hash only); the send seam decides whether anything actually
-   * leaves the box. Returns the raw code ONLY in mock/dev mode so tests and
-   * local flows can assert on it.
+   * leaves the box. The raw code is returned to the caller ONLY outside
+   * production (dev/staging echo so local flows can complete offline). In
+   * production the response never carries the code — it reaches the user only
+   * through the delivery channel.
    */
   async requestOtp(input: {
     email: string
@@ -52,15 +54,18 @@ class AuthOtpModuleService extends MedusaService({ AuthOtp }) {
       code,
     })
 
-    return { code: deliveredCode }
+    const echoCode =
+      process.env.NODE_ENV !== "production" ? code : deliveredCode
+
+    return { code: process.env.NODE_ENV === "production" ? null : echoCode }
   }
 
   /**
-   * Verify a presented code for a credential flow. Codes are single-use.
-   *
-   * Pre-launch (no provider configured): ANY non-empty code verifies, so the
-   * signup and reset flows work end-to-end without real email delivery. Once
-   * verification is enabled and SMTP keys are set, the stored hash is enforced.
+   * Verify a presented code for a credential flow. Codes are single-use and
+   * the stored hash is ALWAYS enforced — a reset/verify only succeeds when the
+   * presented code matches an OTP actually issued to this email. There is no
+   * "any non-empty code" bypass: accepting arbitrary codes would let anyone
+   * take over an account's password via POST /auth/otp/reset.
    */
   async verifyOtp(input: {
     email: string
@@ -70,14 +75,11 @@ class AuthOtpModuleService extends MedusaService({ AuthOtp }) {
     const email = normalizeEmail(input.email)
     const code = input.code.trim()
 
-    if (!this.verificationEnabled()) {
-      if (!code) {
-        throw new MedusaError(
-          MedusaError.Types.INVALID_DATA,
-          "Enter the verification code"
-        )
-      }
-      return { ok: true }
+    if (!code) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Enter the verification code"
+      )
     }
 
     const [otp] = await this.listAuthOtps(

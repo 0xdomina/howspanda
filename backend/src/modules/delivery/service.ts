@@ -486,11 +486,14 @@ class DeliveryModuleService extends MedusaService({
    * wallet (the caller's wallet service credits `delivery_payout`). Returns the
    * amount released so the route can credit it.
    *
-   * Hardening: the confirming caller MUST already be a party (recipient or
-   * courier) on the job. Previously any caller could supply any email and
-   * release the payout (money-loss vector) — that escape hatch is removed.
+   * Hardening:
+   * - ONLY the job's RECIPIENT party may confirm. Previously any party
+   *   (including the courier themselves) could confirm and release the payout
+   *   — a courier confirming their own delivery is self-pay fraud.
+   * - The status flip is a single conditional UPDATE, so two concurrent
+   *   confirms can never both pass the check and release the payout twice.
    */
-  async confirmDelivery(jobId: string, recipientEmail: string, courierEmail?: string) {
+  async confirmDelivery(jobId: string, recipientEmail: string) {
     const job = await this.getJob(jobId)
     if (!["in_transit", "accepted"].includes(job.status)) {
       throw new MedusaError(
@@ -498,17 +501,17 @@ class DeliveryModuleService extends MedusaService({
         "Job is not deliverable"
       )
     }
-    // The caller must already be on the job roster — never register them on
-    // the spot (that allowed payout release by anyone).
-    const parties = await this.listDeliveryParties({ job_id: jobId })
-    const confirmEmail = (recipientEmail || courierEmail || "").trim().toLowerCase()
-    const isParty =
-      parties.some((p) => p.email === confirmEmail) &&
-      confirmEmail !== ""
-    if (!isParty) {
+
+    const confirmEmail = (recipientEmail || "").trim().toLowerCase()
+    const [recipientParty] = await this.listDeliveryParties({
+      job_id: jobId,
+      role: "recipient",
+      email: confirmEmail,
+    })
+    if (!recipientParty) {
       throw new MedusaError(
         MedusaError.Types.UNAUTHORIZED,
-        "Only a job party can confirm delivery"
+        "Only the job's recipient can confirm delivery"
       )
     }
 
@@ -518,18 +521,30 @@ class DeliveryModuleService extends MedusaService({
       ? Number(accepted.offered_price)
       : Number(job.posted_price)
 
+    // Atomic flip: the WHERE re-checks status at update time under READ
+    // COMMITTED, so a concurrent second confirm matches zero rows and is
+    // rejected — the payout below is released exactly once.
     const updated = await this.updateDeliveryJobs({
-      id: jobId,
-      status: "delivered",
-      delivered_at: new Date(),
+      selector: { id: jobId, status: { $in: ["in_transit", "accepted"] } },
+      data: { status: "delivered", delivered_at: new Date() },
     })
+    if (!updated.length) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Job is not deliverable"
+      )
+    }
     await this.sendMessage({
       jobId,
       senderEmail: confirmEmail,
       body: "Delivery confirmed — payment released to the courier.",
       isSystem: true,
     })
-    return { job: updated, payout, courierEmail: accepted?.courier_email ?? null }
+    return {
+      job: updated[0],
+      payout,
+      courierEmail: accepted?.courier_email ?? null,
+    }
   }
 
   /**

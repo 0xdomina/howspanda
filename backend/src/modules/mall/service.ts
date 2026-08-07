@@ -3,6 +3,7 @@ import Mall from "./models/mall"
 import MallSeller from "./models/mall-seller"
 import MallBuyer from "./models/mall-buyer"
 import MallPrize from "./models/mall-prize"
+import MallPurchase from "./models/mall-purchase"
 
 const DEFAULT_TARGET_SELLERS = 5
 const DEFAULT_TARGET_BUYERS = 10
@@ -55,6 +56,7 @@ class MallModuleService extends MedusaService({
   MallSeller,
   MallBuyer,
   MallPrize,
+  MallPurchase,
 }) {
   async createMall(input: CreateMallInput) {
     if (input.prizePoolNgn <= 0) {
@@ -272,6 +274,27 @@ class MallModuleService extends MedusaService({
       )
     }
     if (mall[0].status !== "active") {
+      return null
+    }
+    // Replay guard: one lottery ticket per (mall, order). A repeated call with
+    // the same order is a no-op — otherwise a buyer could re-roll the same
+    // purchase until a win landed, draining the pool with one real order.
+    const [already] = await this.listMallPurchases({
+      mall_id: input.mallId,
+      order_id: input.orderId,
+    })
+    if (already) {
+      return null
+    }
+    try {
+      await this.createMallPurchases({
+        mall_id: input.mallId,
+        order_id: input.orderId,
+        buyer_email: input.buyerEmail,
+      })
+    } catch {
+      // Concurrent replay hit the (mall_id, order_id) unique index — the other
+      // request already recorded this purchase.
       return null
     }
     let buyer = await this.listMallBuyers({
@@ -537,7 +560,9 @@ class MallModuleService extends MedusaService({
   }
 
   // Newest prize wins across all malls, with the mall name — feeds the
-  // storefront win ticker.
+  // storefront win ticker. Public: amounts and mall names only, no buyer PII.
+  // The winner email is masked (j***@howsu.local) so the ticker never leaks
+  // a real contact to anonymous visitors.
   async recentWins(count = 5) {
     const prizes = await this.listMallPrizes(
       {},
@@ -551,11 +576,23 @@ class MallModuleService extends MedusaService({
       id: p.id,
       mall_id: p.mall_id,
       mall_name: (p as any).mall?.name ?? "Mall",
-      winner_buyer_email: p.winner_buyer_email,
+      winner_buyer_email: maskEmail(p.winner_buyer_email),
       amount_ngn: Number(p.amount_ngn),
       won_at: p.created_at,
     }))
   }
+}
+
+// "j***@howsu.local" — first char + asterisks + domain. Handles malformed
+// addresses defensively (no domain → mask the local part only).
+function maskEmail(email: string): string {
+  const [local, domain] = (email || "").split("@")
+  if (!local) {
+    return "***"
+  }
+  const head = local.slice(0, 1)
+  const masked = `${head}${"*".repeat(Math.min(Math.max(local.length - 1, 0), 3))}`
+  return domain ? `${masked}@${domain}` : masked
 }
 
 export default MallModuleService

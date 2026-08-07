@@ -77,7 +77,8 @@ class CryptoUsdcProviderService extends AbstractPaymentProvider<CryptoUsdcOption
       input.context?.idempotency_key ?? `cr_${randomUUID().replace(/-/g, "")}`
 
     const settlement = getCryptoSettlement()
-    const usdcAmount = quoteUsdc(amount)
+    // Session amount is kobo (minor unit); quoteUsdc expects naira (major).
+    const usdcAmount = quoteUsdc(amount / 100)
     const intent = await settlement.createDepositIntent({
       reference,
       usdc_amount: usdcAmount,
@@ -186,7 +187,7 @@ class CryptoUsdcProviderService extends AbstractPaymentProvider<CryptoUsdcOption
         ...input.data,
         amount,
         currency_code: input.currency_code,
-        usdc_amount: quoteUsdc(amount),
+        usdc_amount: quoteUsdc(amount / 100),
       },
     }
   }

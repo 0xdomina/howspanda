@@ -188,6 +188,20 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
       reference: input.reference,
       status: "pending",
       wallet_id: wallet.id,
+    }).catch(async () => {
+      // Concurrent create for the same (idempotency_key, wallet_id) hit the
+      // unique index — re-read the winner's intent rather than double-creating.
+      const [existing] = await this.listWalletSpends(
+        { idempotency_key: input.idempotency_key, wallet_id: wallet.id },
+        { take: 1 }
+      )
+      if (!existing) {
+        throw new MedusaError(
+          MedusaError.Types.UNEXPECTED_STATE,
+          "Failed to create spend intent — retry"
+        )
+      }
+      return existing
     })
 
     return { spend, address: wallet.address, to_address: input.to_address }
@@ -235,14 +249,39 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     if (spend.status === "failed") {
       return spend
     }
+    if (spend.status !== "pending") {
+      // signing (claimed by a concurrent request) — in flight, do nothing.
+      return spend
+    }
+
+    // Atomic claim: a single conditional UPDATE moves pending → signing. Only
+    // ONE caller wins; the loser re-reads and sees the winner's terminal state
+    // instead of re-broadcasting. Without this, two concurrent requests could
+    // both read `pending` and both broadcast (double payment).
+    const claimed = await this.updateWalletSpends({
+      selector: { id: spend.id, status: "pending" },
+      data: { status: "signing" },
+    })
+    if (!claimed.length) {
+      const [current] = await this.listWalletSpends({ id: spend.id })
+      return current
+    }
 
     const signer = getUserWalletSigner(wallet.network)
-    const result = await signer.spend({
-      derivationIndex: wallet.derivation_index,
-      to: spend.to_address,
-      usdc_amount: spend.usdc_amount,
-      reference: spend.reference,
-    })
+    let result
+    try {
+      result = await signer.spend({
+        derivationIndex: wallet.derivation_index,
+        to: spend.to_address,
+        usdc_amount: spend.usdc_amount,
+        reference: spend.reference,
+      })
+    } catch (err) {
+      // Broadcast never left the box — return the row to pending so the
+      // idempotency key can be retried.
+      await this.updateWalletSpends({ id: spend.id, status: "pending" })
+      throw err
+    }
 
     if (result.status === "failed") {
       await this.updateWalletSpends({ id: spend.id, status: "failed" })

@@ -104,8 +104,9 @@ class PaystackProviderService extends AbstractPaymentProvider<PaystackOptions> {
       `${PAYSTACK_API_BASE}/transaction/initialize`,
       {
         email: input.context?.customer?.email ?? "guest@howsu.local",
-        // Paystack expects the minor unit (kobo for NGN = NGN * 100)
-        amount: Math.round(amount * 100),
+        // Paystack expects the minor unit (kobo), which is already what
+        // Medusa passes in `input.amount` — do NOT scale it again.
+        amount: Math.round(amount),
         currency: currencyCode.toUpperCase(),
         reference,
         metadata: { session_id: input.data?.session_id ?? null },
@@ -227,7 +228,8 @@ class PaystackProviderService extends AbstractPaymentProvider<PaystackOptions> {
       `${PAYSTACK_API_BASE}/refund`,
       {
         transaction: reference,
-        amount: Math.round(amount * 100),
+        // Refund amounts are kobo (minor unit), same as the session amount.
+        amount: Math.round(amount),
       },
       this.authHeaders()
     )
@@ -318,8 +320,8 @@ class PaystackProviderService extends AbstractPaymentProvider<PaystackOptions> {
     const event = String(data.event ?? "")
     const tx = (data.data ?? {}) as Record<string, any>
     const sessionId = tx.metadata?.session_id ?? tx.reference ?? ""
-    // Paystack webhook amounts are in kobo — convert back to major units.
-    const amount = Number(tx.amount ?? 0) / 100
+    // Paystack webhook amounts are already in kobo (minor unit).
+    const amount = Number(tx.amount ?? 0)
 
     if (event === "charge.success") {
       return {

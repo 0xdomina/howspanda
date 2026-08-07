@@ -247,6 +247,28 @@ class MarketplaceModuleService extends MedusaService({
   }
 
   /**
+   * Atomically flip swept lines `available → reserved` and stamp them with the
+   * payout id. The update is a single conditional UPDATE (selector includes
+   * `status: available`), so under READ COMMITTED Postgres re-evaluates the
+   * WHERE against the latest row version after a competing update commits — a
+   * concurrent payout claiming the same lines gets zero rows for them instead
+   * of silently double-reserving. Throws CONFLICT so no money double-pays.
+   */
+  async reserveCommissionLines(lineIds: string[], payoutId: string) {
+    const updated = await this.updateCommissionLines({
+      selector: { id: { $in: lineIds }, status: "available" },
+      data: { status: "reserved", payout_id: payoutId },
+    })
+    if (updated.length < lineIds.length) {
+      throw new MedusaError(
+        MedusaError.Types.CONFLICT,
+        "One or more commission lines were already claimed by another payout — retry shortly"
+      )
+    }
+    return updated
+  }
+
+  /**
    * Refund/chargeback reversal for one seller order's commission line.
    * - pending/available → `reversed` (drops out of balances)
    * - reserved          → CONFLICT: a payout is in flight, reconcile first

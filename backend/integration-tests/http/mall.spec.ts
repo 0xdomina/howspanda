@@ -290,6 +290,55 @@ medusaIntegrationTestRunner({
         expect(winsForBuyer.length).toBeLessThanOrEqual(1)
         expect(second).toBeNull()
       })
+
+      it("replaying the same order for a mall is a no-op (no extra tickets)", async () => {
+        const replayMall = await mall.createMall({
+          name: "Replay Mall",
+          createdBySellerId: sellerId,
+          prizeWinnerCount: 1,
+          prizeDistribution: "equal",
+          prizePoolNgn: 20000,
+          targetSellers: 1,
+          targetBuyers: 5,
+        })
+        await mall.joinAsSeller({
+          mallId: replayMall.id,
+          sellerId,
+          contributionNgn: 5000,
+        })
+        for (let i = 1; i <= 5; i++) {
+          await mall.joinAsBuyer({
+            mallId: replayMall.id,
+            buyerEmail: `replay-buyer-${i}@howsu.local`,
+          })
+        }
+        const active = await mall.getDetails(replayMall.id)
+        expect(active.status).toEqual("active")
+
+        // Same order twice — the (mall_id, order_id) dedupe must swallow the
+        // second call regardless of whether the first draw won.
+        await mall.recordPurchase({
+          mallId: replayMall.id,
+          buyerEmail: "replay-buyer-1@howsu.local",
+          orderId: "order_replay_1",
+        })
+        await mall.recordPurchase({
+          mallId: replayMall.id,
+          buyerEmail: "replay-buyer-1@howsu.local",
+          orderId: "order_replay_1",
+        })
+
+        const purchases = await mall.listMallPurchases({
+          mall_id: replayMall.id,
+          order_id: "order_replay_1",
+        })
+        expect(purchases.length).toEqual(1)
+        const [buyer] = await mall.listMallBuyers({
+          mall_id: replayMall.id,
+          buyer_email: "replay-buyer-1@howsu.local",
+        })
+        expect(Number(buyer.purchase_count)).toEqual(1)
+      })
     })
   },
 })

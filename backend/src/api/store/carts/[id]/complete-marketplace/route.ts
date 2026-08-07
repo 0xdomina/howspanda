@@ -57,7 +57,8 @@ export const POST = async (
     if (result.order.email) {
       await growth.recordBuyerSpend({
         buyerEmail: result.order.email,
-        amountNgn: Number(result.order.total ?? 0),
+        // order.total is kobo (minor unit); the challenge ledger is in naira.
+        amountNgn: Number(result.order.total ?? 0) / 100,
         orderId: result.order.id,
       })
     }

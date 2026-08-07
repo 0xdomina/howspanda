@@ -76,6 +76,14 @@ const DELIVERY_RATE_LIMIT = rateLimit({
     return b?.email || b?.courierEmail || b?.recipientEmail
   },
 })
+// Escrow-status polls are per-order ownership reads (email-gated); throttle by
+// the queried email so an attacker cannot scrape order states wholesale.
+const ESCROW_STATUS_RATE_LIMIT = rateLimit({
+  name: "escrow-status",
+  limit: 60,
+  windowMs: 15 * 60 * 1000,
+  keyOf: (req) => (req.query.email as string) || undefined,
+})
 const ADMIN_RATE_LIMIT = rateLimit({
   name: "admin",
   limit: 120,
@@ -99,6 +107,17 @@ const CLAIM_RATE_LIMIT = rateLimit({
   keyOf: (req) => {
     const authed = req as AuthenticatedMedusaRequest
     return (authed.auth_context?.actor_id as string) ?? undefined
+  },
+})
+// Cash tips book withdrawable seller balance, so they are auth-gated (route)
+// and throttled per buyer email.
+const TIP_RATE_LIMIT = rateLimit({
+  name: "tip",
+  limit: 10,
+  windowMs: 60 * 60 * 1000,
+  keyOf: (req) => {
+    const b = req.body as { email?: string } | undefined
+    return b?.email
   },
 })
 // Credential endpoints (login/register/update/reset) are the brute-force
@@ -503,8 +522,9 @@ export const PostDeliveryCancelSchema = z.object({
 })
 
 export const PostDeliveryConfirmSchema = z.object({
+  // Only the recipient confirms delivery (courier self-confirm would release
+  // the payout without the buyer's sign-off).
   recipientEmail: z.string().email(),
-  courierEmail: z.string().email().optional(),
 })
 
 // Chat + POD verification (Phase 12)
@@ -550,8 +570,9 @@ export const PostKycVerifySchema = z
   })
 
 // Auth OTP (Phase: true OTP for signup verify + forgot-password reset). The
-// code is deliberately NOT digit-restricted here: pre-launch any non-empty
-// code passes, so the flows work end-to-end without a mail provider.
+// code is always a 6-digit value issued for the exact email; verification
+// enforces the stored hash (no bypass). The raw code is echoed back only
+// outside production so local/dev flows can complete without a mail provider.
 export const PostAuthOtpRequestSchema = z.object({
   email: z.string().email(),
   purpose: z.enum(["signup", "reset"]),
@@ -560,12 +581,12 @@ export const PostAuthOtpRequestSchema = z.object({
 export const PostAuthOtpVerifySchema = z.object({
   email: z.string().email(),
   purpose: z.enum(["signup", "reset"]),
-  code: z.string().min(1).max(8),
+  code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
 })
 
 export const PostAuthOtpResetSchema = z.object({
   email: z.string().email(),
-  code: z.string().min(1).max(8),
+  code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
   newPassword: z.string().min(8),
 })
 
@@ -817,6 +838,7 @@ export default defineMiddlewares({
         authenticate("customer", ["session", "bearer"], {
           allowUnauthenticated: true,
         }),
+        ESCROW_STATUS_RATE_LIMIT,
       ],
     },
     {
@@ -863,9 +885,8 @@ export default defineMiddlewares({
       matcher: "/store/orders/:id/tip",
       methods: ["POST"],
       middlewares: [
-        authenticate("customer", ["session", "bearer"], {
-          allowUnauthenticated: true,
-        }),
+        authenticate("customer", ["session", "bearer"]),
+        TIP_RATE_LIMIT,
         validateAndTransformBody(PostBuyerTipSchema),
       ],
     },
@@ -1104,12 +1125,24 @@ export default defineMiddlewares({
     {
       matcher: "/store/malls/:id/join-buyer",
       methods: ["POST"],
-      middlewares: [MALL_RATE_LIMIT, validateAndTransformBody(PostMallJoinBuyerSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        MALL_RATE_LIMIT,
+        validateAndTransformBody(PostMallJoinBuyerSchema),
+      ],
     },
     {
       matcher: "/store/malls/:id/purchase",
       methods: ["POST"],
-      middlewares: [MALL_RATE_LIMIT, validateAndTransformBody(PostMallPurchaseSchema)],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        MALL_RATE_LIMIT,
+        validateAndTransformBody(PostMallPurchaseSchema),
+      ],
     },
     {
       // Seller (store owner) posts a delivery job from a completed order.
