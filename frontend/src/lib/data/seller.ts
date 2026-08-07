@@ -203,6 +203,23 @@ export const listSellerOrders = async (): Promise<any[]> => {
   }
 }
 
+export const retrieveSellerAnalytics = async (): Promise<any | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return null
+
+    return await sdk.client
+      .fetch<any>("/sellers/analytics", {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      })
+      .catch(() => null)
+  } catch {
+    return null
+  }
+}
+
 export const markOrderDelivered = async (orderId: string): Promise<string | null> => {
   try {
     const headers = await getSellerAuthHeaders()
