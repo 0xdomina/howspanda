@@ -189,17 +189,28 @@ describe("Payments — crypto USDC provider (mock)", () => {
 
 describe("Payments — network-agnostic crypto settlement", () => {
   it("switches network and testnet↔mainnet purely by config", () => {
-    expect(getCryptoSettlement("base").network).toEqual("base")
-    expect(getCryptoSettlement("solana").network).toEqual("solana")
+    // Force the offline mock so the seam is tested purely by config — a live
+    // ARC_MNEMONIC in .env would otherwise pin the Arc adapter to testnet.
+    const prevSigner = process.env.CRYPTO_WALLET_SIGNER
+    process.env.CRYPTO_WALLET_SIGNER = "mock"
 
     const prev = process.env.CRYPTO_NETWORK_ENV
+    const prevDefault = process.env.CRYPTO_DEFAULT_NETWORK
     try {
+      expect(getCryptoSettlement("base").network).toEqual("base")
+      expect(getCryptoSettlement("solana").network).toEqual("solana")
+
+      process.env.CRYPTO_DEFAULT_NETWORK = "base"
       expect(getCryptoSettlement().env).toEqual("testnet")
       process.env.CRYPTO_NETWORK_ENV = "mainnet"
       expect(getCryptoSettlement().env).toEqual("mainnet")
     } finally {
+      if (prevSigner === undefined) delete process.env.CRYPTO_WALLET_SIGNER
+      else process.env.CRYPTO_WALLET_SIGNER = prevSigner
       if (prev === undefined) delete process.env.CRYPTO_NETWORK_ENV
       else process.env.CRYPTO_NETWORK_ENV = prev
+      if (prevDefault === undefined) delete process.env.CRYPTO_DEFAULT_NETWORK
+      else process.env.CRYPTO_DEFAULT_NETWORK = prevDefault
     }
   })
 

@@ -21,17 +21,27 @@ export type CreateBuyerWithdrawalWorkflowInput = {
 }
 
 // Idempotency guard — checked FIRST, mirroring create-payout: a replayed key
-// returns the existing withdrawal untouched.
+// returns the existing withdrawal untouched. Scoped to the buyer's wallet so a
+// key minted by one buyer can never replay (or even observe) another buyer's
+// withdrawal row.
 const getExistingWithdrawalStep = createStep(
   "get-existing-buyer-withdrawal",
   async (
-    { idempotency_key }: { idempotency_key: string },
+    { buyer_email, idempotency_key }: { buyer_email: string; idempotency_key: string },
     { container }
   ) => {
     const buyerWallet: BuyerWalletModuleService =
       container.resolve(BUYER_WALLET_MODULE)
 
+    const [wallet] = await buyerWallet.listWallets({
+      buyer_email,
+    })
+    if (!wallet) {
+      return new StepResponse(null)
+    }
+
     const [existing] = await buyerWallet.listBuyerWithdrawals({
+      wallet: wallet.id,
       idempotency_key,
     })
     return new StepResponse(existing ?? null)
@@ -48,6 +58,7 @@ const createBuyerWithdrawalWorkflow = createWorkflow(
   "create-buyer-withdrawal",
   (input: CreateBuyerWithdrawalWorkflowInput) => {
     const existing = getExistingWithdrawalStep({
+      buyer_email: input.buyer_email,
       idempotency_key: input.idempotency_key,
     })
 

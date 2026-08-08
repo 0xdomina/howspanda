@@ -105,6 +105,36 @@ medusaIntegrationTestRunner({
         }
       })
 
+      it("tracks brevo channel failures when SMTP creds are missing", async () => {
+        // Point the transport at brevo with no SMTP creds so it throws.
+        const prevChannel = process.env.NOTIFICATIONS_CHANNEL
+        delete process.env.BREVO_SMTP_HOST
+        delete process.env.BREVO_SMTP_USER
+        delete process.env.BREVO_SMTP_PASS
+        process.env.NOTIFICATIONS_CHANNEL = "brevo"
+
+        await notifications.enqueueEmail({
+          kind: "test_brevo_failure",
+          recipient: "notify-brevo@howsu.local",
+          to: "notify-brevo@howsu.local",
+          subject: "Should fail",
+        })
+
+        try {
+          const result = await notifications.drainEmail()
+          expect(result.failed).toEqual(1)
+
+          const [row] = await notifications.listNotificationOutboxes({
+            recipient: "notify-brevo@howsu.local",
+          })
+          expect(row.status).toEqual("pending")
+          expect(row.attempts).toEqual(1)
+          expect(row.last_error).toContain("BREVO_SMTP")
+        } finally {
+          process.env.NOTIFICATIONS_CHANNEL = prevChannel
+        }
+      })
+
       it("leaves rows pending (skipped) when the email transport is disabled", async () => {
         const prevEnabled = process.env.NOTIFICATIONS_EMAIL_ENABLED
         delete process.env.NOTIFICATIONS_EMAIL_ENABLED

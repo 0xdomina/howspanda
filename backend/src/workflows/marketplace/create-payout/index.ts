@@ -25,13 +25,21 @@ export type CreatePayoutWorkflowInput = {
 
 // Idempotency guard — checked FIRST, like the seller-order links check in
 // create-seller-orders: a replayed key returns the existing payout untouched.
+// Scoped to the seller so a key minted by one seller can never replay (or even
+// observe) another seller's payout row.
 const getExistingPayoutStep = createStep(
   "get-existing-payout",
-  async ({ idempotency_key }: { idempotency_key: string }, { container }) => {
+  async (
+    { seller_id, idempotency_key }: { seller_id: string; idempotency_key: string },
+    { container }
+  ) => {
     const marketplace: MarketplaceModuleService =
       container.resolve(MARKETPLACE_MODULE)
 
-    const [existing] = await marketplace.listPayouts({ idempotency_key })
+    const [existing] = await marketplace.listPayouts({
+      seller_id,
+      idempotency_key,
+    })
     return new StepResponse(existing ?? null)
   }
 )
@@ -116,6 +124,7 @@ const createPayoutWorkflow = createWorkflow(
   "create-payout",
   (input: CreatePayoutWorkflowInput) => {
     const existing = getExistingPayoutStep({
+      seller_id: input.seller_id,
       idempotency_key: input.idempotency_key,
     })
 
