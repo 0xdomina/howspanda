@@ -35,9 +35,10 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<RequestBody>,
   res: MedusaResponse
 ) => {
-  // If `actor_id` is present, the request is already authenticated
-  // as an existing seller admin
-  if (req.auth_context?.actor_id) {
+  // Seller-authenticated actors already administer a store. A customer actor
+  // is allowed through this route once to upgrade the same account into a
+  // store owner without creating a second login identity.
+  if (req.auth_context?.actor_type === "seller" && req.auth_context?.actor_id) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       "Request already authenticated as a seller."
@@ -61,6 +62,7 @@ export const POST = async (
       input: {
         ...sellerData,
         authIdentityId: req.auth_context.auth_identity_id,
+        preserveCustomerAuth: req.auth_context.actor_type === "customer",
       } as CreateSellerWorkflowInput,
     })
 

@@ -24,7 +24,7 @@ const TrustScoreCard = async () => {
   const trust = await retrieveSellerTrustScore().catch(() => null)
 
   return (
-    <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+    <div className="figma-surface p-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-ink-muted">Trust score</p>
         {trust && (
@@ -100,21 +100,21 @@ export default async function SellerDashboardPage() {
 
   return (
     <div data-testid="seller-dashboard-page">
-      <div className="grid grid-cols-1 small:grid-cols-2 gap-4 mb-8">
-        <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+      <div className="mb-8 grid grid-cols-1 gap-4 small:grid-cols-2">
+        <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Available balance</p>
           <p className="mt-1 font-mono tabular-nums text-2xl text-ink">
             {convertToLocale({ amount: available, currency_code: "ngn" })}
           </p>
         </div>
-        <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+        <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Products</p>
           <p className="mt-1 font-mono tabular-nums text-2xl text-ink">
             {products.length}
           </p>
         </div>
         <TrustScoreCard />
-        <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+        <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Best next step</p>
           <p className="mt-1 text-sm text-ink">
             Deliver orders quickly and reply to reviews to grow your trust score.
@@ -124,7 +124,7 @@ export default async function SellerDashboardPage() {
 
       {products.length === 0 && (
         <div className="flex flex-col gap-4">
-          <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+          <div className="figma-surface p-5">
             <h3 className="font-display text-xl font-medium text-ink mb-2">
               Add your first product
             </h3>
@@ -142,7 +142,7 @@ export default async function SellerDashboardPage() {
       )}
       {products.length > 0 && (
         <div className="flex flex-col gap-4">
-          <div className="p-5 border border-ink-hairline rounded-large bg-paper-surface">
+          <div className="figma-surface p-5">
             <h3 className="font-display text-xl font-medium text-ink mb-2">
               Next steps
             </h3>

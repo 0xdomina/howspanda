@@ -83,10 +83,14 @@ const CartDropdown = ({
       <Popover className="relative h-full">
         <PopoverButton className="h-full">
           <LocalizedClientLink
-            className="hover:text-ink"
+            className="relative grid h-8 w-8 place-items-center rounded-full border border-ink-hairline text-base transition-colors hover:border-brand hover:text-brand"
             href="/cart"
             data-testid="nav-cart-link"
-          >{`Cart (${totalItems})`}</LocalizedClientLink>
+            aria-label={`Cart (${totalItems} items)`}
+          >
+            <span aria-hidden="true">🛒</span>
+            {totalItems > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] text-white">{totalItems}</span>}
+          </LocalizedClientLink>
         </PopoverButton>
         <Transition
           show={cartDropdownOpen}
@@ -100,7 +104,7 @@ const CartDropdown = ({
         >
           <PopoverPanel
             static
-            className="hidden small:block absolute top-[calc(100%+1px)] right-0 bg-paper-surface border-x border-b border-ink-hairline w-[420px] text-ui-fg-base"
+            className="soft-glass hidden small:block absolute top-[calc(100%+1px)] right-0 w-[420px] rounded-control border border-ink-hairline text-ui-fg-base shadow-modal"
             data-testid="nav-cart-dropdown"
           >
             <div className="p-4 flex items-center justify-center">

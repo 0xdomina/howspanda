@@ -4,6 +4,8 @@ import { HttpTypes } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import Thumbnail from "../thumbnail"
 import PreviewPrice from "./price"
+import WishlistButton from "@modules/wishlist/components/wishlist-button"
+import QuickView from "@modules/products/components/quick-view"
 
 export default async function ProductPreview({
   product,
@@ -19,17 +21,18 @@ export default async function ProductPreview({
   })
 
   return (
-    <LocalizedClientLink href={`/products/${product.handle}`} className="group">
-      <div data-testid="product-wrapper">
+    <div className="group">
+      <div data-testid="product-wrapper" className="relative rounded-control">
+        <LocalizedClientLink href={`/products/${product.handle}`} className="block">
         <Thumbnail
           thumbnail={product.thumbnail}
           images={product.images}
           size="full"
           isFeatured={isFeatured}
         />
-        <div className="mt-3 flex items-start justify-between gap-3">
+        <div className="mt-4 flex items-start justify-between gap-3">
           <Text
-            className="text-sm leading-snug text-ink group-hover:text-ink-muted"
+            className="text-sm font-medium leading-snug text-ink group-hover:text-ink-muted"
             data-testid="product-title"
           >
             {product.title}
@@ -37,8 +40,10 @@ export default async function ProductPreview({
           <div className="flex items-center gap-x-2 pt-0.5">
             {cheapestPrice && <PreviewPrice price={cheapestPrice} />}
           </div>
-        </div>
+          </div>
+        </LocalizedClientLink>
+        <div className="absolute right-3 top-3 z-10 flex flex-col gap-2"><WishlistButton item={{ id: product.id, handle: product.handle, title: product.title, thumbnail: product.thumbnail, price: cheapestPrice?.calculated_price }} /><QuickView item={{ title: product.title, description: product.description, thumbnail: product.thumbnail, price: cheapestPrice?.calculated_price, href: `/products/${product.handle}` }} /></div>
       </div>
-    </LocalizedClientLink>
+    </div>
   )
 }

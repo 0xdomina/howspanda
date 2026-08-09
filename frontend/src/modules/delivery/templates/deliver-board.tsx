@@ -27,7 +27,7 @@ const statusLabel: Record<string, string> = {
 }
 
 const JobCard = ({ job }: { job: any }) => (
-  <div className="flex flex-col rounded-large border border-ink-hairline bg-paper-surface p-5">
+  <div className="figma-surface flex flex-col p-5">
     <div className="flex items-start justify-between gap-3">
       <LocalizedClientLink href={`/deliver/${job.id}`} className="min-w-0">
         <h3 className="font-display text-lg font-medium text-ink hover:underline">
@@ -128,8 +128,8 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
   }
 
   return (
-    <div data-testid="deliver-page" className="content-container flex-1 small:py-12">
-      <div className="py-8">
+    <div data-testid="deliver-page" className="figma-container flex-1 py-10 small:py-16">
+      <div className="mb-8 max-w-2xl">
         <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">
           Deliver
         </h1>
@@ -146,13 +146,13 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
           value={city}
           onChange={(e) => setCity(e.target.value)}
           placeholder="Filter by city"
-          className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink small:max-w-xs"
+          className="w-full rounded-control border border-ink-hairline bg-white px-3 py-3 text-sm text-ink outline-none focus:border-ink small:max-w-xs"
         />
         <select
           value={radiusKm}
           onChange={(e) => setRadiusKm(Number(e.target.value))}
           disabled={!loc}
-          className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink disabled:opacity-50 small:w-auto"
+          className="w-full rounded-control border border-ink-hairline bg-white px-3 py-3 text-sm text-ink outline-none focus:border-ink disabled:opacity-50 small:w-auto"
         >
           <option value={5}>Within 5 km</option>
           <option value={10}>Within 10 km</option>
@@ -164,7 +164,7 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
           type="button"
           disabled={isPending || locBusy}
           onClick={useMyLocation}
-          className="rounded-medium border border-ink-strong px-4 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+          className="rounded-control border border-ink-strong px-4 py-3 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
         >
           {locBusy ? "Locating…" : loc ? "Refresh near me" : "Use my location"}
         </button>
@@ -172,7 +172,7 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
           type="button"
           disabled={isPending}
           onClick={applyFilter}
-          className="rounded-medium border border-ink-strong px-4 py-2 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+          className="rounded-control border border-ink-strong px-4 py-3 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
         >
           {isPending ? "Searching…" : "Search"}
         </button>
@@ -199,7 +199,7 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
       )}
 
       {filtered.length === 0 ? (
-        <div className="rounded-large border border-dashed py-16 text-center">
+        <div className="rounded-control border border-dashed border-ink-hairline bg-white py-16 text-center">
           <p className="text-ink-muted">No open delivery jobs right now.</p>
           <p className="mt-1 text-sm text-ink-muted">
             Check back soon — sellers post jobs from completed orders.

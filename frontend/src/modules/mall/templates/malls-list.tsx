@@ -21,7 +21,7 @@ const maskEmail = (email: string) => {
 const WinTicker = ({ wins }: { wins: MallWin[] }) => {
   if (!wins.length) return null
   return (
-    <div className="mb-8 rounded-large border border-ink-hairline bg-paper-surface px-4 py-3">
+    <div className="mb-8 rounded-control border border-ink-hairline bg-white px-4 py-3">
       <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
         Recent wins
       </p>
@@ -87,7 +87,7 @@ const MallCard = ({
   }
 
   return (
-    <div className="flex flex-col rounded-large border border-ink-hairline bg-paper-surface p-5">
+    <div className="figma-surface flex flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -145,14 +145,14 @@ const MallCard = ({
               type="button"
               disabled={isPending}
               onClick={join}
-              className="w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
+              className="w-full rounded-control bg-ink px-3 py-3 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
             >
               {isPending ? "Joining…" : "Join this mall"}
             </button>
           ) : (
             <LocalizedClientLink
               href="/account"
-              className="block w-full rounded-medium border border-ink-strong px-3 py-2 text-center text-sm font-medium text-ink hover:bg-ink hover:text-white"
+              className="block w-full rounded-control border border-ink-strong px-3 py-3 text-center text-sm font-medium text-ink hover:bg-ink hover:text-white"
             >
               Sign in to join
             </LocalizedClientLink>
@@ -190,8 +190,8 @@ const MallsClient = ({
   }, [malls])
 
   return (
-    <div data-testid="malls-page" className="content-container flex-1 small:py-12">
-      <div className="py-8">
+    <div data-testid="malls-page" className="figma-container flex-1 py-10 small:py-16">
+      <div className="mb-8 max-w-2xl">
         <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">
           Malls
         </h1>
@@ -205,7 +205,7 @@ const MallsClient = ({
       <WinTicker wins={wins} />
 
       {malls.length === 0 ? (
-        <div className="rounded-large border border-dashed py-16 text-center">
+        <div className="rounded-control border border-dashed border-ink-hairline bg-white py-16 text-center">
           <p className="text-ink-muted">No malls are open right now.</p>
           <p className="mt-1 text-sm text-ink-muted">
             Check back soon — a seller near you may be starting one.

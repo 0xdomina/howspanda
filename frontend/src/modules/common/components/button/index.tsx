@@ -36,8 +36,8 @@ const Button = ({
       {...props}
       variant={VARIANT_MAP[variant]}
       className={clx(
-        "font-medium",
-        rounded === "pill" ? "!rounded-full" : "!rounded-control",
+        "font-medium transition-colors duration-fast",
+        rounded === "pill" ? "!rounded-control" : "!rounded-control",
         className
       )}
     />

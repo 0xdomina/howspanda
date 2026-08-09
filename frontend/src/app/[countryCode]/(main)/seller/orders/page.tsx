@@ -24,18 +24,18 @@ export default async function SellerOrdersPage() {
       </h2>
 
       {orders.length === 0 ? (
-        <div className="text-center py-16 border border-dashed rounded-large">
+        <div className="rounded-control border border-dashed border-ink-hairline bg-white py-16 text-center">
           <p className="text-ink-muted">No orders yet.</p>
           <p className="text-sm text-ink-muted mt-1">
             When someone buys from your store, the order shows up here.
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-ink-hairline border border-ink-hairline rounded-large overflow-hidden">
+        <ul className="overflow-hidden rounded-control border border-ink-hairline bg-white divide-y divide-ink-hairline">
           {orders.map((order: any) => (
             <li
               key={order.id}
-              className="flex items-center justify-between gap-4 p-4 bg-paper-surface"
+              className="flex items-center justify-between gap-4 bg-white p-4"
             >
               <div className="flex-1 min-w-0">
                 <p className="text-ink font-medium truncate">{order.display_id}</p>

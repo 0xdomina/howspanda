@@ -38,7 +38,7 @@ export default function CategoryTemplate({
 
   return (
     <div
-      className="flex flex-col small:flex-row small:items-start py-6 content-container"
+      className="figma-container flex flex-col gap-8 py-10 small:flex-row small:items-start small:py-16"
       data-testid="category-container"
     >
       <RefinementList sortBy={sort} data-testid="sort-by-container" />
@@ -58,7 +58,7 @@ export default function CategoryTemplate({
               </span>
             ))}
           <h1
-            className="font-display text-3xl font-semibold tracking-tight text-ink"
+            className="font-display text-3xl font-medium tracking-[-0.02em] text-ink"
             data-testid="category-page-title"
           >
             {category.name}

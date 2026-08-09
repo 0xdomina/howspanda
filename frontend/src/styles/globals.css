@@ -32,12 +32,12 @@
 }
 
 :root {
-  --button-inverted: #e35d2a;
-  --button-inverted-hover: #cf5020;
-  --button-inverted-pressed: #b84619;
-  --button-inverted-gradient: #e35d2a;
-  --button-inverted-hover-gradient: #cf5020;
-  --button-inverted-pressed-gradient: #b84619;
+  --button-inverted: #db4444;
+  --button-inverted-hover: #b92f2f;
+  --button-inverted-pressed: #8f2424;
+  --button-inverted-gradient: #db4444;
+  --button-inverted-hover-gradient: #b92f2f;
+  --button-inverted-pressed-gradient: #8f2424;
 }
 
 @layer utilities {
@@ -102,6 +102,31 @@
 @layer components {
   .content-container {
     @apply max-w-[1440px] w-full mx-auto px-6;
+  }
+
+  .figma-container {
+    @apply mx-auto w-full max-w-[1170px] px-4 small:px-0;
+  }
+
+  .figma-button {
+    @apply inline-flex items-center justify-center rounded-control bg-brand px-8 py-4 text-sm font-medium text-white transition-colors duration-fast hover:bg-[#b92f2f] focus-visible:outline-brand;
+  }
+
+  .figma-surface {
+    @apply rounded-control border border-ink-hairline bg-paper-surface;
+  }
+
+  /* Use glass as a quiet layer for overlays; keep product and seller content opaque. */
+  .soft-glass {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(229, 229, 229, 0.9);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+  }
+
+  .rounded-large.border.border-ink-hairline.bg-paper-surface {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   }
 
   .contrast-btn {

@@ -12,7 +12,8 @@ export default async function TransferPage({
   const { success, error } = await declineTransferRequest(id, token)
 
   return (
-    <div className="flex flex-col gap-y-4 items-start w-2/5 mx-auto mt-10 mb-20">
+    <div className="figma-container flex min-h-[calc(100vh-180px)] items-center justify-center py-12 small:py-20">
+      <div className="figma-surface flex w-full max-w-2xl flex-col gap-y-6 p-6 small:p-10">
       <TransferImage />
       <div className="flex flex-col gap-y-6">
         {success && (
@@ -35,6 +36,7 @@ export default async function TransferPage({
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   )

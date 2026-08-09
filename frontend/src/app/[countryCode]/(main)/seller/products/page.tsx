@@ -40,7 +40,7 @@ export default async function SellerProductsPage() {
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-ink-hairline border border-ink-hairline rounded-large overflow-hidden">
+        <ul className="overflow-hidden rounded-control border border-ink-hairline bg-white divide-y divide-ink-hairline">
           {products.map((product: any) => {
             const cheapest =
               product.variants
@@ -49,8 +49,8 @@ export default async function SellerProductsPage() {
             const currency = product.variants?.[0]?.prices?.[0]?.currency_code ?? "ngn"
 
             return (
-              <li key={product.id} className="flex items-center gap-4 p-4 bg-paper-surface">
-                <div className="w-14 h-14 bg-paper-tinted rounded overflow-hidden flex-shrink-0">
+            <li key={product.id} className="flex items-center gap-4 bg-white p-4">
+                <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-control bg-paper-tinted">
                   {product.thumbnail ? (
                     <img
                       src={product.thumbnail}

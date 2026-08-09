@@ -14,20 +14,13 @@ interface SellerLayoutProps {
 
 const SellerLayout: React.FC<SellerLayoutProps> = ({ seller, children }) => {
   return (
-    <div className="flex-1 small:py-12" data-testid="seller-page">
-      <div className="content-container max-w-6xl mx-auto">
-        <div className="py-8">
-          <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">
-            Your store
-          </h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            {seller?.name ?? seller?.first_name ?? "Manage your products and orders."}
-          </p>
+    <div className="flex-1 bg-[#fafafa] py-6 small:py-12" data-testid="seller-page">
+      <div className="figma-container">
+        <div className="mb-8 flex flex-col gap-2 small:mb-10 small:flex-row small:items-end small:justify-between">
+          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Sell layer</p><h1 className="mt-2 font-display text-4xl font-semibold tracking-tight text-ink">Your store</h1></div>
+          <p className="text-sm text-ink-muted">{seller?.name ?? seller?.first_name ?? "Your business on How’s U"}</p>
         </div>
-        <div className="grid grid-cols-1 small:grid-cols-[220px_1fr] gap-8 small:gap-12">
-          <div>{seller && <SellerNav />}</div>
-          <div className="flex-1">{children}</div>
-        </div>
+        <div className="grid grid-cols-1 gap-8 small:grid-cols-[180px_1fr] small:gap-12"><div>{seller && <SellerNav />}</div><div className="min-w-0">{children}</div></div>
       </div>
     </div>
   )

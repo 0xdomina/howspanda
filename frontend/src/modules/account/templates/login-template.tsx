@@ -15,21 +15,22 @@ export enum LOGIN_VIEW {
 
 const LoginTemplate = () => {
   const searchParams = useSearchParams()
-  const [currentView, setCurrentView] = useState(
-    searchParams.get("mode") === "register"
-      ? LOGIN_VIEW.REGISTER
-      : LOGIN_VIEW.SIGN_IN
-  )
+  const [currentView, setCurrentView] = useState(() => {
+    const mode = searchParams.get("mode")
+    return mode === "register" ? LOGIN_VIEW.REGISTER : mode === "forgot" ? LOGIN_VIEW.FORGOT_PASSWORD : LOGIN_VIEW.SIGN_IN
+  })
 
   return (
-    <div className="w-full flex justify-start px-8 py-8">
-      {currentView === "sign-in" ? (
-        <Login setCurrentView={setCurrentView} />
-      ) : currentView === "forgot-password" ? (
-        <ForgotPassword setCurrentView={setCurrentView} />
-      ) : (
-        <Register setCurrentView={setCurrentView} />
-      )}
+    <div className="figma-container flex min-h-[calc(100vh-180px)] items-center justify-center py-12 small:py-20">
+      <div className="figma-surface w-full max-w-[480px] p-6 small:p-10">
+        {currentView === "sign-in" ? (
+          <Login setCurrentView={setCurrentView} />
+        ) : currentView === "forgot-password" ? (
+          <ForgotPassword setCurrentView={setCurrentView} />
+        ) : (
+          <Register setCurrentView={setCurrentView} />
+        )}
+      </div>
     </div>
   )
 }

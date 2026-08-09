@@ -11,6 +11,7 @@ import { useParams, usePathname, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import ProductPrice from "../product-price"
 import MobileActions from "./mobile-actions"
+import WishlistButton from "@modules/wishlist/components/wishlist-button"
 import { useRouter } from "next/navigation"
 
 type ProductActionsProps = {
@@ -175,7 +176,7 @@ export default function ProductActions({
           )}
         </div>
 
-        <ProductPrice product={product} variant={selectedVariant} />
+        <div className="flex items-start justify-between gap-4"><ProductPrice product={product} variant={selectedVariant} /><WishlistButton item={{ id: product.id, handle: product.handle, title: product.title, thumbnail: product.thumbnail }} /></div>
 
         {addError && (
           <p className="text-sm text-rose-600" data-testid="add-product-error">

@@ -23,10 +23,10 @@ export default async function Checkout() {
   if (!customer) {
     return (
       <div
-        className="content-container py-12"
+        className="figma-container py-16"
         data-testid="checkout-auth-required"
       >
-        <div className="mx-auto max-w-md rounded-large border border-ink-hairline bg-paper-surface p-8 text-center">
+        <div className="mx-auto max-w-md rounded-control border border-ink-hairline bg-white p-8 text-center shadow-float">
           <h1 className="font-display text-2xl font-medium tracking-[-0.02em] text-ink">
             Create an account to checkout
           </h1>
@@ -56,7 +56,7 @@ export default async function Checkout() {
   }
 
   return (
-    <div className="grid grid-cols-1 small:grid-cols-[1fr_416px] content-container gap-x-40 py-12">
+    <div className="figma-container grid grid-cols-1 gap-8 py-10 small:grid-cols-[1fr_380px] small:gap-12">
       <PaymentWrapper cart={cart}>
         <CheckoutForm cart={cart} customer={customer} />
       </PaymentWrapper>

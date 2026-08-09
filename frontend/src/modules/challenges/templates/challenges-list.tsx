@@ -28,7 +28,7 @@ const ChallengeCard = ({ challenge }: { challenge: Challenge }) => {
   const meta = typeLabel[challenge.type] ?? typeLabel.arc_pool
 
   return (
-    <div className="flex flex-col rounded-large border border-ink-hairline bg-paper-surface p-5">
+    <div className="figma-surface flex flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <LocalizedClientLink href={`/challenges/${challenge.slug}`}>
@@ -60,7 +60,7 @@ const ChallengeCard = ({ challenge }: { challenge: Challenge }) => {
 
       <LocalizedClientLink
         href={`/challenges/${challenge.slug}`}
-        className="mt-4 block w-full rounded-medium bg-ink px-3 py-2 text-center text-sm font-medium text-white hover:bg-ink/90"
+        className="mt-4 block w-full rounded-control bg-ink px-3 py-3 text-center text-sm font-medium text-white hover:bg-ink/90"
       >
         View challenge
       </LocalizedClientLink>
@@ -72,9 +72,9 @@ const ChallengesClient = ({ challenges }: { challenges: Challenge[] }) => {
   return (
     <div
       data-testid="challenges-page"
-      className="content-container flex-1 small:py-12"
+      className="figma-container flex-1 py-10 small:py-16"
     >
-      <div className="py-8">
+      <div className="mb-8 max-w-2xl">
         <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">
           Challenges
         </h1>
@@ -85,7 +85,7 @@ const ChallengesClient = ({ challenges }: { challenges: Challenge[] }) => {
       </div>
 
       {challenges.length === 0 ? (
-        <div className="rounded-large border border-dashed py-16 text-center">
+        <div className="rounded-control border border-dashed border-ink-hairline bg-white py-16 text-center">
           <p className="text-ink-muted">No challenges are live right now.</p>
           <p className="mt-1 text-sm text-ink-muted">
             Check back soon — a new campaign could start any day.

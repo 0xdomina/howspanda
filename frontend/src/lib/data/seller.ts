@@ -3,6 +3,7 @@
 import { sdk } from "@lib/config"
 import { redirect } from "next/navigation"
 import { revalidateTag } from "next/cache"
+import { getAuthHeaders, getCacheTag } from "./cookies"
 import {
   getSellerAuthHeaders,
   getSellerCacheTag,
@@ -146,8 +147,52 @@ export async function sellerLogin(_currentState: unknown, formData: FormData) {
   }
 }
 
+export async function upgradeCustomerToSeller(
+  _currentState: unknown,
+  formData: FormData
+) {
+  const name = (formData.get("name") as string)?.trim()
+  const description = (formData.get("description") as string)?.trim()
+
+  if (!name) return "Choose a store name to continue."
+
+  try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) return "Sign in to your How’s U account first."
+
+    const { customer } = await sdk.client.fetch<{
+      customer: {
+        email?: string
+        phone?: string
+        first_name?: string
+        last_name?: string
+      }
+    }>("/store/customers/me", { method: "GET", headers })
+
+    await sdk.client.fetch("/sellers", {
+      method: "POST",
+      headers,
+      body: {
+        name,
+        description: description || undefined,
+        admin: {
+          email: customer.email,
+          phone: customer.phone,
+          first_name: customer.first_name,
+          last_name: customer.last_name,
+        },
+      },
+    })
+
+    revalidateTag(await getSellerCacheTag("seller"), "max")
+    revalidateTag(await getCacheTag("customers"), "max")
+    return null
+  } catch (error: any) {
+    return error?.message ?? error?.toString?.() ?? String(error)
+  }
+}
+
 export async function sellerSignout(countryCode: string) {
-  await sdk.auth.logout()
   await removeSellerAuthToken()
   redirect(`/${countryCode}/seller`)
 }

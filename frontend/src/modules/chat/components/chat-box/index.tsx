@@ -35,7 +35,7 @@ const ChatMessage = ({ message }: { message: AiChatMessage }) => {
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[80%] rounded-large px-4 py-2.5 text-sm leading-relaxed shadow-float ${
+        className={`max-w-[80%] rounded-control px-4 py-2.5 text-sm leading-relaxed shadow-float ${
           isUser
             ? "bg-ink text-paper"
             : "bg-paper-surface border border-ink-hairline text-ink"
@@ -128,8 +128,8 @@ export default function ChatBox() {
   }
 
   return (
-    <div className="flex h-[520px] flex-col overflow-hidden rounded-large border border-ink-hairline bg-paper shadow-float">
-      <div className="flex items-center justify-between border-b border-ink-hairline bg-paper-surface px-5 py-3">
+    <div className="flex h-[520px] flex-col overflow-hidden rounded-control border border-ink-hairline bg-white shadow-float">
+      <div className="soft-glass flex items-center justify-between border-b border-ink-hairline px-5 py-3">
         <div>
           <p className="text-sm font-semibold text-ink">How&rsquo;s u Assistant</p>
           <p className="text-xs text-ink-muted">
@@ -161,7 +161,7 @@ export default function ChatBox() {
         )}
         {isPending ? (
           <div className="flex justify-start">
-            <span className="rounded-large border border-ink-hairline bg-paper-surface px-4 py-2.5 text-sm text-ink-muted">
+            <span className="rounded-control border border-ink-hairline bg-paper-surface px-4 py-2.5 text-sm text-ink-muted">
               Thinking…
             </span>
           </div>

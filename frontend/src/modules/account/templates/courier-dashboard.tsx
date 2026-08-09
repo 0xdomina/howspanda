@@ -134,7 +134,7 @@ const CourierDashboard = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4 small:grid-cols-3">
-        <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+        <div className="figma-surface p-4">
           <p className="text-xs text-ink-muted">Courier status</p>
           {suspended ? (
             <p className="mt-1 flex items-center gap-2">
@@ -157,7 +157,7 @@ const CourierDashboard = ({
             </p>
           )}
         </div>
-        <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+        <div className="figma-surface p-4">
           <p className="text-xs text-ink-muted">KYC level</p>
           <p className="mt-1 text-sm font-medium text-ink">{kycLevel}</p>
           <p className="mt-1 text-xs text-ink-muted">
@@ -166,7 +166,7 @@ const CourierDashboard = ({
               : "Complete the KYC profile step to activate courierhood."}
           </p>
         </div>
-        <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+        <div className="figma-surface p-4">
           <p className="text-xs text-ink-muted">Lifetime earnings</p>
           <p className="mt-1 font-mono tabular-nums text-lg text-ink">{ngn(earnings)}</p>
           <p className="mt-1 text-xs text-ink-muted">Released delivery payouts</p>
@@ -182,7 +182,7 @@ const CourierDashboard = ({
           </p>
         </div>
       ) : active ? (
-        <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+        <div className="figma-surface p-4">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-medium text-ink">My jobs</h2>
             <LocalizedClientLink

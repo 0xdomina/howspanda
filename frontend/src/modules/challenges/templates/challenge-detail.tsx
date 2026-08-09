@@ -144,9 +144,9 @@ const ChallengeDetailClient = ({
   return (
     <div
       data-testid="challenge-page"
-      className="content-container flex-1 small:py-12"
+      className="figma-container flex-1 py-10 small:py-16"
     >
-      <div className="py-8">
+      <div className="mb-8 max-w-2xl">
         <LocalizedClientLink
           href="/challenges"
           className="text-sm text-ink-muted hover:text-ink"
@@ -165,7 +165,7 @@ const ChallengeDetailClient = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4 small:grid-cols-2">
-        <div className="rounded-large border border-ink-hairline bg-paper-surface p-5">
+        <div className="figma-surface p-5">
           <h2 className="font-display text-lg font-medium text-ink">
             How it works
           </h2>
@@ -189,7 +189,7 @@ const ChallengeDetailClient = ({
           ) : null}
         </div>
 
-        <div className="rounded-large border border-ink-hairline bg-paper-surface p-5">
+        <div className="figma-surface p-5">
           <h2 className="font-display text-lg font-medium text-ink">
             Leaderboard
           </h2>

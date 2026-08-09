@@ -16,8 +16,8 @@ const LoginTemplate = () => {
   )
 
   return (
-    <div className="w-full flex justify-center px-8 py-16">
-      <div className="bg-paper-surface border border-ink-hairline rounded-large p-8 w-full max-w-md">
+    <div className="figma-container flex min-h-[calc(100vh-180px)] items-center justify-center py-12 small:py-20">
+      <div className="figma-surface w-full max-w-[480px] p-6 small:p-10">
         {currentView === SELLER_LOGIN_VIEW.SIGN_IN ? (
           <SellerLogin setCurrentView={setCurrentView} />
         ) : (

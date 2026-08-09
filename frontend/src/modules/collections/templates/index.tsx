@@ -21,11 +21,11 @@ export default function CollectionTemplate({
   const sort = sortBy || "created_at"
 
   return (
-    <div className="flex flex-col small:flex-row small:items-start py-6 content-container">
+    <div className="figma-container flex flex-col gap-8 py-10 small:flex-row small:items-start small:py-16">
       <RefinementList sortBy={sort} />
       <div className="w-full">
         <div className="mb-8">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
+          <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">
             {collection.title}
           </h1>
         </div>

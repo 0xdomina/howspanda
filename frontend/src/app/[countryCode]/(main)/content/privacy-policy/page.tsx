@@ -7,7 +7,8 @@ export const metadata: Metadata = {
 
 export default async function PrivacyPolicyPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="figma-container py-10 small:py-16">
+      <div className="figma-surface mx-auto max-w-3xl p-6 small:p-10">
       <h1 className="font-display text-2xl font-medium tracking-[-0.02em] text-ink">
         Privacy Policy
       </h1>
@@ -46,6 +47,7 @@ export default async function PrivacyPolicyPage() {
           the marketplace.
         </p>
       </div>
+    </div>
     </div>
   )
 }

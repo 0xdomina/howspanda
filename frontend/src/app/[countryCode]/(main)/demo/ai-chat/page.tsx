@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default async function DemoAiChatPage() {
   return (
-    <div className="content-container py-10">
+    <div className="figma-container py-10 small:py-16">
       <div className="mx-auto max-w-2xl">
         <div className="mb-6 text-center">
           <p className="eyebrow text-brand">Demo</p>

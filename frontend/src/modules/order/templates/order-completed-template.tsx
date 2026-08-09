@@ -23,10 +23,10 @@ export default async function OrderCompletedTemplate({
   const shareText = `My order on How's u is confirmed.`
 
   return (
-    <div className="py-6 min-h-[calc(100vh-64px)]">
-      <div className="content-container flex flex-col justify-center items-center gap-y-10 max-w-4xl h-full w-full">
+    <div className="min-h-[calc(100vh-64px)] bg-[#fafafa] py-10 small:py-16">
+      <div className="figma-container flex w-full max-w-4xl flex-col items-center justify-center gap-y-10">
         <div
-          className="flex flex-col gap-4 max-w-4xl h-full bg-paper-surface w-full py-10"
+          className="figma-surface flex h-full w-full max-w-4xl flex-col gap-4 p-6 small:p-10"
           data-testid="order-complete-container"
         >
           <div className="mb-4 flex items-start justify-between gap-4">

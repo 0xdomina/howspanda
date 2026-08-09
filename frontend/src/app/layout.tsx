@@ -2,6 +2,8 @@ import { getBaseURL } from "@lib/util/env"
 import { Metadata } from "next"
 import { Fraunces, Instrument_Sans, JetBrains_Mono } from "next/font/google"
 import "styles/globals.css"
+import { WishlistProvider } from "@modules/wishlist/context"
+import { loadWishlist } from "@lib/data/wishlist"
 
 const sans = Instrument_Sans({
   subsets: ["latin"],
@@ -32,7 +34,9 @@ export const metadata: Metadata = {
     "How's u is an AI-powered marketplace that helps people shop more and sell more.",
 }
 
-export default function RootLayout(props: { children: React.ReactNode }) {
+export default async function RootLayout(props: { children: React.ReactNode }) {
+  const initialWishlist = await loadWishlist()
+
   return (
     <html
       lang="en"
@@ -40,7 +44,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
       className={`${sans.variable} ${display.variable} ${mono.variable}`}
     >
       <body className="bg-paper font-sans text-ink antialiased">
-        <main className="relative">{props.children}</main>
+        <WishlistProvider initialItems={initialWishlist}><main className="relative">{props.children}</main></WishlistProvider>
       </body>
     </html>
   )

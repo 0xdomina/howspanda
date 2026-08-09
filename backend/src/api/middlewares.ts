@@ -592,12 +592,12 @@ export const PostKycVerifySchema = z
 // outside production so local/dev flows can complete without a mail provider.
 export const PostAuthOtpRequestSchema = z.object({
   email: z.string().email(),
-  purpose: z.enum(["signup", "reset"]),
+  purpose: z.enum(["signup", "reset", "email_change"]),
 })
 
 export const PostAuthOtpVerifySchema = z.object({
   email: z.string().email(),
-  purpose: z.enum(["signup", "reset"]),
+  purpose: z.enum(["signup", "reset", "email_change"]),
   code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
 })
 
@@ -610,6 +610,26 @@ export const PostAuthOtpResetSchema = z.object({
 export const PostAuthOtpAssertSchema = z.object({
   email: z.string().email(),
   proof: z.string().min(10),
+})
+
+export const PostWishlistReplaceSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().min(1).max(200),
+    handle: z.string().max(200).optional(),
+    title: z.string().min(1).max(300),
+    thumbnail: z.string().max(2000).nullable().optional(),
+    price: z.string().max(100).optional(),
+  })).max(100),
+})
+
+export const PostEmailChangeRequestSchema = z.object({
+  new_email: z.string().email(),
+  current_password: z.string().min(1),
+})
+
+export const PostEmailChangeConfirmSchema = z.object({
+  new_email: z.string().email(),
+  code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
 })
 
 // Payment rails (runtime toggle). `enabled` is the only mutable field — the
@@ -745,7 +765,7 @@ export default defineMiddlewares({
       matcher: "/sellers",
       method: ["POST"],
       middlewares: [
-        authenticate("seller", ["session", "bearer"], {
+        authenticate(["customer", "seller"], ["session", "bearer"], {
           allowUnregistered: true,
         }),
         validateAndTransformBody(PostSellerCreateSchema),
@@ -754,7 +774,7 @@ export default defineMiddlewares({
     {
       matcher: "/sellers/*",
       middlewares: [
-        authenticate("seller", ["session", "bearer"]),
+        authenticate(["customer", "seller"], ["session", "bearer"]),
       ],
     },
     {
@@ -1179,13 +1199,13 @@ export default defineMiddlewares({
       // required (the store namespace enforces the key, we enforce the actor).
       matcher: "/store/malls",
       methods: ["GET"],
-      middlewares: [authenticate("seller", ["session", "bearer"])],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
     },
     {
       matcher: "/store/malls",
       methods: ["POST"],
       middlewares: [
-        authenticate("seller", ["session", "bearer"]),
+        authenticate(["customer", "seller"], ["session", "bearer"]),
         validateAndTransformBody(PostMallCreateSchema),
       ],
     },
@@ -1193,7 +1213,7 @@ export default defineMiddlewares({
       matcher: "/store/malls/:id/join",
       methods: ["POST"],
       middlewares: [
-        authenticate("seller", ["session", "bearer"]),
+        authenticate(["customer", "seller"], ["session", "bearer"]),
         validateAndTransformBody(PostMallJoinSchema),
       ],
     },
@@ -1201,12 +1221,12 @@ export default defineMiddlewares({
       // Author-only mall lifecycle after expiry: re-launch or cancel.
       matcher: "/store/malls/:id/relaunch",
       methods: ["POST"],
-      middlewares: [authenticate("seller", ["session", "bearer"])],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
     },
     {
       matcher: "/store/malls/:id/cancel",
       methods: ["POST"],
-      middlewares: [authenticate("seller", ["session", "bearer"])],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
     },
     {
       // Public win ticker for the storefront malls pages.
@@ -1241,14 +1261,14 @@ export default defineMiddlewares({
       matcher: "/store/delivery-jobs",
       methods: ["POST"],
       middlewares: [
-        authenticate("seller", ["session", "bearer"]),
+        authenticate(["customer", "seller"], ["session", "bearer"]),
         validateAndTransformBody(PostDeliveryJobSchema),
       ],
     },
     {
       matcher: "/store/delivery-jobs/mine",
       methods: ["GET"],
-      middlewares: [authenticate("seller", ["session", "bearer"])],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
     },
     {
       // Courier application: only a signed-in customer or seller account can
@@ -1299,7 +1319,7 @@ export default defineMiddlewares({
     {
       matcher: "/store/delivery-jobs/:id/offers/:offerId/accept",
       methods: ["POST"],
-      middlewares: [authenticate("seller", ["session", "bearer"])],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
     },
     {
       matcher: "/store/delivery-jobs/:id/pickup",
@@ -1374,6 +1394,37 @@ export default defineMiddlewares({
       matcher: "/auth/otp/assert",
       methods: ["POST"],
       middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpAssertSchema)],
+    },
+    {
+      matcher: "/auth/email/change/request",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        OTP_RATE_LIMIT,
+        validateAndTransformBody(PostEmailChangeRequestSchema),
+      ],
+    },
+    {
+      matcher: "/auth/email/change/confirm",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        OTP_RATE_LIMIT,
+        validateAndTransformBody(PostEmailChangeConfirmSchema),
+      ],
+    },
+    {
+      matcher: "/store/wishlist",
+      methods: ["GET"],
+      middlewares: [authenticate("customer", ["session", "bearer"])],
+    },
+    {
+      matcher: "/store/wishlist",
+      methods: ["PUT"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        validateAndTransformBody(PostWishlistReplaceSchema),
+      ],
     },
     {
       matcher: "/admin/payment-rails",

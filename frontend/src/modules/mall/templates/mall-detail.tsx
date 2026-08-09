@@ -31,7 +31,7 @@ const GoodCard = ({ good }: { good: any }) => {
   return (
     <LocalizedClientLink
       href={good.handle ? `/products/${good.handle}` : "#"}
-      className="group rounded-large border border-ink-hairline bg-paper-surface p-3 transition hover:border-ink"
+      className="figma-surface group p-3 transition hover:border-ink"
     >
       <div className="aspect-square overflow-hidden rounded-medium bg-ink/5">
         {good.thumbnail ? (
@@ -126,8 +126,8 @@ const MallDetailClient = ({
   }
 
   return (
-    <div data-testid="mall-detail-page" className="content-container flex-1 small:py-12">
-      <div className="py-6">
+    <div data-testid="mall-detail-page" className="figma-container flex-1 py-10 small:py-16">
+      <div className="mb-6">
         <LocalizedClientLink
           href="/malls"
           className="text-sm text-ink-muted hover:text-ink"

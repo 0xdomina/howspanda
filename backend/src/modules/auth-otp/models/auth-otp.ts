@@ -6,7 +6,7 @@ import { model } from "@medusajs/framework/utils"
 const AuthOtp = model.define("auth_otp", {
   id: model.id().primaryKey(),
   email: model.text().searchable(),
-  purpose: model.enum(["signup", "reset"]),
+  purpose: model.enum(["signup", "reset", "email_change"]),
   channel: model.enum(["email", "phone"]).default("email"),
   destination: model.text().searchable(),
   code_hash: model.text(),

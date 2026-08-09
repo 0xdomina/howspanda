@@ -166,11 +166,9 @@ const AccountNav = ({
       </div>
       <div className="hidden small:block" data-testid="account-nav">
         <div>
-          <div className="pb-4">
-            <h3 className="text-base-semi">Account</h3>
-          </div>
+          <div className="pb-4"><h3 className="text-sm font-semibold text-ink">Your account</h3></div>
           <div className="text-base-regular">
-            <ul className="flex mb-0 justify-start items-start flex-col gap-y-4">
+            <ul className="mb-0 flex flex-col items-start justify-start gap-1">
               <li>
                 <AccountNavLink
                   href="/account"
@@ -279,8 +277,8 @@ const AccountNavLink = ({
   return (
     <LocalizedClientLink
       href={href}
-      className={clx("text-ink-muted hover:text-ink", {
-        "text-ink font-semibold": active,
+      className={clx("block rounded-full px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-paper-tinted hover:text-ink", {
+        "bg-ink font-semibold text-white hover:bg-ink hover:text-white": active,
       })}
       data-testid={dataTestId}
     >

@@ -38,7 +38,7 @@ const Section = ({
   title: string
   children: React.ReactNode
 }) => (
-  <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+  <div className="figma-surface p-4">
     <h3 className="font-display text-lg font-medium text-ink">{title}</h3>
     <div className="mt-3">{children}</div>
   </div>
@@ -212,8 +212,8 @@ const DeliverJobDetailClient = ({
   }
 
   return (
-    <div data-testid="deliver-job-page" className="content-container flex-1 small:py-12">
-      <div className="py-6">
+    <div data-testid="deliver-job-page" className="figma-container flex-1 py-10 small:py-16">
+      <div className="mb-6">
         <LocalizedClientLink
           href="/deliver"
           className="text-sm text-ink-muted hover:text-ink"

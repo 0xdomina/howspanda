@@ -1,161 +1,17 @@
-import { listCategories } from "@lib/data/categories"
-import { listCollections } from "@lib/data/collections"
-import { Text, clx } from "@medusajs/ui"
-
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
-export default async function Footer() {
-  const { collections } = await listCollections({
-    fields: "*products",
-  })
-  const productCategories = await listCategories()
-
-  return (
-    <footer className="border-t border-ink-hairline w-full bg-paper">
-      <div className="content-container flex flex-col w-full">
-        <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
-          <div>
-            <LocalizedClientLink
-              href="/"
-              className="font-display text-2xl font-semibold tracking-tight text-ink hover:text-ink-muted"
-            >
-              How&rsquo;s u
-            </LocalizedClientLink>
-          </div>
-          <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
-            {productCategories && productCategories?.length > 0 && (
-              <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Categories
-                </span>
-                <ul
-                  className="grid grid-cols-1 gap-2"
-                  data-testid="footer-categories"
-                >
-                  {productCategories?.slice(0, 6).map((c) => {
-                    if (c.parent_category) {
-                      return
-                    }
-
-                    const children =
-                      c.category_children?.map((child) => ({
-                        name: child.name,
-                        handle: child.handle,
-                        id: child.id,
-                      })) || null
-
-                    return (
-                      <li
-                        className="flex flex-col gap-2 text-ui-fg-subtle txt-small"
-                        key={c.id}
-                      >
-                        <LocalizedClientLink
-                          className={clx(
-                            "hover:text-ui-fg-base",
-                            children && "txt-small-plus"
-                          )}
-                          href={`/categories/${c.handle}`}
-                          data-testid="category-link"
-                        >
-                          {c.name}
-                        </LocalizedClientLink>
-                        {children && (
-                          <ul className="grid grid-cols-1 ml-3 gap-2">
-                            {children &&
-                              children.map((child) => (
-                                <li key={child.id}>
-                                  <LocalizedClientLink
-                                    className="hover:text-ui-fg-base"
-                                    href={`/categories/${child.handle}`}
-                                    data-testid="category-link"
-                                  >
-                                    {child.name}
-                                  </LocalizedClientLink>
-                                </li>
-                              ))}
-                          </ul>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            )}
-            {collections && collections.length > 0 && (
-              <div className="flex flex-col gap-y-2">
-                <span className="txt-small-plus txt-ui-fg-base">
-                  Collections
-                </span>
-                <ul
-                  className={clx(
-                    "grid grid-cols-1 gap-2 text-ui-fg-subtle txt-small",
-                    {
-                      "grid-cols-2": (collections?.length || 0) > 3,
-                    }
-                  )}
-                >
-                  {collections?.slice(0, 6).map((c) => (
-                    <li key={c.id}>
-                      <LocalizedClientLink
-                        className="hover:text-ui-fg-base"
-                        href={`/collections/${c.handle}`}
-                      >
-                        {c.title}
-                      </LocalizedClientLink>
-                    </li>
-                  ))}
-                  <li>
-                    <LocalizedClientLink
-                      className="hover:text-ui-fg-base"
-                      href="/collections"
-                    >
-                      All collections
-                    </LocalizedClientLink>
-                  </li>
-                </ul>
-              </div>
-            )}
-            <div className="flex flex-col gap-y-2">
-              <span className="txt-small-plus txt-ui-fg-base">How&rsquo;s u</span>
-              <ul className="grid grid-cols-1 gap-y-2 text-ui-fg-subtle txt-small">
-                <li>
-                  <LocalizedClientLink
-                    className="hover:text-ui-fg-base"
-                    href="/"
-                  >
-                    Home
-                  </LocalizedClientLink>
-                </li>
-                <li>
-                  <LocalizedClientLink
-                    className="hover:text-ui-fg-base"
-                    href="/cart"
-                  >
-                    Shopping bag
-                  </LocalizedClientLink>
-                </li>
-                <li>
-                  <LocalizedClientLink
-                    className="hover:text-ui-fg-base"
-                    href="/account"
-                  >
-                    Your account
-                  </LocalizedClientLink>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
-          <Text className="txt-compact-small">
-            © {new Date().getFullYear()}{" "}
-            <LocalizedClientLink href="/" className="hover:text-ui-fg-base">
-              How&rsquo;s u
-            </LocalizedClientLink>
-            . Shop more. Sell more.
-          </Text>
-        </div>
+export default function Footer() {
+  return <footer className="bg-black text-white" data-testid="footer">
+    <section className="border-b border-white/20 bg-white py-12 text-ink small:py-16" aria-label="How's U promises">
+      <div className="figma-container grid grid-cols-1 gap-10 text-center small:grid-cols-3">
+        {[["↗", "LOW-COST DELIVERY", "Affordable delivery options arranged between buyers and sellers"], ["◉", "24/7 CUSTOMER SERVICE", "Friendly support whenever you need a hand"], ["✓", "BUYER PROTECTION", "We help resolve issues fairly when an order goes wrong"]].map(([icon, title, copy]) => <div key={title}><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-black text-2xl text-white">{icon}</div><h2 className="mt-4 text-sm font-bold">{title}</h2><p className="mt-2 text-sm text-ink-muted">{copy}</p></div>)}
       </div>
-    </footer>
-  )
+    </section>
+    <div className="figma-container grid gap-12 py-16 small:grid-cols-[1.5fr_1fr_1fr]">
+      <div><LocalizedClientLink href="/" className="font-display text-2xl font-bold">How&rsquo;s U</LocalizedClientLink><p className="mt-6 max-w-xs text-sm text-white/70">Shop more. Sell more. A marketplace where buyers, sellers, and couriers win.</p></div>
+      <div><h2 className="font-semibold">Account</h2><ul className="mt-5 grid gap-3 text-sm text-white/70"><li><LocalizedClientLink href="/account" className="hover:text-white">My Account</LocalizedClientLink></li><li><LocalizedClientLink href="/cart" className="hover:text-white">Cart</LocalizedClientLink></li><li><LocalizedClientLink href="/store" className="hover:text-white">Shop</LocalizedClientLink></li><li><LocalizedClientLink href="/seller" className="hover:text-white">Become a seller</LocalizedClientLink></li></ul></div>
+      <div><h2 className="font-semibold">Quick Link</h2><ul className="mt-5 grid gap-3 text-sm text-white/70"><li><LocalizedClientLink href="/content/privacy-policy" className="hover:text-white">Privacy Policy</LocalizedClientLink></li><li><LocalizedClientLink href="/content/terms-of-use" className="hover:text-white">Terms Of Use</LocalizedClientLink></li><li><LocalizedClientLink href="/contact" className="hover:text-white">Contact</LocalizedClientLink></li><li><LocalizedClientLink href="/deliver" className="hover:text-white">Delivery</LocalizedClientLink></li></ul></div>
+    </div>
+    <div className="border-t border-white/20 py-5 text-center text-xs text-white/50">© {new Date().getFullYear()} How&rsquo;s U. All rights reserved.</div>
+  </footer>
 }

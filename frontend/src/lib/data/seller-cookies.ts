@@ -1,5 +1,6 @@
 import "server-only"
 import { cookies as nextCookies } from "next/headers"
+import { getAuthHeaders } from "./cookies"
 
 const SELLER_COOKIE = "_medusa_seller_jwt"
 
@@ -11,7 +12,7 @@ export const getSellerAuthHeaders = async (): Promise<
     const token = cookies.get(SELLER_COOKIE)?.value
 
     if (!token) {
-      return {}
+      return getAuthHeaders()
     }
 
     return { authorization: `Bearer ${token}` }

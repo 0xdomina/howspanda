@@ -5,7 +5,7 @@ import { sendOtp } from "../../lib/kyc/send-otp"
 
 const CODE_LIFETIME_MS = 15 * 60 * 1000
 
-export const OTP_PURPOSES = ["signup", "reset"] as const
+export const OTP_PURPOSES = ["signup", "reset", "email_change"] as const
 export type OtpPurpose = (typeof OTP_PURPOSES)[number]
 
 export function normalizeEmail(email: string): string {

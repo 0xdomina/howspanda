@@ -2,6 +2,7 @@ import {
   createWorkflow,
   WorkflowResponse,
   transform,
+  when,
 } from "@medusajs/framework/workflows-sdk"
 import {
   setAuthAppMetadataStep,
@@ -24,6 +25,7 @@ export type CreateSellerWorkflowInput = {
     last_name?: string
   }
   authIdentityId: string
+  preserveCustomerAuth?: boolean
 }
 
 const createSellerWorkflow = createWorkflow(
@@ -64,11 +66,17 @@ const createSellerWorkflow = createWorkflow(
 
     const sellerAdmin = createSellerAdminStep(sellerAdminData)
 
-    setAuthAppMetadataStep({
-      authIdentityId: input.authIdentityId,
-      actorType: "seller",
-      value: sellerAdmin.id,
-    })
+    when(
+      "seller-auth-metadata",
+      { preserveCustomerAuth: input.preserveCustomerAuth },
+      (data) => !data.preserveCustomerAuth
+    ).then(() =>
+      setAuthAppMetadataStep({
+        authIdentityId: input.authIdentityId,
+        actorType: "seller",
+        value: sellerAdmin.id,
+      })
+    )
 
     // The signup identifier (email or phone) is the seller's verified contact
     // — the login credential proves ownership — so KYC seeds it as verified

@@ -13,12 +13,15 @@ export async function resolveSellerId(
 ): Promise<string> {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
+  const filters =
+    req.auth_context?.actor_type === "customer"
+      ? { auth_identity_id: [req.auth_context.auth_identity_id] }
+      : { id: [req.auth_context.actor_id] }
+
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
     fields: ["id", "seller.id"],
-    filters: {
-      id: [req.auth_context.actor_id],
-    },
+    filters,
   })
 
   if (!sellerAdmin?.seller?.id) {
@@ -65,12 +68,15 @@ export async function resolveSellerContext(
 ): Promise<SellerContext> {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
+  const filters =
+    req.auth_context?.actor_type === "customer"
+      ? { auth_identity_id: [req.auth_context.auth_identity_id] }
+      : { id: [req.auth_context.actor_id] }
+
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
     fields: ["id", "email", "phone", "role", "seller.id"],
-    filters: {
-      id: [req.auth_context.actor_id],
-    },
+    filters,
   })
 
   if (!sellerAdmin?.seller?.id) {

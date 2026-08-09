@@ -34,12 +34,11 @@ export const GET = async (
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
 
+  const context = await resolveSellerContext(req)
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
     fields: ["id", "first_name", "last_name", "email", "phone", "seller.*"],
-    filters: {
-      id: [req.auth_context.actor_id],
-    },
+    filters: { id: [context.sellerAdminId] },
   })
 
   if (!sellerAdmin) {

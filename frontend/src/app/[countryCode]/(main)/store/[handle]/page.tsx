@@ -33,9 +33,9 @@ export default async function StorePage({
     profile
 
   return (
-    <div className="content-container flex flex-col gap-10 py-8 small:py-14">
+    <div className="figma-container flex flex-col gap-12 py-10 small:py-16">
       {/* Store header */}
-      <section className="flex flex-col gap-6 small:flex-row small:items-start small:justify-between">
+      <section className="figma-surface flex flex-col gap-6 p-6 small:flex-row small:items-start small:justify-between small:p-8">
         <div className="flex items-start gap-4">
           {seller.logo ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -95,7 +95,7 @@ export default async function StorePage({
             {broadcasts.map((b) => (
               <li
                 key={b.id}
-                className="rounded-medium border border-ink-hairline bg-paper-surface p-4"
+                className="figma-surface p-4"
               >
                 <p className="text-sm font-medium text-ink">{b.title}</p>
                 <p className="mt-1 text-sm text-ink-muted">{b.body}</p>
@@ -128,10 +128,10 @@ export default async function StorePage({
                     <img
                       src={p.thumbnail}
                       alt={p.title}
-                      className="aspect-square w-full rounded-medium object-cover"
+                      className="aspect-square w-full rounded-control border border-ink-hairline object-cover"
                     />
                   ) : (
-                    <div className="aspect-square w-full rounded-medium bg-ink/5" />
+                    <div className="aspect-square w-full rounded-control border border-ink-hairline bg-ink/5" />
                   )}
                   <p className="mt-2 text-sm text-ink group-hover:text-ink-muted">
                     {p.title}
