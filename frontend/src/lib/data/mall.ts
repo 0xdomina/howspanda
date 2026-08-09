@@ -22,6 +22,9 @@ export type Mall = {
   buyer_count?: number
   winner_count?: number
   shopping_open?: boolean
+  sellers?: MallSeller[]
+  buyers?: MallBuyer[]
+  prizes?: MallPrize[]
   starts_at?: string | null
   ends_at?: string | null
   expires_at: string

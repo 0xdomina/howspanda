@@ -52,6 +52,9 @@ const MallCard = ({
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const pending = mall.status === "pending"
+  const alreadyJoined = Boolean(
+    customerEmail && mall.buyers?.some((buyer) => buyer.buyer_email === customerEmail)
+  )
 
   const join = () => {
     if (!customerEmail) {
@@ -99,7 +102,9 @@ const MallCard = ({
         <LocalizedClientLink href={`/malls/${mall.id}`} className="block w-full rounded-control border border-ink-strong px-3 py-3 text-center text-sm font-medium text-ink transition-colors duration-200 hover:bg-ink hover:text-white">
           {pending ? "Browse products" : "View products & shop"}
         </LocalizedClientLink>
-        {(pending || mall.status === "active") && (
+        {alreadyJoined ? (
+          <div className="rounded-control bg-emerald-50 px-3 py-3 text-center text-sm font-medium text-emerald-700">You&rsquo;re in</div>
+        ) : (pending || mall.status === "active") && (
           customerEmail ? (
             <button type="button" disabled={isPending} onClick={join} className="w-full rounded-control bg-ink px-3 py-3 text-sm font-medium text-white disabled:opacity-50">
               {isPending ? "Joining…" : "Join this mall"}
