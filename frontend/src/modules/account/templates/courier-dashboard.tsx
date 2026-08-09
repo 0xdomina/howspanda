@@ -21,8 +21,7 @@ const statusLabel: Record<string, string> = {
   cancelled: "Cancelled",
 }
 
-// Courierhood is activated by the KYC ladder itself — reaching the
-// profile-completed level makes any signed-in account an active courier.
+// Courierhood is activated by a verified identity document.
 const DetailsForm = ({
   active,
   onDone,
@@ -114,8 +113,7 @@ const CourierDashboard = ({
 
   const courier = me?.courier ?? null
   const kycLevel = me?.kyc?.level ?? "unverified"
-  const kycVerified =
-    kycLevel === "profile_completed" || kycLevel === "identity_verified"
+  const kycVerified = kycLevel === "identity_verified"
   const suspended = courier?.status === "suspended"
   const active = kycVerified && !suspended
   const earnings = me?.earnings ?? 0
@@ -127,9 +125,8 @@ const CourierDashboard = ({
       <div>
         <h1 className="font-display text-2xl font-medium text-ink">Courier</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Sign in with an account, verify your phone, and complete your profile
-          — the KYC level itself activates courierhood. Then earn by delivering
-          packages.
+          Sign in, complete your profile, and verify your ID to unlock courier
+          applications and delivery offers.
         </p>
       </div>
 
@@ -153,7 +150,7 @@ const CourierDashboard = ({
           )}
           {active && (
             <p className="mt-1 text-xs text-ink-muted">
-              Profile complete — you can make offers.
+              Verified ID — you can make delivery offers.
             </p>
           )}
         </div>
@@ -163,7 +160,7 @@ const CourierDashboard = ({
           <p className="mt-1 text-xs text-ink-muted">
             {active
               ? "Courierhood is active."
-              : "Complete the KYC profile step to activate courierhood."}
+              : "Verify your ID to activate courier features."}
           </p>
         </div>
         <div className="figma-surface p-4">
@@ -248,11 +245,10 @@ const CourierDashboard = ({
         </div>
       ) : (
         <div className="rounded-large border border-amber-300 bg-amber-50 p-4">
-          <h2 className="font-display text-lg font-medium text-amber-900">Activate courierhood</h2>
+          <h2 className="font-display text-lg font-medium text-amber-900">Verify your ID to activate courierhood</h2>
           <p className="mt-1 text-sm text-amber-800">
-            Verify your phone and complete your profile (the profile_completed
-            KYC level) and you&apos;ll be an active courier — no application or
-            approval needed.
+            Upload a clear ID card photo and complete the verification step. A
+            verified identity unlocks courier applications and offers.
           </p>
           <LocalizedClientLink
             href="/account/verification"

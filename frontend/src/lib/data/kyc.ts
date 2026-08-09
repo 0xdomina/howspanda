@@ -27,6 +27,8 @@ export type KycProfileView = {
   phone_verified_at: string | null
   id_submitted_at: string | null
   id_reviewed_at: string | null
+  id_document_uploaded: boolean
+  id_document_mime: string | null
 }
 
 // Server-side feature toggles (GET /store/features). The UI shows/hides the
@@ -141,6 +143,7 @@ export const submitKycIdentity = async (input: {
   phone?: string
   id_type: "nin"
   id_number: string
+  document?: File
   // Fields extracted client-side from the ID card (OCR + cleaning). Sent as
   // JSON so the backend NIN match can check them against the profile.
   extracted?: {
@@ -156,11 +159,21 @@ export const submitKycIdentity = async (input: {
   }
 }): Promise<{ ok: boolean; profile: KycProfileView | null; error: string | null }> => {
   try {
+    const body = new FormData()
+    body.append("id_type", input.id_type)
+    body.append("id_number", input.id_number)
+    if (input.document) {
+      body.append("document", input.document, input.document.name)
+    }
+    if (input.extracted) {
+      body.append("extracted", JSON.stringify(input.extracted))
+    }
     const res = await sdk.client.fetch<{ ok: boolean; profile: KycProfileView }>(
       "/kyc/identity",
       {
         method: "POST",
-        body: input,
+        headers: { "content-type": null } as any,
+        body: body as any,
       }
     )
     return { ok: true, profile: res.profile, error: null }

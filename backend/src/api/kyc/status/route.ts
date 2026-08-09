@@ -1,22 +1,17 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import {
+  AuthenticatedMedusaRequest,
+  MedusaResponse,
+} from "@medusajs/framework/http"
 import KycModuleService from "../../../modules/kyc/service"
 import { KYC_MODULE } from "../../../modules/kyc"
 
-// Public, quota-free profile view by email or phone — same identity model as
-// delivery. Never returns the full ID number.
+// KYC state is account data. It is read from the authenticated actor rather
+// than accepting an arbitrary email/phone lookup from the public internet.
 export const GET = async (
-  req: MedusaRequest,
+  req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const email = (req.query?.email as string | undefined) ?? ""
-  const phone = (req.query?.phone as string | undefined) ?? ""
-  if (!email && !phone) {
-    res
-      .status(400)
-      .json({ ok: false, message: "email or phone query param is required" })
-    return
-  }
   const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
-  const profile = await kyc.getProfileView({ email, phone })
+  const profile = await kyc.getProfileForUser(req.auth_context)
   res.json({ ok: true, profile })
 }

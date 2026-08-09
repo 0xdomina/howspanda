@@ -47,18 +47,16 @@ const baseSteps: StepDef[] = [
     label: "Complete your profile",
     done: (kyc) =>
       kyc?.level === "profile_completed" || kyc?.level === "identity_verified",
-    unlocks: "Sell, deliver, and withdraw earnings",
+    unlocks: "Set up your store and manage seller features",
   },
 ]
 
-// The identity rung is shown only while NIN verification is enabled on the
-// server. Flipping FEATURE_NIN_VERIFICATION raises the unlock level for selling
-// + delivering to identity_verified, so this step becomes mandatory.
+// The identity rung is shown when NIN verification is enabled on the server.
 const identityStep: StepDef = {
   key: "identity",
   label: "Verify your identity (NIN)",
-  done: (kyc) => !!kyc?.id_status,
-  unlocks: "Keep selling and delivering while NIN verification is on",
+  done: (kyc) => kyc?.id_status === "verified",
+  unlocks: "Apply, offer, and earn as a courier",
 }
 
 const buildSteps = (features: KycFeatures): StepDef[] =>
@@ -544,6 +542,7 @@ const IdentityStep = ({
 }) => {
   const [mode, setMode] = useState<"upload" | "manual">("upload")
   const [image, setImage] = useState<string | null>(null)
+  const [document, setDocument] = useState<File | null>(null)
   const [stage, setStage] = useState<"idle" | "scanning" | "review">("idle")
   const [progress, setProgress] = useState<number | null>(null)
   const [doc, setDoc] = useState<ExtractedNinDoc>({})
@@ -564,6 +563,11 @@ const IdentityStep = ({
       setError("Choose an image of your ID card.")
       return
     }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Choose an ID image smaller than 8 MB.")
+      return
+    }
+    setDocument(file)
     const reader = new FileReader()
     reader.onload = () => setImage(reader.result as string)
     reader.readAsDataURL(file)
@@ -613,6 +617,7 @@ const IdentityStep = ({
   const reset = () => {
     setStage("idle")
     setImage(null)
+    setDocument(null)
     setDoc({})
     setError(null)
   }
@@ -622,6 +627,10 @@ const IdentityStep = ({
     const idNumber = (doc.id_number ?? "").replace(/\D/g, "")
     if (idNumber.length !== 11) {
       setError("NIN must be an 11-digit number.")
+      return
+    }
+    if (!document) {
+      setError("Choose the ID card photo again before submitting.")
       return
     }
     const extracted = {
@@ -640,6 +649,7 @@ const IdentityStep = ({
         email,
         id_type: "nin",
         id_number: idNumber,
+        document: document ?? undefined,
         extracted,
       })
       if (res.ok && res.profile) {
@@ -662,6 +672,7 @@ const IdentityStep = ({
         email,
         id_type: "nin",
         id_number: idNumber,
+        document: document ?? undefined,
         // The match checks the card's name against the profile — in manual
         // mode the card isn't scanned, so the profile name stands in.
         extracted: {
@@ -690,7 +701,7 @@ const IdentityStep = ({
               : "border border-ink-strong text-ink hover:bg-ink hover:text-white"
           }`}
         >
-          Scan ID card
+          Upload ID card
         </button>
         <button
           type="button"
@@ -708,8 +719,9 @@ const IdentityStep = ({
       {mode === "upload" && stage === "idle" && (
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
-            Take a photo of your National ID card. The card is read in your
-            browser — only the extracted details are sent, never the photo.
+            Upload a clear photo of your National ID card. We read it locally
+            to help fill the form, then validate the original image securely on
+            the backend. The raw image is not kept in public storage.
           </p>
           <input
             type="file"
@@ -731,7 +743,7 @@ const IdentityStep = ({
                 onClick={scan}
                 className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
               >
-                Scan ID card
+                Scan and review
               </button>
             </div>
           )}
@@ -828,8 +840,9 @@ const IdentityStep = ({
       {mode === "manual" && (
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
-            Enter your National Identification Number (NIN). Only the last 4
-            digits are stored — nothing else is kept.
+            Enter your National Identification Number (NIN). Manual entries
+            stay pending review; uploading a card photo enables automatic file
+            validation.
           </p>
           <input
             value={nin}
@@ -879,8 +892,8 @@ const VerificationClient = ({
         Verification
       </h2>
       <p className="text-sm text-ink-muted">
-        Progressively verify your account. Complete your profile after verifying
-        your phone to start selling and delivering, then withdraw your earnings.
+        Complete your profile to set up a store. A verified ID unlocks courier
+        applications and delivery offers.
       </p>
 
       <ol className="space-y-4">
@@ -903,7 +916,8 @@ const VerificationClient = ({
                 </div>
                 <p className="mt-1 text-xs text-ink-muted">Unlocks: {step.unlocks}</p>
               </div>
-              {done(step.key) && (
+              {(done(step.key) ||
+                (step.key === "identity" && profile?.id_status === "pending")) && (
                 <span className="shrink-0 rounded-full bg-emerald-600/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
                   {step.key === "identity" && profile?.id_status === "pending"
                     ? "Pending review"
@@ -912,7 +926,8 @@ const VerificationClient = ({
               )}
             </div>
 
-            {!done(step.key) && (
+            {!done(step.key) &&
+              !(step.key === "identity" && profile?.id_status === "pending") && (
               <div className="mt-4">
                 {step.key === "email" && (
                   <EmailStep email={email} onDone={(p) => setProfile(p)} />
@@ -940,6 +955,12 @@ const VerificationClient = ({
                   />
                 )}
               </div>
+            )}
+            {step.key === "identity" && profile?.id_status === "pending" && (
+              <p className="mt-4 text-sm text-ink-muted">
+                Your ID document is being reviewed. Courier features will open
+                as soon as verification is approved.
+              </p>
             )}
           </li>
         ))}

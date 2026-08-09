@@ -42,6 +42,8 @@ export type KycProfileView = {
   phone_verified_at: string | null
   id_submitted_at: string | null
   id_reviewed_at: string | null
+  id_document_uploaded: boolean
+  id_document_mime: string | null
 }
 
 // Which personal fields must be present (and non-empty) for the ladder to count
@@ -125,7 +127,7 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    * on, identity verification becomes a mandatory rung of the same ladder.
    */
   ninVerificationEnabled(): boolean {
-    return process.env.FEATURE_NIN_VERIFICATION === "true"
+    return process.env.FEATURE_NIN_VERIFICATION !== "false"
   }
 
   /**
@@ -134,14 +136,18 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    * on raises the bar to identity_verified automatically.
    */
   requiredUnlockLevel(): KycLevel {
-    return this.ninVerificationEnabled() ? "identity_verified" : "profile_completed"
+    return "profile_completed"
+  }
+
+  requiredCourierLevel(): KycLevel {
+    return "identity_verified"
   }
 
   private unlockMessage(required: KycLevel): string {
     if (required === "identity_verified") {
-      return "Verify your identity (NIN) to unlock selling and delivering."
+      return "Upload and verify your ID card to unlock courier features."
     }
-    return "Complete your KYC profile (verified phone + personal details) to unlock selling and delivering."
+      return "Complete your KYC profile (verified phone + personal details) to set up your store."
   }
 
   /**
@@ -289,6 +295,9 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       id_status: string
       id_submitted_at: Date | null
       id_reviewed_at: Date | null
+      id_document_hash: string | null
+      id_document_mime: string | null
+      id_document_size: number | null
     } | null = null
     if (input.userType && input.userId) {
       const byUser = await this.listKycProfiles(
@@ -352,6 +361,8 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       id_reviewed_at: profile.id_reviewed_at
         ? profile.id_reviewed_at.toISOString()
         : null,
+      id_document_uploaded: !!profile.id_document_hash,
+      id_document_mime: profile.id_document_mime,
     }
   }
 
@@ -549,12 +560,20 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
   async submitIdentity(input: {
     email?: string | null
     phone?: string | null
+    userType?: "customer" | "seller" | null
+    userId?: string | null
     id_type: string
     id_number: string
     // Fields extracted client-side from the ID card (OCR + cleaning). Sent as
     // JSON so the backend match has something to check the user's claims
-    // against; nothing but the masked number is persisted.
+    // against; nothing but the masked number and document fingerprint are
+    // persisted.
     extracted?: ExtractedNinDoc
+    document?: {
+      sha256: string
+      mime: string
+      size: number
+    }
   }): Promise<{ ok: boolean; profile: KycProfileView }> {
     if (input.id_type !== "nin") {
       throw new MedusaError(
@@ -573,13 +592,15 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
     const profile = await this.getOrCreateProfile({
       email: input.email,
       phone: input.phone,
+      userType: input.userType,
+      userId: input.userId,
     })
 
     // With NIN verification flipped on, the submission is verified here and
     // now by the match — there is no admin review on the platform. Off (the
     // default) keeps the pending state until a review/provider flips it.
     let idStatus: "pending" | "verified" = "pending"
-    if (this.ninVerificationEnabled()) {
+    if (this.ninVerificationEnabled() && input.document) {
       const match = matchNin({
         profile: {
           first_name: profile.first_name,
@@ -598,6 +619,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       idStatus = "verified"
     }
 
+    const documentFields = input.document
+      ? {
+          id_document_hash: input.document.sha256,
+          id_document_mime: input.document.mime,
+          id_document_size: input.document.size,
+        }
+      : {}
+
     await this.updateKycProfiles({
       id: profile.id,
       id_type: "nin",
@@ -605,11 +634,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       id_status: idStatus,
       id_submitted_at: new Date(),
       id_reviewed_at: idStatus === "verified" ? new Date() : null,
+      ...documentFields,
     })
 
     return {
       ok: true,
       profile: (await this.getProfileView({
+        userType: input.userType,
+        userId: input.userId,
         email: profile.email,
         phone: profile.phone,
       }))!,
@@ -656,7 +688,7 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    */
   async assertCourierKyc(email: string): Promise<void> {
     const profile = await this.getProfileView({ email })
-    const required = this.requiredUnlockLevel()
+    const required = this.requiredCourierLevel()
     if (!profile || KYC_LEVEL_ORDER[profile.level] < KYC_LEVEL_ORDER[required]) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,

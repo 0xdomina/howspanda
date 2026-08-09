@@ -2,9 +2,8 @@
 // code change. The frontend reads the same values via GET /store/features and
 // shows/hides UI instantly when a flag is turned on.
 export type FeatureFlags = {
-  // NIN document verification. Off by default: users unlock seller + courier
-  // with phone + complete profile. When flipped on, identity verification
-  // becomes a mandatory rung of the same ladder.
+  // NIN document verification. Enabled unless explicitly disabled so a
+  // verified ID can unlock courier features in production.
   nin_verification: boolean
   // Product showcase video upload. Off by default. When flipped on, sellers
   // can attach a single compressed 30s video to a product.
@@ -13,7 +12,7 @@ export type FeatureFlags = {
 
 export function featureFlags(): FeatureFlags {
   return {
-    nin_verification: process.env.FEATURE_NIN_VERIFICATION === "true",
+    nin_verification: process.env.FEATURE_NIN_VERIFICATION !== "false",
     product_video: process.env.FEATURE_PRODUCT_VIDEO === "true",
   }
 }

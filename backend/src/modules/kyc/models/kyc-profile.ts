@@ -18,7 +18,8 @@ const KycProfile = model.define("kyc_profile", {
   user_id: model.text().nullable(),
   // Personal profile collected as part of the ladder (names exactly as on the
   // ID card + residence address). Filling these after phone verification bumps
-  // the ladder to profile_completed, which unlocks seller + courier features.
+  // the ladder to profile_completed, which unlocks seller setup. Courier
+  // features additionally require a verified identity document.
   first_name: model.text().nullable(),
   last_name: model.text().nullable(),
   other_name: model.text().nullable(),
@@ -40,6 +41,11 @@ const KycProfile = model.define("kyc_profile", {
     .default("none"),
   id_submitted_at: model.dateTime().nullable(),
   id_reviewed_at: model.dateTime().nullable(),
+  // The raw ID image is never stored in the public media bucket. We keep only
+  // a server-computed fingerprint and validation metadata for auditability.
+  id_document_hash: model.text().nullable(),
+  id_document_mime: model.text().nullable(),
+  id_document_size: model.number().nullable(),
 })
 
 export default KycProfile

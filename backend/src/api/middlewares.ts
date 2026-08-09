@@ -1369,6 +1369,11 @@ export default defineMiddlewares({
       middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryVerifySchema)],
     },
     {
+      matcher: "/kyc/status",
+      methods: ["GET"],
+      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
+    },
+    {
       matcher: "/kyc/request",
       methods: ["POST"],
       middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycRequestSchema)],
@@ -1381,7 +1386,12 @@ export default defineMiddlewares({
     {
       matcher: "/kyc/identity",
       methods: ["POST"],
-      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycIdentitySchema)],
+      // Multipart identity uploads are parsed inside the route. Authenticate
+      // first so a caller cannot submit KYC against another email/phone.
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        OTP_RATE_LIMIT,
+      ],
     },
     {
       matcher: "/auth/otp/request",

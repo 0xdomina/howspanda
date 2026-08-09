@@ -8,7 +8,7 @@ import VerificationClient from "@modules/account/components/verification"
 
 export const metadata: Metadata = {
   title: "Verification",
-  description: "Verify your identity to unlock selling and delivering.",
+  description: "Verify your identity to unlock courier features.",
 }
 
 export default async function VerificationPage() {
