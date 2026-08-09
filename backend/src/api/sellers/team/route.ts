@@ -11,7 +11,13 @@ import {
 import { z } from "@medusajs/framework/zod"
 import MarketplaceModuleService from "../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
-import { resolveSellerContext } from "../../../lib/sellers/resolve-seller"
+import {
+  DEFAULT_STAFF_PERMISSIONS,
+  normalizeSellerPermissions,
+  resolveSellerContext,
+  SELLER_PERMISSION_KEYS,
+  type SellerPermission,
+} from "../../../lib/sellers/resolve-seller"
 import { sendTeamInviteEmail } from "../../../lib/notifications/send-team-invite"
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
@@ -25,6 +31,11 @@ export const PostSellerTeamSchema = z.strictObject({
   email: z.string().email(),
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
+  permissions: z.array(z.string()).max(SELLER_PERMISSION_KEYS.length).optional(),
+})
+
+export const PatchSellerTeamSchema = z.strictObject({
+  permissions: z.array(z.string()).max(SELLER_PERMISSION_KEYS.length),
 })
 
 type TeamMember = {
@@ -35,6 +46,7 @@ type TeamMember = {
   email: string | null
   phone: string | null
   created_at: string | null
+  permissions: SellerPermission[]
 }
 
 export const GET = async (
@@ -54,6 +66,7 @@ export const GET = async (
       "email",
       "phone",
       "created_at",
+      "permissions",
     ],
     filters: { seller_id: [context.sellerId] },
   })
@@ -66,6 +79,7 @@ export const GET = async (
     email: admin.email ?? null,
     phone: admin.phone ?? null,
     created_at: admin.created_at ?? null,
+    permissions: normalizeSellerPermissions(admin.permissions),
   }))
 
   res.json({ team })
@@ -85,6 +99,22 @@ export const POST = async (
 
   const body = req.validatedBody
   const email = normalizeEmail(body.email)
+
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: existingTeam } = await query.graph({
+    entity: "seller_admin",
+    fields: ["id", "role"],
+    filters: { seller_id: [context.sellerId] },
+  })
+  const staffCount = (existingTeam ?? []).filter(
+    (member: any) => (member.role ?? "owner") === "staff"
+  ).length
+  if (staffCount >= 3) {
+    throw new MedusaError(
+      MedusaError.Types.CONFLICT,
+      "A store can have up to 3 invited managers in addition to its owner."
+    )
+  }
 
   const marketplace: MarketplaceModuleService =
     req.scope.resolve(MARKETPLACE_MODULE)
@@ -106,8 +136,6 @@ export const POST = async (
 
   // Invite existing platform users only — the invited email must already hold
   // an account on the platform. We never provision a new login here.
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-
   const { data } = await query.graph({
     entity: "auth_identity",
     fields: [
@@ -149,6 +177,9 @@ export const POST = async (
     email,
     first_name: body.first_name,
     last_name: body.last_name,
+    permissions: normalizeSellerPermissions(
+      body.permissions ?? DEFAULT_STAFF_PERMISSIONS
+    ) as unknown as Record<string, unknown>,
   })
 
   // Attach the seller actor to the invitee's EXISTING identity so they sign in
@@ -184,6 +215,7 @@ export const POST = async (
       email,
       first_name: staffAdmin.first_name,
       last_name: staffAdmin.last_name,
+      permissions: normalizeSellerPermissions(staffAdmin.permissions),
     },
   })
 }

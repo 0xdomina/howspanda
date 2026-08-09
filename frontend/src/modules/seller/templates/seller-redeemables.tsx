@@ -262,8 +262,10 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
 
 const RedeemablesClient = ({
   redeemables,
+  isOwner,
 }: {
   redeemables: SellerRedeemable[]
+  isOwner: boolean
 }) => {
   const [creating, setCreating] = useState(false)
   const [redeeming, setRedeeming] = useState(false)
@@ -317,7 +319,7 @@ const RedeemablesClient = ({
       <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-medium text-ink">Create a code</h3>
-          {!creating && (
+          {isOwner && !creating && (
             <button
               type="button"
               onClick={() => setCreating(true)}
@@ -327,13 +329,19 @@ const RedeemablesClient = ({
             </button>
           )}
         </div>
-        {createdCode && (
+        {!isOwner && (
+          <p className="text-sm text-ink-muted">
+            Only the store owner can create or cancel redeemables. You can still
+            open the till if redeemable access is enabled for your account.
+          </p>
+        )}
+        {isOwner && createdCode && (
           <div className="mb-4 rounded-medium bg-ink/5 border border-ink-hairline p-3">
             <p className="text-xs text-ink-muted">Code(s) created — share this with your buyer:</p>
             <p className="mt-1 font-mono text-lg font-semibold text-ink">{createdCode}</p>
           </div>
         )}
-        {creating && (
+        {isOwner && creating && (
           <CreateForm
             onCreated={(code) => {
               setCreating(false)
@@ -408,7 +416,7 @@ const RedeemablesClient = ({
                   >
                     {r.status ?? "unknown"}
                   </span>
-                  {r.status === "active" && (
+                  {isOwner && r.status === "active" && (
                     <button
                       type="button"
                       disabled={isPending}

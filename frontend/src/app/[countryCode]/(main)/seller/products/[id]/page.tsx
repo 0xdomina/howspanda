@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { retrieveSeller, retrieveSellerProduct } from "@lib/data/seller"
 import { retrieveFeatures } from "@lib/data/kyc"
 import EditProduct from "@modules/seller/components/edit-product"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Edit product",
@@ -18,7 +19,7 @@ export default async function EditProductPage({
   const { id } = await params
   const seller = await retrieveSeller().catch(() => null)
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "products")) {
     notFound()
   }
 

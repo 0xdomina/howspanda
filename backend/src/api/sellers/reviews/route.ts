@@ -6,11 +6,13 @@ import { MedusaError } from "@medusajs/framework/utils"
 import { REVIEWS_MODULE } from "../../../modules/reviews"
 import type ReviewsModuleService from "../../../modules/reviews/service"
 import { resolveSellerId } from "../../../lib/reviews/resolve-seller"
+import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "reviews")
   const sellerId = await resolveSellerId(req)
   const reviews = req.scope.resolve<ReviewsModuleService>(REVIEWS_MODULE)
 

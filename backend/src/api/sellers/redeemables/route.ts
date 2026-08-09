@@ -13,32 +13,19 @@ import { REDEEMABLES_MODULE } from "../../../modules/redeemables"
 import RedeemablesModuleService from "../../../modules/redeemables/service"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import { PostSellerRedeemableSchema } from "../../middlewares"
+import {
+  requireSellerOwner,
+  requireSellerPermission,
+} from "../../../lib/sellers/resolve-seller"
 
 type PostBody = z.infer<typeof PostSellerRedeemableSchema>
-
-async function resolveSellerId(
-  req: AuthenticatedMedusaRequest
-): Promise<string> {
-  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { data: [sellerAdmin] } = await query.graph({
-    entity: "seller_admin",
-    fields: ["id", "seller.id"],
-    filters: { id: [req.auth_context.actor_id] },
-  })
-  if (!sellerAdmin?.seller?.id) {
-    throw new MedusaError(
-      MedusaError.Types.UNAUTHORIZED,
-      "Seller not found for authenticated actor"
-    )
-  }
-  return sellerAdmin.seller.id
-}
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const sellerId = await resolveSellerId(req)
+  const context = await requireSellerPermission(req, "redeemables")
+  const sellerId = context.sellerId
   const redeemables =
     req.scope.resolve<RedeemablesModuleService>(REDEEMABLES_MODULE)
 
@@ -56,7 +43,8 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<PostBody>,
   res: MedusaResponse
 ) => {
-  const sellerId = await resolveSellerId(req)
+  const context = await requireSellerOwner(req)
+  const sellerId = context.sellerId
   const body = req.validatedBody
   const redeemables =
     req.scope.resolve<RedeemablesModuleService>(REDEEMABLES_MODULE)

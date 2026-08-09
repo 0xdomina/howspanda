@@ -10,6 +10,7 @@ import {
 import { z } from "@medusajs/framework/zod"
 import { PostSellerMobileProductSchema } from "../../middlewares"
 import createSellerProductWorkflow from "../../../workflows/marketplace/create-seller-product"
+import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
 
 type MobileProductBody = z.infer<typeof PostSellerMobileProductSchema>
 
@@ -55,6 +56,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<MobileProductBody>,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "products")
   const body = req.validatedBody
   const product = toFullProductShape(body)
 
@@ -97,6 +99,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "products")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({

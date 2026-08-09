@@ -37,7 +37,16 @@ export const GET = async (
   const context = await resolveSellerContext(req)
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
-    fields: ["id", "first_name", "last_name", "email", "phone", "seller.*"],
+    fields: [
+      "id",
+      "first_name",
+      "last_name",
+      "email",
+      "phone",
+      "role",
+      "permissions",
+      "seller.*",
+    ],
     filters: { id: [context.sellerAdminId] },
   })
 
@@ -56,7 +65,10 @@ export const GET = async (
   })
 
   res.json({
-    seller_admin: sellerAdmin,
+    seller_admin: {
+      ...sellerAdmin,
+      permissions: context.permissions,
+    },
     kyc: kycProfile,
   })
 }
@@ -126,11 +138,25 @@ export const PATCH = async (
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: [updatedAdmin] } = await query.graph({
     entity: "seller_admin",
-    fields: ["id", "first_name", "last_name", "email", "phone", "seller.*"],
+    fields: [
+      "id",
+      "first_name",
+      "last_name",
+      "email",
+      "phone",
+      "role",
+      "permissions",
+      "seller.*",
+    ],
     filters: {
       id: [context.sellerAdminId],
     },
   })
 
-  res.json({ seller_admin: updatedAdmin })
+  res.json({
+    seller_admin: {
+      ...updatedAdmin,
+      permissions: context.permissions,
+    },
+  })
 }

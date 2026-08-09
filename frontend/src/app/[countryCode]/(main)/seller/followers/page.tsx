@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { retrieveSeller } from "@lib/data/seller"
 import { getSellerFollowers } from "@lib/data/follows"
 import SellerFollowersClient from "@modules/seller/templates/seller-followers"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Followers",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function SellerFollowersPage() {
   const seller = await retrieveSeller().catch(() => null)
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "followers")) {
     notFound()
   }
 

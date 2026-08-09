@@ -10,14 +10,16 @@ import {
   removeSellerAuthToken,
   setSellerAuthToken,
 } from "./seller-cookies"
+import type { SellerPermission } from "../seller-permissions"
 
-type SellerAdmin = {
+export type SellerAdmin = {
   id: string
   first_name?: string
   last_name?: string
   email?: string
   phone?: string
   role?: "owner" | "staff"
+  permissions?: SellerPermission[]
   seller?: {
     id: string
     name?: string
@@ -1013,6 +1015,7 @@ export type SellerTeamMember = {
   email: string | null
   phone: string | null
   created_at?: string | null
+  permissions?: SellerPermission[]
 }
 
 export const listSellerTeam = async (): Promise<SellerTeamMember[]> => {
@@ -1037,6 +1040,7 @@ export const addSellerTeamMember = async (body: {
   email: string
   first_name?: string
   last_name?: string
+  permissions?: SellerPermission[]
 }): Promise<{ success: boolean; error: string | null }> => {
   try {
     const headers = await getSellerAuthHeaders()
@@ -1108,5 +1112,32 @@ export const updateSellerStore = async (body: {
     return { success: true, error: null }
   } catch (error: any) {
     return { success: false, error: error?.message ?? error?.toString?.() ?? String(error) }
+  }
+}
+
+export const updateSellerTeamMemberPermissions = async (
+  id: string,
+  permissions: SellerPermission[]
+): Promise<{ success: boolean; error: string | null }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers))
+      return { success: false, error: "Not signed in as a seller." }
+
+    await sdk.client.fetch(`/sellers/team/${id}`, {
+      method: "PATCH",
+      headers,
+      body: { permissions },
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
+
+    return { success: true, error: null }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message ?? error?.toString?.() ?? String(error),
+    }
   }
 }

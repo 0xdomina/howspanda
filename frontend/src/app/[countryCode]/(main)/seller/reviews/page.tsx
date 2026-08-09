@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveSeller, listSellerReviews } from "@lib/data/seller"
 import ReviewsClient from "@modules/seller/templates/seller-reviews"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Reviews",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 export default async function SellerReviewsPage() {
   const seller = await retrieveSeller().catch(() => null)
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "reviews")) {
     notFound()
   }
 

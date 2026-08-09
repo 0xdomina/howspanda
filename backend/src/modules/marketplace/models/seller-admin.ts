@@ -18,6 +18,10 @@ const SellerAdmin = model.define("seller_admin", {
   // Links the seller_admin row to its auth identity so the store owner can
   // later remove a staff member (and their login) by id.
   auth_identity_id: model.text().nullable(),
+  // Staff permissions are intentionally store-scoped. A null value keeps
+  // legacy staff accounts on the safe day-to-day default until the owner
+  // explicitly changes their access.
+  permissions: model.json().nullable(),
   seller: model.belongsTo(() => Seller, {
     mappedBy: "admins",
   }),

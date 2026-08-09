@@ -10,6 +10,7 @@ import MallModuleService from "../../../../../modules/mall/service"
 import { MALL_MODULE } from "../../../../../modules/mall"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
 import type MarketplaceModuleService from "../../../../../modules/marketplace/service"
+import { requireSellerOwner } from "../../../../../lib/sellers/resolve-seller"
 
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
@@ -38,6 +39,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const sellerId = await resolveSellerId(req)
   const { id } = req.params as { id: string }
 

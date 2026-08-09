@@ -8,11 +8,13 @@ import {
 } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import MarketplaceModuleService from "../../../modules/marketplace/service"
+import { requireSellerOwner } from "../../../lib/sellers/resolve-seller"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({

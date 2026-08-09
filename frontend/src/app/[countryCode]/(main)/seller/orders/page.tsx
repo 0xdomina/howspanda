@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveSeller, listSellerOrders } from "@lib/data/seller"
 import OrderActions from "@modules/seller/components/order-actions"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Your orders",
@@ -13,7 +14,7 @@ export default async function SellerOrdersPage() {
   const seller = await retrieveSeller().catch(() => null)
   const orders = (await listSellerOrders().catch(() => [])) || []
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "orders")) {
     notFound()
   }
 

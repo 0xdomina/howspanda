@@ -7,6 +7,7 @@ import {
   getSellerBrief,
 } from "@lib/data/seller"
 import SellerAiClient from "@modules/seller/templates/seller-ai"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "AI tools",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 export default async function SellerAiPage() {
   const seller = await retrieveSeller().catch(() => null)
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "ai")) {
     notFound()
   }
 

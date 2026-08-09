@@ -25,7 +25,7 @@ export default async function SellerMoneyPage() {
   const payouts = await listSellerPayouts().catch(() => [])
   const rails = await getPaymentRails().catch(() => [])
 
-  if (!seller) {
+  if (!seller || seller.role === "staff") {
     notFound()
   }
 

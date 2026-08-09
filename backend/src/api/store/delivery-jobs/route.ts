@@ -10,6 +10,7 @@ import {
 import DeliveryModuleService from "../../../modules/delivery/service"
 import { DELIVERY_MODULE } from "../../../modules/delivery"
 import type { PostJobInput } from "../../../modules/delivery/service"
+import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
 
 // Anyone with a publishable key can browse open jobs (courier view).
 // Supports ?city=... text filter and ?lat=..&lng=..&radiusKm=.. near-me search.
@@ -29,6 +30,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<PostJobInput>,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "delivery")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",

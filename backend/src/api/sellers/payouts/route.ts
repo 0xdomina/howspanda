@@ -12,6 +12,7 @@ import MarketplaceModuleService from "../../../modules/marketplace/service"
 import createPayoutWorkflow from "../../../workflows/marketplace/create-payout"
 import { PostSellerPayoutSchema } from "../../middlewares"
 import { z } from "@medusajs/framework/zod"
+import { requireSellerOwner } from "../../../lib/sellers/resolve-seller"
 
 type PostSellerPayoutBody = z.infer<typeof PostSellerPayoutSchema>
 
@@ -42,6 +43,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const sellerId = await resolveSellerId(req)
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
@@ -58,6 +60,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<PostSellerPayoutBody>,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const sellerId = await resolveSellerId(req)
   const body = req.validatedBody
 

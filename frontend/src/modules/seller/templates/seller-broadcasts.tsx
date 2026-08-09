@@ -18,10 +18,12 @@ const TYPE_LABEL: Record<string, string> = {
 const BroadcastComposer = ({
   remaining,
   followerCount,
+  allowVoucher,
   onDone,
 }: {
   remaining: number
   followerCount: number
+  allowVoucher: boolean
   onDone: () => void
 }) => {
   const [type, setType] = useState("general")
@@ -108,11 +110,13 @@ const BroadcastComposer = ({
           onChange={(e) => setType(e.target.value)}
           className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
         >
-          {Object.entries(TYPE_LABEL).map(([value, label]) => (
+          {Object.entries(TYPE_LABEL)
+            .filter(([value]) => allowVoucher || value !== "voucher")
+            .map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
-          ))}
+            ))}
         </select>
       </div>
 
@@ -247,10 +251,12 @@ const SellerBroadcastsClient = ({
   broadcasts: initial,
   remaining,
   followerCount,
+  allowVoucher,
 }: {
   broadcasts: SellerBroadcast[]
   remaining: number
   followerCount: number
+  allowVoucher: boolean
 }) => {
   const [items, setItems] = useState(initial)
   const [left, setLeft] = useState(remaining)
@@ -275,6 +281,7 @@ const SellerBroadcastsClient = ({
       <BroadcastComposer
         remaining={left}
         followerCount={followerCount}
+        allowVoucher={allowVoucher}
         onDone={reload}
       />
 

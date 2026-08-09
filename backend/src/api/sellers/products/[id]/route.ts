@@ -6,6 +6,7 @@ import { z } from "@medusajs/framework/zod"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { PatchSellerMobileProductSchema } from "../../../middlewares"
 import updateSellerProductWorkflow from "../../../../workflows/marketplace/update-seller-product"
+import { requireSellerPermission } from "../../../../lib/sellers/resolve-seller"
 
 type PatchProductBody = z.infer<typeof PatchSellerMobileProductSchema>
 
@@ -16,6 +17,7 @@ export const PATCH = async (
   req: AuthenticatedMedusaRequest<PatchProductBody>,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "products")
   const body = req.validatedBody
 
   const update: {

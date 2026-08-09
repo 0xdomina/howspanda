@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveSeller, listSellerReferrals } from "@lib/data/seller"
 import ReferralsClient from "@modules/seller/templates/seller-referrals"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Referrals",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 export default async function SellerReferralsPage() {
   const seller = await retrieveSeller().catch(() => null)
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "referrals")) {
     notFound()
   }
 

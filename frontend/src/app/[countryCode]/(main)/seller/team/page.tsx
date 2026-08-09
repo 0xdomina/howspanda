@@ -11,12 +11,12 @@ export const metadata: Metadata = {
 
 export default async function SellerTeamPage() {
   const seller = await retrieveSeller().catch(() => null)
-  if (!seller) {
+  if (!seller || seller.role === "staff") {
     notFound()
   }
 
   const team = await listSellerTeam().catch(() => [])
-  const isOwner = seller.role !== "staff"
+  const isOwner = true
 
   return (
     <SellerTeamClient

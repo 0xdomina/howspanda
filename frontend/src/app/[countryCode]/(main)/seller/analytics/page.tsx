@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveSeller, retrieveSellerAnalytics } from "@lib/data/seller"
 import SellerAnalytics from "@modules/seller/templates/seller-analytics"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Analytics",
@@ -13,7 +14,7 @@ export default async function SellerAnalyticsPage() {
   const seller = await retrieveSeller().catch(() => null)
   const analytics = await retrieveSellerAnalytics().catch(() => null)
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "analytics")) {
     notFound()
   }
 

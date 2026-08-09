@@ -8,6 +8,7 @@ import {
 } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
 import MarketplaceModuleService from "../../../../../modules/marketplace/service"
+import { requireSellerPermission } from "../../../../../lib/sellers/resolve-seller"
 
 const resolveOwnedLine = async (
   req: AuthenticatedMedusaRequest,
@@ -34,6 +35,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "orders")
   const { marketplace } = await resolveOwnedLine(req, req.params.id)
   await marketplace.markOrderDelivered(req.params.id)
 

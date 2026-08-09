@@ -10,6 +10,7 @@ import {
 import Button from "@modules/common/components/button"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { convertToLocale } from "@lib/util/money"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 const tierStyles: Record<string, string> = {
   "Top Store": "bg-emerald-600/10 text-emerald-700",
@@ -97,22 +98,24 @@ export default async function SellerDashboardPage() {
 
   const ngn = balance?.balances?.ngn
   const available = Number(ngn?.available ?? 0)
+  const canViewMoney = seller.role !== "staff"
+  const canViewProducts = sellerHasPermission(seller, "products")
 
   return (
     <div data-testid="seller-dashboard-page">
       <div className="mb-8 grid grid-cols-1 gap-4 small:grid-cols-2">
-        <div className="figma-surface p-5">
+        {canViewMoney && <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Available balance</p>
           <p className="mt-1 font-mono tabular-nums text-2xl text-ink">
             {convertToLocale({ amount: available, currency_code: "ngn" })}
           </p>
-        </div>
-        <div className="figma-surface p-5">
+        </div>}
+        {canViewProducts && <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Products</p>
           <p className="mt-1 font-mono tabular-nums text-2xl text-ink">
             {products.length}
           </p>
-        </div>
+        </div>}
         <TrustScoreCard />
         <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Best next step</p>

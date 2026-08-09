@@ -12,6 +12,7 @@ import AiModuleService, {
 import { getModelId } from "./model"
 import { AiUsageTokens } from "./capabilities"
 import { resolveSeller, SellerIdentity } from "./seller-context"
+import { requireSellerPermission } from "../sellers/resolve-seller"
 
 type HandlerContext = {
   query: any
@@ -40,6 +41,7 @@ export async function runAiRoute<T>(
   capability: string,
   handler: (ctx: HandlerContext) => Promise<HandlerOutput<T>>
 ): Promise<void> {
+  await requireSellerPermission(req, "ai")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER)
   const aiService: AiModuleService = req.scope.resolve(AI_MODULE)

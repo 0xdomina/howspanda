@@ -5,6 +5,7 @@ import { retrieveSeller, listSellerProducts } from "@lib/data/seller"
 import Button from "@modules/common/components/button"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { convertToLocale } from "@lib/util/money"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Your products",
@@ -15,7 +16,7 @@ export default async function SellerProductsPage() {
   const seller = await retrieveSeller().catch(() => null)
   const products = (await listSellerProducts().catch(() => [])) || []
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "products")) {
     notFound()
   }
 

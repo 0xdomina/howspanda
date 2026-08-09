@@ -9,6 +9,11 @@ import {
 import MarketplaceModuleService from "../../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
 import { resolveSellerContext } from "../../../../lib/sellers/resolve-seller"
+import { PatchSellerTeamSchema } from "../route"
+import { normalizeSellerPermissions } from "../../../../lib/sellers/resolve-seller"
+import { z } from "@medusajs/framework/zod"
+
+type PatchBody = z.infer<typeof PatchSellerTeamSchema>
 
 // Owner-only removal of a staff member. The staff login is revoked (auth
 // identity deleted) and the seller_admin row is removed.
@@ -68,4 +73,52 @@ export const DELETE = async (
   await marketplace.deleteSellerAdmins(memberId)
 
   res.json({ ok: true, id: memberId })
+}
+
+export const PATCH = async (
+  req: AuthenticatedMedusaRequest<PatchBody>,
+  res: MedusaResponse
+) => {
+  const context = await resolveSellerContext(req)
+  if (context.role !== "owner") {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Only the store owner can manage team permissions."
+    )
+  }
+
+  const marketplace: MarketplaceModuleService =
+    req.scope.resolve(MARKETPLACE_MODULE)
+  const memberId = req.params.id as string
+  const [member] = await marketplace.listSellerAdmins({
+    id: memberId,
+    seller_id: context.sellerId,
+  })
+
+  if (!member) {
+    throw new MedusaError(
+      MedusaError.Types.NOT_FOUND,
+      "Team member not found in this store."
+    )
+  }
+  if (member.role === "owner") {
+    throw new MedusaError(
+      MedusaError.Types.CONFLICT,
+      "The store owner's access cannot be limited."
+    )
+  }
+
+  const permissions = normalizeSellerPermissions(req.validatedBody.permissions)
+  await marketplace.updateSellerAdmins({
+    id: memberId,
+    permissions: permissions as unknown as Record<string, unknown>,
+  })
+
+  res.json({
+    team_member: {
+      id: memberId,
+      role: member.role,
+      permissions,
+    },
+  })
 }

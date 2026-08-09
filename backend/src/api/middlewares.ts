@@ -14,7 +14,10 @@ import express from "express"
 import path from "path"
 import { rateLimit } from "../lib/security/rate-limit"
 import { PostSellerCreateSchema } from "./sellers/route"
-import { PostSellerTeamSchema } from "./sellers/team/route"
+import {
+  PatchSellerTeamSchema,
+  PostSellerTeamSchema,
+} from "./sellers/team/route"
 import { PatchSellerMeSchema } from "./sellers/me/route"
 import { PostCourierApplySchema } from "./store/couriers/apply/route"
 import { assertCryptoAllowedForCart } from "../lib/payments/seller-crypto-gate"
@@ -782,6 +785,11 @@ export default defineMiddlewares({
       matcher: "/sellers/team",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostSellerTeamSchema)],
+    },
+    {
+      matcher: "/sellers/team/:id",
+      methods: ["PATCH"],
+      middlewares: [validateAndTransformBody(PatchSellerTeamSchema)],
     },
     {
       // Store settings + own profile. Auth comes from the /sellers/* matcher.

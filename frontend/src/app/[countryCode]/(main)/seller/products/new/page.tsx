@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveSeller } from "@lib/data/seller"
 import { retrieveFeatures } from "@lib/data/kyc"
+import { sellerHasPermission } from "@lib/seller-permissions"
 import AddProduct from "@modules/seller/components/add-product"
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 export default async function NewProductPage() {
   const seller = await retrieveSeller().catch(() => null)
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "products")) {
     notFound()
   }
 

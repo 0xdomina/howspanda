@@ -16,6 +16,7 @@ import {
 } from "../../../lib/payments/payouts/paystack-transfers"
 import { PostPayoutAccountSchema } from "../../middlewares"
 import { z } from "@medusajs/framework/zod"
+import { requireSellerOwner } from "../../../lib/sellers/resolve-seller"
 
 type PostPayoutAccountBody = z.infer<typeof PostPayoutAccountSchema>
 
@@ -51,6 +52,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const sellerId = await resolveSellerId(req)
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
@@ -67,6 +69,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<PostPayoutAccountBody>,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const sellerId = await resolveSellerId(req)
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)

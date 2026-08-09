@@ -9,6 +9,7 @@ import {
 import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import type MarketplaceModuleService from "../../../modules/marketplace/service"
+import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
 
 type Bucket = { label: string; gross: number; net: number; orders: number }
 
@@ -86,6 +87,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "analytics")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({

@@ -14,6 +14,7 @@ import type MarketplaceModuleService from "../../../modules/marketplace/service"
 import { REDEEMABLES_MODULE } from "../../../modules/redeemables"
 import type RedeemablesModuleService from "../../../modules/redeemables/service"
 import { PostSellerTipSchema } from "../../middlewares"
+import { requireSellerOwner } from "../../../lib/sellers/resolve-seller"
 
 type PostBody = z.infer<typeof PostSellerTipSchema>
 
@@ -40,6 +41,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const sellerId = await resolveSellerId(req)
   const tipping: TippingModuleService = req.scope.resolve(TIPPING_MODULE)
 
@@ -54,6 +56,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<PostBody>,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const sellerId = await resolveSellerId(req)
   const body = req.validatedBody
   const tipping: TippingModuleService = req.scope.resolve(TIPPING_MODULE)

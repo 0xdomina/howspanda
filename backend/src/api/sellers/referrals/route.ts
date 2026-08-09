@@ -12,6 +12,7 @@ import GrowthModuleService from "../../../modules/growth/service"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import type MarketplaceModuleService from "../../../modules/marketplace/service"
 import { PostReferralCreateSchema } from "../../middlewares"
+import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
 
 type PostBody = z.infer<typeof PostReferralCreateSchema>
 
@@ -48,6 +49,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "referrals")
   const sellerId = await resolveSellerId(req)
   const growth = req.scope.resolve<GrowthModuleService>(GROWTH_MODULE)
   const marketplace =
@@ -132,6 +134,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<PostBody>,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "referrals")
   const sellerId = await resolveSellerId(req)
   const growth = req.scope.resolve<GrowthModuleService>(GROWTH_MODULE)
   const referral = await growth.createForSeller(

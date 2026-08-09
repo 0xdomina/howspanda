@@ -9,6 +9,7 @@ import {
 import MallModuleService from "../../../modules/mall/service"
 import { MALL_MODULE } from "../../../modules/mall"
 import type { CreateMallInput } from "../../../modules/mall/service"
+import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
 
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
@@ -32,6 +33,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "malls")
   const sellerId = await resolveSellerId(req)
   const mallService = req.scope.resolve<MallModuleService>(MALL_MODULE)
   const malls = await mallService.listForSeller(sellerId)
@@ -42,6 +44,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<CreateMallInput>,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "malls")
   const sellerId = await resolveSellerId(req)
 
   const body = req.validatedBody ?? (req.body as CreateMallInput)

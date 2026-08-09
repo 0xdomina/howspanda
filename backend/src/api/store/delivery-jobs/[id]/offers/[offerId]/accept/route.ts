@@ -8,6 +8,7 @@ import {
 } from "@medusajs/framework/utils"
 import DeliveryModuleService from "../../../../../../../modules/delivery/service"
 import { DELIVERY_MODULE } from "../../../../../../../modules/delivery"
+import { requireSellerOwner } from "../../../../../../../lib/sellers/resolve-seller"
 
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
@@ -34,6 +35,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const { id, offerId } = req.params as { id: string; offerId: string }
   const sellerId = await resolveSellerId(req)
   const deliveryService = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)

@@ -4,7 +4,7 @@ import {
 } from "@medusajs/framework/http"
 import { FOLLOWS_MODULE } from "../../../modules/follows"
 import FollowsModuleService from "../../../modules/follows/service"
-import { resolveSellerId } from "../../../lib/sellers/resolve-seller"
+import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
 
 // Store owner's follower dashboard. Count-only: how many people follow and
 // the recent broadcast delivery/read rates — never who they are.
@@ -12,7 +12,8 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const sellerId = await resolveSellerId(req)
+  const context = await requireSellerPermission(req, "followers")
+  const sellerId = context.sellerId
   const follows = req.scope.resolve<FollowsModuleService>(FOLLOWS_MODULE)
 
   const { broadcasts, remaining_this_week } =

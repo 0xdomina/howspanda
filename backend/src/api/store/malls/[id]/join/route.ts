@@ -8,6 +8,7 @@ import {
 } from "@medusajs/framework/utils"
 import MallModuleService from "../../../../../modules/mall/service"
 import { MALL_MODULE } from "../../../../../modules/mall"
+import { requireSellerPermission } from "../../../../../lib/sellers/resolve-seller"
 
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
@@ -31,6 +32,7 @@ export const POST = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerPermission(req, "malls")
   const sellerId = await resolveSellerId(req)
 
   const { id } = req.params as { id: string }

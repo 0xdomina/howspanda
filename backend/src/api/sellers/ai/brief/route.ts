@@ -6,12 +6,14 @@ import { buildSellerAnalytics } from "../../../../lib/ai/seller-analytics"
 import { resolveSeller } from "../../../../lib/ai/seller-context"
 import { AI_MODULE } from "../../../../modules/ai"
 import AiModuleService from "../../../../modules/ai/service"
+import { requireSellerPermission } from "../../../../lib/sellers/resolve-seller"
 
 const PERIODS = ["daily", "weekly"] as const
 
 // GET is instant and quota-free: it reads the most recently stored brief for
 // the seller (the scheduled job keeps it warm). No LLM call.
 export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) => {
+  await requireSellerPermission(req, "ai")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const aiService: AiModuleService = req.scope.resolve(AI_MODULE)
   const seller = await resolveSeller(query, req.auth_context.actor_id)

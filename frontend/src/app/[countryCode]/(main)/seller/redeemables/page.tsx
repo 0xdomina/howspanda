@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveSeller, listSellerRedeemables } from "@lib/data/seller"
 import RedeemablesClient from "@modules/seller/templates/seller-redeemables"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Redeemables",
@@ -12,11 +13,16 @@ export const metadata: Metadata = {
 export default async function SellerRedeemablesPage() {
   const seller = await retrieveSeller().catch(() => null)
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "redeemables")) {
     notFound()
   }
 
   const redeemables = await listSellerRedeemables().catch(() => [])
 
-  return <RedeemablesClient redeemables={redeemables} />
+  return (
+    <RedeemablesClient
+      redeemables={redeemables}
+      isOwner={seller.role !== "staff"}
+    />
+  )
 }

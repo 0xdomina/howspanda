@@ -7,11 +7,13 @@ import {
   MedusaError,
 } from "@medusajs/framework/utils"
 import { COMMISSION_BANDS } from "../../../lib/marketplace/commission"
+import { requireSellerOwner } from "../../../lib/sellers/resolve-seller"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
+  await requireSellerOwner(req)
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({

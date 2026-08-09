@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { retrieveSeller, listSellerOrders } from "@lib/data/seller"
 import { listSellerDeliveryJobs } from "@lib/data/delivery"
 import SellerDeliveryClient from "@modules/seller/templates/seller-delivery"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Delivery",
@@ -17,7 +18,7 @@ export default async function SellerDeliveryPage() {
     listSellerOrders().catch(() => []),
   ])
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "delivery")) {
     notFound()
   }
 

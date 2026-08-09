@@ -1,6 +1,7 @@
 import React from "react"
 
 import SellerNav from "../components/seller-nav"
+import type { SellerPermission } from "@lib/seller-permissions"
 
 interface SellerLayoutProps {
   seller: {
@@ -8,6 +9,8 @@ interface SellerLayoutProps {
     first_name?: string
     last_name?: string
     handle?: string
+    role?: "owner" | "staff"
+    permissions?: SellerPermission[]
   } | null
   children: React.ReactNode
 }
@@ -20,7 +23,7 @@ const SellerLayout: React.FC<SellerLayoutProps> = ({ seller, children }) => {
           <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Sell layer</p><h1 className="mt-2 font-display text-4xl font-semibold tracking-tight text-ink">Your store</h1></div>
           <p className="text-sm text-ink-muted">{seller?.name ?? seller?.first_name ?? "Your business on How’s U"}</p>
         </div>
-        <div className="grid grid-cols-1 gap-8 small:grid-cols-[180px_1fr] small:gap-12"><div>{seller && <SellerNav />}</div><div className="min-w-0">{children}</div></div>
+        <div className="grid grid-cols-1 gap-8 small:grid-cols-[180px_1fr] small:gap-12"><div>{seller && <SellerNav seller={seller} />}</div><div className="min-w-0">{children}</div></div>
       </div>
     </div>
   )

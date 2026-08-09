@@ -10,7 +10,10 @@ import { FOLLOWS_MODULE } from "../../../modules/follows"
 import FollowsModuleService from "../../../modules/follows/service"
 import { REDEEMABLES_MODULE } from "../../../modules/redeemables"
 import RedeemablesModuleService from "../../../modules/redeemables/service"
-import { resolveSellerId } from "../../../lib/sellers/resolve-seller"
+import {
+  requireSellerOwner,
+  requireSellerPermission,
+} from "../../../lib/sellers/resolve-seller"
 import { PostBroadcastSchema } from "../../middlewares"
 import { z } from "@medusajs/framework/zod"
 
@@ -20,7 +23,8 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  const sellerId = await resolveSellerId(req)
+  const context = await requireSellerPermission(req, "broadcasts")
+  const sellerId = context.sellerId
   const follows = req.scope.resolve<FollowsModuleService>(FOLLOWS_MODULE)
 
   const result = await follows.listBroadcasts(sellerId)
@@ -31,7 +35,8 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<PostBroadcastBody>,
   res: MedusaResponse
 ) => {
-  const sellerId = await resolveSellerId(req)
+  const context = await requireSellerPermission(req, "broadcasts")
+  const sellerId = context.sellerId
   const body = req.validatedBody
   const follows = req.scope.resolve<FollowsModuleService>(FOLLOWS_MODULE)
 
@@ -51,6 +56,7 @@ export const POST = async (
   let discountType: "fixed" | "percent" | null = null
   let discountValue: number | null = null
   if (body.type === "voucher" && body.voucher) {
+    await requireSellerOwner(req)
     const redeemables =
       req.scope.resolve<RedeemablesModuleService>(REDEEMABLES_MODULE)
     const expires_at = body.voucher.expires_in_days

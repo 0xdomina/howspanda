@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { retrieveSeller } from "@lib/data/seller"
 import { listSellerMalls } from "@lib/data/mall"
 import SellerMallsClient from "@modules/seller/templates/seller-malls"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
   title: "Malls",
@@ -14,7 +15,7 @@ export default async function SellerMallsPage() {
   const seller = await retrieveSeller().catch(() => null)
   const malls = await listSellerMalls().catch(() => [])
 
-  if (!seller) {
+  if (!seller || !sellerHasPermission(seller, "malls")) {
     notFound()
   }
 
