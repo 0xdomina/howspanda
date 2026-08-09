@@ -20,6 +20,7 @@ export const POST = async (
   const body = req.validatedBody as {
     first_name?: string
     last_name?: string
+    phone?: string
     other_name?: string
     address?: string
     country?: string

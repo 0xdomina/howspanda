@@ -52,6 +52,7 @@ export type KycProfileView = {
 export const PROFILE_REQUIRED_FIELDS = [
   "first_name",
   "last_name",
+  "phone",
   "address",
   "country",
   "state",
@@ -61,6 +62,7 @@ export const PROFILE_REQUIRED_FIELDS = [
 export function profileComplete(profile: {
   first_name?: string | null
   last_name?: string | null
+  phone?: string | null
   address?: string | null
   country?: string | null
   state?: string | null
@@ -79,7 +81,7 @@ export function computeLevel(profile: {
   state?: string | null
   city?: string | null
 }): KycLevel {
-  if (profile.id_status === "verified") {
+  if (profile.id_status === "verified" && profile.email_verified_at && profileComplete(profile)) {
     return "identity_verified"
   }
   if (profile.email_verified_at) {
@@ -396,6 +398,7 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       id: profile.id,
       first_name: input.first_name?.trim() || null,
       last_name: input.last_name?.trim() || null,
+      phone: input.phone?.trim() || null,
       other_name: input.other_name?.trim() || null,
       address: input.address?.trim() || null,
       country: input.country?.trim() || null,

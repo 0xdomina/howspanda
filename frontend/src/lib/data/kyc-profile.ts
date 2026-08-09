@@ -7,6 +7,7 @@ import type { KycProfileView } from "./kyc"
 export type KycProfileInput = {
   first_name?: string
   last_name?: string
+  phone?: string
   other_name?: string
   address?: string
   country?: string
@@ -34,6 +35,7 @@ export const saveMyKycProfile = async (
         body: {
           first_name: input.first_name?.trim() || undefined,
           last_name: input.last_name?.trim() || undefined,
+          phone: input.phone?.trim() || undefined,
           other_name: input.other_name?.trim() || undefined,
           address: input.address?.trim() || undefined,
           country: input.country?.trim() || undefined,

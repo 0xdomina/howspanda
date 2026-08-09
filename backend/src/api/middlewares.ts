@@ -698,6 +698,7 @@ export const PostKycReviewSchema = z
 // required fields (name, address, country, state, city) are all present.
 export const PostKycProfileSchema = z.object({  first_name: z.string().trim().min(1).max(100).optional(),
   last_name: z.string().trim().min(1).max(100).optional(),
+  phone: z.string().trim().min(7).max(32),
   other_name: z.string().trim().min(1).max(100).optional(),
   address: z.string().trim().min(1).max(300).optional(),
   country: z.string().trim().min(1).max(80).optional(),

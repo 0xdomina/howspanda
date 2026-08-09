@@ -158,11 +158,13 @@ const EmailStep = ({
 // be overridden or left blank.
 const ProfileStep = ({
   email,
+  phone,
   kyc,
   customerName,
   onDone,
 }: {
   email: string
+  phone?: string | null
   kyc: KycProfileView | null
   customerName?: { first_name?: string | null; last_name?: string | null }
   onDone: (p: KycProfileView) => void
@@ -171,6 +173,7 @@ const ProfileStep = ({
   const [form, setForm] = useState({
     first_name: kyc?.first_name ?? nameParts[0] ?? "",
     last_name: kyc?.last_name ?? (customerName?.last_name ?? nameParts.slice(1).join(" ")),
+    phone: kyc?.phone ?? phone ?? "",
     other_name: kyc?.other_name ?? "",
     address: kyc?.address ?? "",
     country: kyc?.country ?? "",
@@ -224,6 +227,10 @@ const ProfileStep = ({
 
   const submitProfile = () => {
     setError(null)
+    if (form.phone.trim().length < 7) {
+      setError("Enter a phone number so delivery contacts can reach you.")
+      return
+    }
     startTransition(async () => {
       const res = await saveMyKycProfile(form)
       if (res.ok && res.profile) {
@@ -291,6 +298,22 @@ const ProfileStep = ({
             className={inputClass}
           />
         </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs text-ink-muted">Phone number</label>
+        <input
+          value={form.phone}
+          onChange={set("phone")}
+          placeholder="e.g. 08012345678"
+          type="tel"
+          autoComplete="tel"
+          required
+          className={inputClass}
+        />
+        <p className="mt-1 text-xs text-ink-muted">
+          Keep this number up to date for delivery contact. We do not send verification codes to phone numbers.
+        </p>
       </div>
 
       <div>
@@ -826,6 +849,7 @@ const VerificationClient = ({
                 {step.key === "profile" && (
                   <ProfileStep
                     email={email}
+                    phone={phone}
                     kyc={profile}
                     customerName={customerName}
                     onDone={(p) => setProfile(p)}
