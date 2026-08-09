@@ -9,6 +9,7 @@ import ProfilePassword from "@modules/account/components/profile-password"
 import { notFound } from "next/navigation"
 import { listRegions } from "@lib/data/regions"
 import { retrieveCustomer } from "@lib/data/customer"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
 export const metadata: Metadata = {
   title: "Profile",
@@ -32,6 +33,13 @@ export default async function Profile() {
           and phone number. You can also update your billing address, or change
           your password.
         </p>
+      </div>
+      <div className="mb-8 flex flex-col gap-4 rounded-control border border-ink-hairline bg-paper-surface p-5 small:flex-row small:items-center small:justify-between" data-testid="profile-manage-business">
+        <div>
+          <p className="text-sm font-semibold text-ink">Manage Business</p>
+          <p className="mt-1 text-sm text-ink-muted">Set up or manage your store from the seller workspace.</p>
+        </div>
+        <LocalizedClientLink href="/seller" className="figma-button w-fit">Open Manage Business</LocalizedClientLink>
       </div>
       <div className="flex flex-col gap-y-8 w-full">
         <ProfileName customer={customer} />
