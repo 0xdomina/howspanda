@@ -1,7 +1,8 @@
 import { Metadata } from "next"
 
 import { retrieveCustomer } from "@lib/data/customer"
-import { getEnabledRailKeys, getPaymentRails } from "@lib/data/payment-rails"
+import { getPaymentRails } from "@lib/data/payment-rails"
+import { getEnabledRailKeys } from "@lib/data/payment-rails-utils"
 import { notFound } from "next/navigation"
 
 import WalletClient from "@modules/account/components/wallet"

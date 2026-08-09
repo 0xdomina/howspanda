@@ -23,6 +23,7 @@ type SellerAdmin = {
     handle?: string
     logo?: string
     description?: string
+    crypto_payments_enabled?: boolean
   }
 }
 
@@ -1041,6 +1042,7 @@ export const updateSellerStore = async (body: {
   handle?: string
   logo?: string | null
   description?: string | null
+  crypto_payments_enabled?: boolean
   first_name?: string
   last_name?: string
 }): Promise<{ success: boolean; error: string | null }> => {

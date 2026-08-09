@@ -54,12 +54,25 @@ const CANNED_OUTPUTS: Record<string, string> = {
   }),
 }
 
+// Capabilities defined outside model.ts (buyer AI, chat, etc.) register their
+// mock outputs here so the deterministic provider stays in sync without every
+// module editing model.ts.
+const EXTRA_CANNED_OUTPUTS = new Map<string, string>()
+
+export function registerMockOutput(capability: string, output: string): void {
+  EXTRA_CANNED_OUTPUTS.set(capability, output)
+}
+
 // Every capability's system prompt begins with "[capability:<name>]" so the
 // mock can return the right canned shape.
 function detectCapability(prompt: unknown): string {
   const serialized = JSON.stringify(prompt)
   const match = /\[capability:(\w+)\]/.exec(serialized)
   return match?.[1] ?? "insights"
+}
+
+function cannedFor(capability: string): string {
+  return EXTRA_CANNED_OUTPUTS.get(capability) ?? CANNED_OUTPUTS[capability] ?? ""
 }
 
 // Hand-rolled LanguageModelV2 instead of `ai/test`'s MockLanguageModelV2:
@@ -85,7 +98,7 @@ function buildMockModel(fail: boolean): LanguageModelV2 {
         finishReason: "stop" as const,
         usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
         content: [
-          { type: "text" as const, text: CANNED_OUTPUTS[capability] },
+          { type: "text" as const, text: cannedFor(capability) },
         ],
         warnings: [],
       }

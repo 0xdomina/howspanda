@@ -12,6 +12,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ai-sdk/deepseek@npm:^1.0.49":
+  version: 1.0.49
+  resolution: "@ai-sdk/deepseek@npm:1.0.49"
+  dependencies:
+    "@ai-sdk/provider": "npm:2.0.3"
+    "@ai-sdk/provider-utils": "npm:3.0.31"
+  peerDependencies:
+    zod: ^3.25.76 || ^4.1.8
+  checksum: 10c0/931a1876f420676c68aea08ba218fd9e93bed1fe09a89cb4abbc5e32383aed920c851afaf7cf22345fd7b53347ffb2284b9622833b00e3dbfc4f43c8be653024
+  languageName: node
+  linkType: hard
+
 "@ai-sdk/gateway@npm:2.0.121":
   version: 2.0.121
   resolution: "@ai-sdk/gateway@npm:2.0.121"
@@ -37,6 +49,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ai-sdk/openai-compatible@npm:^1.0.47":
+  version: 1.0.47
+  resolution: "@ai-sdk/openai-compatible@npm:1.0.47"
+  dependencies:
+    "@ai-sdk/provider": "npm:2.0.3"
+    "@ai-sdk/provider-utils": "npm:3.0.31"
+  peerDependencies:
+    zod: ^3.25.76 || ^4.1.8
+  checksum: 10c0/f1b8259a96e716d66875627fe97564e7bfe8ec0da425a7afa199618f22ffb5a955fb0b464a24ea13965fa537e01fbc520c06aedb032e95c81872281905c9c599
+  languageName: node
+  linkType: hard
+
 "@ai-sdk/provider-utils@npm:3.0.30":
   version: 3.0.30
   resolution: "@ai-sdk/provider-utils@npm:3.0.30"
@@ -47,6 +71,20 @@ __metadata:
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
   checksum: 10c0/b1ecfd92a9e2fa9bd0ca3d1a8268cd6aa7b1762e78199649cfbb28ee80a6a50c5f287050e5bfe9bb26192d3e97d6d7c963f8a71914416d36dffd2c4138fb71b5
+  languageName: node
+  linkType: hard
+
+"@ai-sdk/provider-utils@npm:3.0.31":
+  version: 3.0.31
+  resolution: "@ai-sdk/provider-utils@npm:3.0.31"
+  dependencies:
+    "@ai-sdk/provider": "npm:2.0.3"
+    "@standard-schema/spec": "npm:^1.0.0"
+    eventsource-parser: "npm:^3.0.6"
+    undici: "npm:^5.29.0"
+  peerDependencies:
+    zod: ^3.25.76 || ^4.1.8
+  checksum: 10c0/207984868ae84128a28767e668aca83a90c8688618b4e8054b3e056e587bf3ea555f273b72eda171f3f9e9c9f0d5cd1c79b5175dd3be546d0dbe967b4dff02fd
   languageName: node
   linkType: hard
 
@@ -1181,6 +1219,13 @@ __metadata:
   version: 0.21.5
   resolution: "@esbuild/win32-x64@npm:0.21.5"
   conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@fastify/busboy@npm:^2.0.0":
+  version: 2.1.1
+  resolution: "@fastify/busboy@npm:2.1.1"
+  checksum: 10c0/6f8027a8cba7f8f7b736718b013f5a38c0476eea67034c94a0d3c375e2b114366ad4419e6a6fa7ffc2ef9c6d3e0435d76dd584a7a1cbac23962fda7650b579e3
   languageName: node
   linkType: hard
 
@@ -10312,7 +10357,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "medusa-starter-default@workspace:."
   dependencies:
+    "@ai-sdk/deepseek": "npm:^1.0.49"
     "@ai-sdk/groq": "npm:^2.0.45"
+    "@ai-sdk/openai-compatible": "npm:^1.0.47"
     "@medusajs/admin-sdk": "npm:2.18.0"
     "@medusajs/cli": "npm:2.18.0"
     "@medusajs/framework": "npm:2.18.0"
@@ -13107,6 +13154,15 @@ __metadata:
   version: 6.21.0
   resolution: "undici-types@npm:6.21.0"
   checksum: 10c0/c01ed51829b10aa72fc3ce64b747f8e74ae9b60eafa19a7b46ef624403508a54c526ffab06a14a26b3120d055e1104d7abe7c9017e83ced038ea5cf52f8d5e04
+  languageName: node
+  linkType: hard
+
+"undici@npm:^5.29.0":
+  version: 5.29.0
+  resolution: "undici@npm:5.29.0"
+  dependencies:
+    "@fastify/busboy": "npm:^2.0.0"
+  checksum: 10c0/e4e4d631ca54ee0ad82d2e90e7798fa00a106e27e6c880687e445cc2f13b4bc87c5eba2a88c266c3eecffb18f26e227b778412da74a23acc374fca7caccec49b
   languageName: node
   linkType: hard
 

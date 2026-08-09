@@ -6,12 +6,11 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import MarketplaceModuleService from "../../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../../modules/marketplace"
 import { SellerOrder } from "./create-seller-orders"
+import { computeCommission } from "../../../../lib/marketplace/commission"
 
 type StepInput = {
   orders: SellerOrder[]
 }
-
-const round2 = (n: number) => Math.round(n * 100) / 100
 
 const createCommissionLinesStep = createStep(
   "create-commission-lines",
@@ -36,8 +35,12 @@ const createCommissionLinesStep = createStep(
     const linesData = orders.map((order) => {
       const totals = orderTotals.find((o) => o.id === order.id)!
       const total = Number(totals.total)
-      const rate = order.seller.commission_rate
-      const commission = round2(total * rate)
+      // Tiered volume discount by default; a per-seller override
+      // (seller.commission_rate) wins when explicitly set.
+      const { rate, commission, net } = computeCommission(
+        total,
+        order.seller.commission_rate
+      )
 
       return {
         order_id: order.id,
@@ -49,7 +52,7 @@ const createCommissionLinesStep = createStep(
         order_total: total,
         rate,
         commission_amount: commission,
-        net_amount: round2(total - commission),
+        net_amount: net,
         seller_id: order.seller.id,
       }
     })

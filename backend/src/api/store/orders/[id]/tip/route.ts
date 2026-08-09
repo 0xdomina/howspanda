@@ -8,6 +8,7 @@ import TippingModuleService from "../../../../../modules/tipping/service"
 import type MarketplaceModuleService from "../../../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
 import { assertOrderEmail } from "../../../../../lib/escrow/order-access"
+import { computeCommission } from "../../../../../lib/marketplace/commission"
 
 // A cash tip is booked as an immediately-withdrawable `available` commission
 // line for the seller, so it MUST be treated as money-in: only a signed-in
@@ -63,13 +64,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
   const currency = lines.find((l) => l.currency_code)?.currency_code ?? "ngn"
 
-  // Locked spec: tips carry a 10% platform fee on every rail (card AND USDC)
-  // — the seller nets 90%, matching the platform's standard marketplace
-  // commission rate. The commission is withheld here at the ledger line, so it
-  // holds whether the order was paid by card or USDC.
-  const rate = 0.1
-  const commission = Math.round(amount * rate * 100) / 100
-  const net = Math.round((amount - commission) * 100) / 100
+  // Tips ride the same tiered platform commission as orders (3–5%, tapering
+  // down on larger values). A ₦15k tip is a small value → 5%; withheld here at
+  // the ledger line so it holds whether the order was paid by card or USDC.
+  const { rate, commission, net } = computeCommission(amount)
   const line = await marketplace.createCommissionLines([
     {
       order_id: `tip:${orderId}:${Date.now()}`,

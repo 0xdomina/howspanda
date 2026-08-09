@@ -13,8 +13,13 @@ const Seller = model.define("seller", {
   verification_status: model
     .enum(["unverified", "pending", "verified"])
     .default("unverified"),
-  // platform commission as a fraction (0.1 = 10%), configurable per seller
-  commission_rate: model.float().default(0.1),
+  // optional per-seller commission override as a fraction; NULL = use the
+  // platform tiered schedule (3–5%, tapering down on larger orders — see
+  // src/lib/marketplace/commission.ts)
+  commission_rate: model.float().nullable(),
+  // per-seller crypto payment switch: when OFF the crypto-usdc rail is closed
+  // for this seller (no crypto session can be created against their products)
+  crypto_payments_enabled: model.boolean().default(true),
   admins: model.hasMany(() => SellerAdmin, {
     mappedBy: "seller",
   }),

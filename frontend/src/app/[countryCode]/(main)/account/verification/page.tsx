@@ -2,7 +2,8 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveCustomer } from "@lib/data/customer"
-import { retrieveFeatures, retrieveMyKyc } from "@lib/data/kyc"
+import { retrieveFeatures } from "@lib/data/kyc"
+import { retrieveMyKyc } from "@lib/data/kyc-server"
 import VerificationClient from "@modules/account/components/verification"
 
 export const metadata: Metadata = {

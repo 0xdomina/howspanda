@@ -122,7 +122,7 @@ export const POST = async (
 
   // crypto_address
   const addressOk =
-    body.network === "base"
+    body.network === "base" || body.network === "arc"
       ? BASE_ADDRESS_RE.test(body.address)
       : SOLANA_ADDRESS_RE.test(body.address)
 

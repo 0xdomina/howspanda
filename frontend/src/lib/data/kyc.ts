@@ -1,5 +1,4 @@
 import { sdk } from "@lib/config"
-import { getAuthHeaders } from "./cookies"
 
 export type KycLevel =
   | "unverified"
@@ -94,34 +93,6 @@ export const retrieveKycStatus = async (
   } catch {
     return null
   }
-}
-
-/**
- * The authenticated user's platform-wide KYC state, read off their profile
- * (/store/kyc/me). Falls back to the public email/phone status lookup for
- * unauthenticated or seller contexts.
- */
-export const retrieveMyKyc = async (
-  email?: string | null,
-  phone?: string | null
-): Promise<KycProfileView | null> => {
-  try {
-    const headers = await getAuthHeaders()
-    if ("authorization" in headers) {
-      const kyc = await sdk.client
-        .fetch<{ kyc: KycProfileView | null }>("/store/kyc/me", {
-          method: "GET",
-          headers,
-          cache: "no-store",
-        })
-        .then(({ kyc }) => kyc)
-        .catch(() => null)
-      if (kyc) return kyc
-    }
-  } catch {
-    // fall through to the email/phone lookup below
-  }
-  return retrieveKycStatus(email, phone)
 }
 
 export const requestKycOtp = async (input: {

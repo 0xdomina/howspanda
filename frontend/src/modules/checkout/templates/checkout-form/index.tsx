@@ -20,7 +20,7 @@ export default async function CheckoutForm({
 
   const shippingMethods = await listCartShippingMethods(cart.id)
   const paymentMethods = await listCartPaymentMethods(cart.region?.id ?? "")
-  const rails = await getPaymentRails()
+  const rails = await getPaymentRails(cart.id)
 
   if (!shippingMethods || !paymentMethods) {
     return null

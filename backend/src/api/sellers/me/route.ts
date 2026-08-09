@@ -20,6 +20,9 @@ export const PatchSellerMeSchema = z.strictObject({
   handle: z.string().min(2).optional(),
   logo: z.string().url().nullable().optional(),
   description: z.string().max(1000).nullable().optional(),
+  // Owner-only store payment switch: OFF closes the crypto-usdc rail for this
+  // seller (no crypto session can be created against their products).
+  crypto_payments_enabled: z.boolean().optional(),
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
 })
@@ -74,11 +77,15 @@ export const PATCH = async (
     handle: string
     logo: string | null
     description: string | null
+    crypto_payments_enabled: boolean
   }> = {}
   if (body.name !== undefined) storeFields.name = body.name
   if (body.handle !== undefined) storeFields.handle = body.handle
   if (body.logo !== undefined) storeFields.logo = body.logo
   if (body.description !== undefined) storeFields.description = body.description
+  if (body.crypto_payments_enabled !== undefined) {
+    storeFields.crypto_payments_enabled = body.crypto_payments_enabled
+  }
 
   if (Object.keys(storeFields).length > 0) {
     if (context.role !== "owner") {

@@ -6,6 +6,7 @@ import {
   ContainerRegistrationKeys,
   MedusaError,
 } from "@medusajs/framework/utils"
+import { COMMISSION_BANDS } from "../../../lib/marketplace/commission"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -51,7 +52,13 @@ export const GET = async (
   )
 
   res.json({
+    // per-seller override (null = tiered schedule applies)
     commission_rate: sellerAdmin.seller.commission_rate,
+    // platform tiered schedule, tapering down as order value grows
+    commission_bands: COMMISSION_BANDS.map((band) => ({
+      from: band.min,
+      rate: band.rate,
+    })),
     summary,
     commission_lines: lines,
   })

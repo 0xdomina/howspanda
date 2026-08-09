@@ -8,7 +8,8 @@ import {
   listPayoutAccounts,
   listSellerPayouts,
 } from "@lib/data/seller"
-import { getEnabledRailKeys, getPaymentRails } from "@lib/data/payment-rails"
+import { getPaymentRails } from "@lib/data/payment-rails"
+import { getEnabledRailKeys } from "@lib/data/payment-rails-utils"
 import SellerMoneyClient from "@modules/seller/templates/seller-money"
 
 export const metadata: Metadata = {

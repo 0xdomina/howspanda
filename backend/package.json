@@ -23,7 +23,9 @@
     "test:unit": "TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit"
   },
   "dependencies": {
+    "@ai-sdk/deepseek": "^1.0.49",
     "@ai-sdk/groq": "^2.0.45",
+    "@ai-sdk/openai-compatible": "^1.0.47",
     "@medusajs/admin-sdk": "2.18.0",
     "@medusajs/cli": "2.18.0",
     "@medusajs/framework": "2.18.0",

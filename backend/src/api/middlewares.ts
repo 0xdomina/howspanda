@@ -3,7 +3,12 @@ import {
   authenticate,
   validateAndTransformBody,
   AuthenticatedMedusaRequest,
+  MedusaRequestHandler,
 } from "@medusajs/framework/http"
+import {
+  ContainerRegistrationKeys,
+  remoteQueryObjectFromString,
+} from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import express from "express"
 import path from "path"
@@ -12,6 +17,8 @@ import { PostSellerCreateSchema } from "./sellers/route"
 import { PostSellerTeamSchema } from "./sellers/team/route"
 import { PatchSellerMeSchema } from "./sellers/me/route"
 import { PostCourierApplySchema } from "./store/couriers/apply/route"
+import { assertCryptoAllowedForCart } from "../lib/payments/seller-crypto-gate"
+import { CRYPTO_USDC_ID } from "../lib/payments/fees"
 
 // Abuse-throttling for sensitive routes. Keyed by identity where the request
 // body already carries the actor's email (so NAT'd users behind one IP are not
@@ -252,6 +259,16 @@ export const PostAiBriefSchema = z.object({
 
 export const PostAiRecommendationsSchema = z.object({
   period: z.enum(["daily", "weekly"]).default("daily"),
+})
+
+// Buyer chat (Phase: model router). `client_key` is the guest identity — a
+// high-entropy secret the client generates and keeps private so an anonymous
+// buyer can persist threads without an account. Never logged.
+export const PostAiChatSchema = z.object({
+  conversation_id: z.string().optional(),
+  message: z.string().min(1).max(4000),
+  client_key: z.string().min(12).max(200).optional(),
+  title: z.string().min(1).max(120).optional(),
 })
 
 export const PostPayoutAccountSchema = z.discriminatedUnion("type", [
@@ -676,6 +693,44 @@ export const PostKycProfileSchema = z.object({  first_name: z.string().trim().mi
   postal_code: z.string().trim().min(1).max(20).optional(),
 })
 
+// Per-seller crypto gate: a crypto-usdc payment session may only be created for
+// a cart where EVERY seller has crypto payments enabled. Resolves the cart from
+// the payment collection id (via the cart_payment_collection link) and rejects
+// when any represented seller turned the rail off.
+const enforceCryptoSellerGate: MedusaRequestHandler = async (req, res, next) => {
+  try {
+    const providerId = (req.body as { provider_id?: string } | undefined)
+      ?.provider_id
+    if (providerId !== CRYPTO_USDC_ID) {
+      return next()
+    }
+
+    const collectionId = (req.params as { id?: string }).id
+    if (!collectionId) {
+      return next()
+    }
+
+    const remoteQuery = req.scope.resolve(ContainerRegistrationKeys.REMOTE_QUERY)
+    const [link] = await remoteQuery(
+      remoteQueryObjectFromString({
+        entryPoint: "cart_payment_collection",
+        variables: { filters: { payment_collection_id: collectionId } },
+        fields: ["cart_id"],
+      })
+    )
+
+    const cartId = link?.cart_id
+    if (!cartId) {
+      return next()
+    }
+
+    await assertCryptoAllowedForCart(req.scope, cartId)
+    return next()
+  } catch (e) {
+    return next(e)
+  }
+}
+
 export default defineMiddlewares({
   routes: [
     {
@@ -762,6 +817,36 @@ export default defineMiddlewares({
       matcher: "/sellers/ai/recommendations",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostAiRecommendationsSchema)],
+    },
+    {
+      // Buyer chat: auth optional (a signed-in customer is identified by their
+      // actor; guests identify via the client_key in the body/query/header).
+      matcher: "/store/ai/chat",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        validateAndTransformBody(PostAiChatSchema),
+      ],
+    },
+    {
+      matcher: "/store/ai/chat",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
+      matcher: "/store/ai/chat/conversations",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+      ],
     },
     {
       matcher: "/sellers/payout-accounts",
@@ -925,6 +1010,13 @@ export default defineMiddlewares({
       matcher: "/store/carts/:id/complete-marketplace",
       methods: ["POST"],
       middlewares: [CHECKOUT_RATE_LIMIT],
+    },
+    {
+      // Per-seller crypto gate: reject crypto-usdc session creation when any
+      // seller in the cart disabled crypto payments.
+      matcher: "/store/payment-collections/:id/payment-sessions",
+      methods: ["POST"],
+      middlewares: [enforceCryptoSellerGate],
     },
     {
       matcher: "/store/reviews/:id",

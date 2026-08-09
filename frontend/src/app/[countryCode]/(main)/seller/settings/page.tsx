@@ -23,6 +23,7 @@ export default async function SellerSettingsPage() {
         handle: seller.seller?.handle,
         logo: seller.seller?.logo,
         description: seller.seller?.description,
+        crypto_payments_enabled: seller.seller?.crypto_payments_enabled,
       }}
       isOwner={seller.role !== "staff"}
     />
