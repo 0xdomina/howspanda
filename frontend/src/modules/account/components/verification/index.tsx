@@ -445,7 +445,7 @@ const ProfileStep = ({
   )
 }
 
-const IdentityStep = ({
+export const IdentityStep = ({
   email,
   kyc,
   onDone,
@@ -778,6 +778,53 @@ const IdentityStep = ({
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
     </div>
+  )
+}
+
+export const ProfileIdentityVerification = ({
+  email,
+  kyc,
+}: {
+  email: string
+  kyc: KycProfileView | null
+}) => {
+  const [profile, setProfile] = useState<KycProfileView | null>(kyc)
+  const status = profile?.id_status ?? "none"
+
+  return (
+    <section
+      id="identity-verification"
+      className="rounded-control border border-ink-hairline bg-paper-surface p-5"
+      data-testid="profile-identity-verification"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-lg font-medium text-ink">Identity and courier access</h2>
+          <p className="mt-1 max-w-xl text-sm text-ink-muted">
+            Upload your ID card here. Once it is approved, this same account can use courier features.
+          </p>
+        </div>
+        {status !== "none" && (
+          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status === "verified" ? "bg-emerald-600/10 text-emerald-700" : status === "pending" ? "bg-amber-600/10 text-amber-800" : "bg-ink/10 text-ink-muted"}`}>
+            {status === "verified" ? "Verified" : status === "pending" ? "Pending review" : "Not submitted"}
+          </span>
+        )}
+      </div>
+
+      {status === "verified" ? (
+        <p className="mt-4 rounded-medium bg-emerald-600/5 p-3 text-sm text-emerald-800">
+          Your identity is verified. Courier access is available from this account.
+        </p>
+      ) : status === "pending" ? (
+        <p className="mt-4 rounded-medium bg-amber-600/5 p-3 text-sm text-amber-900">
+          Your ID is being reviewed. Courier access will open after approval.
+        </p>
+      ) : (
+        <div className="mt-5">
+          <IdentityStep email={email} kyc={profile} onDone={setProfile} />
+        </div>
+      )}
+    </section>
   )
 }
 

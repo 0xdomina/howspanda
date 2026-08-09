@@ -1,6 +1,7 @@
 import { Metadata } from "next"
 
 import EcommerceHome from "@modules/home/components/ecommerce-home"
+import Footer from "@modules/layout/templates/footer"
 
 export const metadata: Metadata = {
   title: "Shop more. Sell more.",
@@ -16,5 +17,10 @@ export default async function Home(props: {
   const searchParams = await props.searchParams
   const page = searchParams?.page ? parseInt(searchParams.page) : 1
 
-  return <EcommerceHome countryCode={params.countryCode} page={page} />
+  return (
+    <>
+      <EcommerceHome countryCode={params.countryCode} page={page} />
+      <Footer />
+    </>
+  )
 }

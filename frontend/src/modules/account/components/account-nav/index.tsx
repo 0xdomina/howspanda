@@ -9,7 +9,6 @@ import User from "@modules/common/icons/user"
 import MapPin from "@modules/common/icons/map-pin"
 import Package from "@modules/common/icons/package"
 import Wallet from "@modules/common/icons/wallet"
-import ShieldCheck from "@modules/common/icons/shield-check"
 import Bell from "@modules/common/icons/bell"
 import FastDelivery from "@modules/common/icons/fast-delivery"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
@@ -134,19 +133,6 @@ const AccountNav = ({
                 </li>
                 <li>
                   <LocalizedClientLink
-                    href="/account/verification"
-                    className="flex items-center justify-between py-4 border-b border-ink-hairline px-8"
-                    data-testid="verification-link"
-                  >
-                    <div className="flex items-center gap-x-2">
-                      <ShieldCheck size={20} />
-                      <span>Verification</span>
-                    </div>
-                    <ChevronDown className="transform -rotate-90" />
-                  </LocalizedClientLink>
-                </li>
-                <li>
-                  <LocalizedClientLink
                     href="/account/notifications"
                     className="flex items-center justify-between py-4 border-b border-ink-hairline px-8"
                     data-testid="notifications-link"
@@ -243,15 +229,6 @@ const AccountNav = ({
                   data-testid="courier-link"
                 >
                   Courier
-                </AccountNavLink>
-              </li>
-              <li>
-                <AccountNavLink
-                  href="/account/verification"
-                  route={route!}
-                  data-testid="verification-link"
-                >
-                  Verification
                 </AccountNavLink>
               </li>
               <li>

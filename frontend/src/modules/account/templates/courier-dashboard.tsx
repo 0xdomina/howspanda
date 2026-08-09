@@ -247,14 +247,14 @@ const CourierDashboard = ({
         <div className="rounded-large border border-amber-300 bg-amber-50 p-4">
           <h2 className="font-display text-lg font-medium text-amber-900">Verify your ID to activate courierhood</h2>
           <p className="mt-1 text-sm text-amber-800">
-            Upload a clear ID card photo and complete the verification step. A
-            verified identity unlocks courier applications and offers.
+            Upload a clear ID card photo from your Profile. A verified identity
+            unlocks courier applications and offers.
           </p>
           <LocalizedClientLink
-            href="/account/verification"
+            href="/account/profile#identity-verification"
             className="mt-3 inline-block text-sm font-medium text-amber-900 underline hover:text-amber-950"
           >
-            Go to Verification →
+            Open Profile →
           </LocalizedClientLink>
         </div>
       )}

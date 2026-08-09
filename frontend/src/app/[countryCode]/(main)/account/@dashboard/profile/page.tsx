@@ -5,10 +5,12 @@ import ProfileBillingAddress from "@modules/account/components/profile-billing-a
 import ProfileEmail from "@modules/account/components/profile-email"
 import ProfileName from "@modules/account/components/profile-name"
 import ProfilePassword from "@modules/account/components/profile-password"
+import { ProfileIdentityVerification } from "@modules/account/components/verification"
 
 import { notFound } from "next/navigation"
 import { listRegions } from "@lib/data/regions"
 import { retrieveCustomer } from "@lib/data/customer"
+import { retrieveMyKyc } from "@lib/data/kyc-server"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
 export const metadata: Metadata = {
@@ -18,9 +20,16 @@ export const metadata: Metadata = {
 
 export default async function Profile() {
   const customer = await retrieveCustomer()
-  const regions = await listRegions()
+  if (!customer) {
+    notFound()
+  }
 
-  if (!customer || !regions) {
+  const [regions, kyc] = await Promise.all([
+    listRegions(),
+    retrieveMyKyc(customer.email, customer.phone).catch(() => null),
+  ])
+
+  if (!regions) {
     notFound()
   }
 
@@ -47,6 +56,8 @@ export default async function Profile() {
         <ProfileEmail customer={customer} />
         <Divider />
         <ProfilePhone customer={customer} />
+        <Divider />
+        <ProfileIdentityVerification email={customer.email ?? ""} kyc={kyc} />
         <Divider />
         {/* <ProfilePassword customer={customer} />
         <Divider /> */}
