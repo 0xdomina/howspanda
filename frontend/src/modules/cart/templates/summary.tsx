@@ -5,6 +5,7 @@ import Button from "@modules/common/components/button"
 import CartTotals from "@modules/common/components/cart-totals"
 import Divider from "@modules/common/components/divider"
 import DiscountCode from "@modules/checkout/components/discount-code"
+import RedeemableCode from "@modules/checkout/components/redeemable-code"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { HttpTypes } from "@medusajs/types"
 
@@ -33,6 +34,7 @@ const Summary = ({ cart }: SummaryProps) => {
         Summary
       </h2>
       <DiscountCode cart={cart} />
+      <RedeemableCode cart={cart} />
       <Divider />
       <CartTotals totals={cart} />
       <LocalizedClientLink

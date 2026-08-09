@@ -283,6 +283,41 @@ export async function applyPromotions(codes: string[]) {
     .catch(medusaError)
 }
 
+export async function applyRedeemable(
+  code: string
+): Promise<{ success: boolean; code?: string; amount_applied?: number; error?: string }> {
+  try {
+    const cartId = await getCartId()
+
+    if (!cartId) {
+      return { success: false, error: "Add an item to your cart before applying a store code" }
+    }
+
+    const headers = {
+      ...(await getAuthHeaders()),
+    }
+
+    const response = await sdk.client.fetch<{ code: string; amount_applied: number }>(
+      `/store/carts/${cartId}/apply-redeemable`,
+      {
+        method: "POST",
+        headers,
+        body: { code: code.trim().toUpperCase() },
+      }
+    )
+      const cartCacheTag = await getCacheTag("carts")
+      revalidateTag(cartCacheTag, "max")
+      revalidatePath("/[countryCode]/cart", "page")
+      revalidatePath("/[countryCode]/checkout", "page")
+    return { success: true, ...response }
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message ?? error?.response?.data?.message ?? "That code could not be applied.",
+    }
+  }
+}
+
 export async function applyGiftCard(code: string) {
   //   const cartId = getCartId()
   //   if (!cartId) return "No cartId cookie found"

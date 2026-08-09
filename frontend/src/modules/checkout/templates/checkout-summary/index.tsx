@@ -1,5 +1,6 @@
 import ItemsPreviewTemplate from "@modules/cart/templates/preview"
 import DiscountCode from "@modules/checkout/components/discount-code"
+import RedeemableCode from "@modules/checkout/components/redeemable-code"
 import CartTotals from "@modules/common/components/cart-totals"
 import Divider from "@modules/common/components/divider"
 
@@ -17,6 +18,7 @@ const CheckoutSummary = ({ cart }: { cart: any }) => {
         <div className="my-6">
           <DiscountCode cart={cart} />
         </div>
+        <RedeemableCode cart={cart} />
       </div>
     </div>
   )
