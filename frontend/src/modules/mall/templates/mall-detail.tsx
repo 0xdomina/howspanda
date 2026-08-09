@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { joinMallAsBuyer } from "@lib/data/mall"
@@ -37,6 +38,7 @@ const GoodCard = ({ good, mallId, canShop }: { good: any; mallId: string; canSho
 }
 
 const MallDetailClient = ({ mall, goods = [], customerEmail }: { mall: any; detail?: any; goods?: any[]; customerEmail?: string | null }) => {
+  const router = useRouter()
   const sellers = mall?.sellers ?? []
   const buyers = mall?.buyers ?? []
   const prizes = mall?.prizes ?? []
@@ -51,7 +53,12 @@ const MallDetailClient = ({ mall, goods = [], customerEmail }: { mall: any; deta
     if (!customerEmail) return
     startJoining(async () => {
       const result = await joinMallAsBuyer(mall.id, customerEmail)
-      setJoinMessage(result.success ? "You are in. Your purchases will count automatically." : result.error)
+      if (result.success) {
+        setJoinMessage("You are in. Your purchases will count automatically.")
+        router.refresh()
+      } else {
+        setJoinMessage(result.error)
+      }
     })
   }
 
