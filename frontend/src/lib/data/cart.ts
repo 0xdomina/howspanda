@@ -118,10 +118,12 @@ export async function addToCart({
   variantId,
   quantity,
   countryCode,
+  mallId,
 }: {
   variantId: string
   quantity: number
   countryCode: string
+  mallId?: string
 }) {
   if (!variantId) {
     throw new Error("Missing variant ID when adding to cart")
@@ -135,6 +137,19 @@ export async function addToCart({
 
   const headers = {
     ...(await getAuthHeaders()),
+  }
+
+  const existingMallId = (cart.metadata as Record<string, unknown> | null | undefined)?.mall_id
+  if (existingMallId && mallId && existingMallId !== mallId) {
+    throw new Error("Finish or clear your current mall cart before shopping another mall.")
+  }
+  if (mallId && !existingMallId) {
+    await sdk.store.cart.update(
+      cart.id,
+      { metadata: { ...(cart.metadata ?? {}), mall_id: mallId } },
+      {},
+      headers
+    )
   }
 
   await sdk.store.cart

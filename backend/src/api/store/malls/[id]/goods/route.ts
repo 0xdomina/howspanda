@@ -11,9 +11,15 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const mall = await mallService.getDetails(id)
 
   const sellers = mall?.sellers ?? []
-  const sellerIds = (sellers ?? [])
-    .map((s: { seller_id?: string }) => s?.seller_id)
+  const sellerIds = [
+    ...(sellers ?? []).map((s: { seller_id?: string }) => s?.seller_id),
+    mall?.created_by_seller_id,
+  ]
     .filter((v): v is string => !!v)
+    .filter((v, index, all) => all.indexOf(v) === index)
+  const participationBySeller = new Map(
+    (sellers ?? []).map((seller: any) => [seller.seller_id, seller])
+  )
 
   let goods: any[] = []
   if (sellerIds.length) {
@@ -22,6 +28,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       entity: "seller",
       fields: [
         "id",
+        "name",
         "products.id",
         "products.title",
         "products.handle",
@@ -38,9 +45,18 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     for (const seller of data ?? []) {
       for (const product of seller.products ?? []) {
         if (!product || product.status !== "published") continue
+        const participation = participationBySeller.get(seller.id)
+        const rawProductIds = (participation as any)?.product_ids
+        const selectedIds = Array.isArray(rawProductIds)
+          ? rawProductIds
+          : Array.isArray(rawProductIds?.ids)
+            ? rawProductIds.ids
+            : null
+        if (selectedIds?.length && !selectedIds.includes(product.id)) continue
         byProduct.set(product.id, {
           ...product,
           seller_id: seller.id,
+          seller_name: seller.name ?? null,
         })
       }
     }

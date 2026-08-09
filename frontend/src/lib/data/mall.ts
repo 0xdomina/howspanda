@@ -17,6 +17,11 @@ export type Mall = {
   prize_pool_ngn: number | string
   contributed_ngn: number | string
   remaining_ngn: number | string
+  paid_out_ngn?: number | string
+  seller_count?: number
+  buyer_count?: number
+  winner_count?: number
+  shopping_open?: boolean
   starts_at?: string | null
   ends_at?: string | null
   expires_at: string
@@ -39,6 +44,8 @@ export type MallSeller = {
   mall_id: string
   seller_id: string
   contribution_ngn: number | string
+  product_ids?: string[] | null
+  contribution_ledger_id?: string | null
   redeemable_id?: string | null
   joined_at: string
 }
@@ -189,6 +196,7 @@ export const createMall = async (input: {
   prizeWinnerCount: number
   prizeDistribution: "equal" | "random"
   prizePoolNgn: number
+  productIds: string[]
   durationDays?: number
 }): Promise<{ success: boolean; error: string | null }> => {
   try {
@@ -214,7 +222,8 @@ export const createMall = async (input: {
 
 export const joinMallAsSeller = async (
   mallId: string,
-  contributionNgn: number
+  contributionNgn: number,
+  productIds: string[]
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
     const headers = await getSellerAuthHeaders()
@@ -225,7 +234,7 @@ export const joinMallAsSeller = async (
     await sdk.client.fetch(`/store/malls/${mallId}/join`, {
       method: "POST",
       headers,
-      body: { contributionNgn },
+      body: { contributionNgn, productIds },
     })
 
     const tag = await getSellerCacheTag("seller")

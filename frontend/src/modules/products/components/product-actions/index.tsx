@@ -143,6 +143,7 @@ export default function ProductActions({
         variantId: selectedVariant.id,
         quantity: 1,
         countryCode,
+        mallId: searchParams.get("mall_id") ?? undefined,
       })
     } catch (error: any) {
       setAddError(error?.message ?? "Could not add to cart. Please try again.")

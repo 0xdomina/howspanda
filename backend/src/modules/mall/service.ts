@@ -30,6 +30,7 @@ export type CreateMallInput = {
   prizeWinnerCount: number
   prizeDistribution: "equal" | "random"
   prizePoolNgn: number
+  productIds?: string[]
   durationDays?: number
 }
 
@@ -37,6 +38,7 @@ export type JoinAsSellerInput = {
   mallId: string
   sellerId: string
   contributionNgn: number
+  productIds?: string[]
   redeemableId?: string
 }
 
@@ -75,7 +77,7 @@ class MallModuleService extends MedusaService({
     )
     // 20% platform tax: the pledge is the gross contribution, the pool the net.
     const netPool = netOfTax(input.prizePoolNgn)
-    return await this.createMalls({
+    const created = await this.createMalls({
       name: input.name,
       description: input.description ?? null,
       created_by_seller_id: input.createdBySellerId,
@@ -89,6 +91,15 @@ class MallModuleService extends MedusaService({
       remaining_ngn: netPool,
       expires_at: expiresAt,
     })
+    await this.createMallSellers({
+      mall: created.id,
+      seller_id: input.createdBySellerId,
+      contribution_ngn: input.prizePoolNgn,
+      product_ids: input.productIds?.length ? { ids: input.productIds } : null,
+      contribution_ledger_id: null,
+      joined_at: new Date(),
+    })
+    return created
   }
 
   async listForSeller(sellerId: string) {
@@ -110,11 +121,42 @@ class MallModuleService extends MedusaService({
     )
   }
 
+  private decorateMall(mall: any) {
+    const sellers = Array.isArray(mall.sellers) ? mall.sellers : []
+    const buyers = Array.isArray(mall.buyers) ? mall.buyers : []
+    const prizes = Array.isArray(mall.prizes) ? mall.prizes : []
+    const paidOut = prizes
+      .filter((prize: any) => prize.claimed || prize.wallet_ledger_id)
+      .reduce((sum: number, prize: any) => sum + Number(prize.amount_ngn ?? 0), 0)
+
+    return {
+      ...mall,
+      seller_count: sellers.length,
+      buyer_count: buyers.length,
+      winner_count: prizes.length,
+      paid_out_ngn: paidOut,
+      shopping_open: mall.status === "active",
+    }
+  }
+
+  async listPublic() {
+    const [pending, active] = await Promise.all([
+      this.listMalls(
+        { status: "pending" },
+        { relations: ["sellers", "buyers", "prizes"], order: { created_at: "DESC" } }
+      ),
+      this.listMalls(
+        { status: "active" },
+        { relations: ["sellers", "buyers", "prizes"], order: { created_at: "DESC" } }
+      ),
+    ])
+    return [...pending, ...active]
+      .map((mall) => this.decorateMall(mall))
+      .sort((a, b) => Number(b.prize_pool_ngn) - Number(a.prize_pool_ngn))
+  }
+
   async listActive() {
-    return await this.listMalls(
-      { status: "active" },
-      { order: { created_at: "DESC" } }
-    )
+    return await this.listPublic()
   }
 
   async getDetails(mallId: string) {
@@ -131,7 +173,7 @@ class MallModuleService extends MedusaService({
         "Mall not found"
       )
     }
-    return mall[0]
+    return this.decorateMall(mall[0])
   }
 
   async joinAsSeller(input: JoinAsSellerInput) {
@@ -165,6 +207,8 @@ class MallModuleService extends MedusaService({
       mall_id: input.mallId,
       seller_id: input.sellerId,
       contribution_ngn: input.contributionNgn,
+      product_ids: input.productIds?.length ? { ids: input.productIds } : null,
+      contribution_ledger_id: null,
       redeemable_id: input.redeemableId ?? null,
       joined_at: new Date(),
     })
@@ -181,6 +225,22 @@ class MallModuleService extends MedusaService({
     })
     await this.checkThresholds(input.mallId)
     return sellerJoin
+  }
+
+  async setContributionLedger(
+    mallId: string,
+    sellerId: string,
+    ledgerId: string
+  ) {
+    const [sellerJoin] = await this.listMallSellers({
+      mall_id: mallId,
+      seller_id: sellerId,
+    })
+    if (!sellerJoin) return null
+    return await this.updateMallSellers({
+      id: sellerJoin.id,
+      contribution_ledger_id: ledgerId,
+    })
   }
 
   async joinAsBuyer(input: JoinAsBuyerInput) {

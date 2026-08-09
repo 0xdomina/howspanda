@@ -10,6 +10,10 @@ import MallModuleService from "../../../modules/mall/service"
 import { MALL_MODULE } from "../../../modules/mall"
 import type { CreateMallInput } from "../../../modules/mall/service"
 import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
+import {
+  debitSellerMallContribution,
+  refundSellerMallContribution,
+} from "../../../lib/mall/contributions"
 
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
@@ -56,10 +60,25 @@ export const POST = async (
   }
 
   const mallService = req.scope.resolve<MallModuleService>(MALL_MODULE)
-  const mall = await mallService.createMall({
-    ...body,
-    createdBySellerId: sellerId,
-  })
+  const reference = `${sellerId}:${Date.now()}`
+  const ledgerId = await debitSellerMallContribution(
+    req,
+    sellerId,
+    body.prizePoolNgn,
+    reference
+  )
+
+  let mall
+  try {
+    mall = await mallService.createMall({
+      ...body,
+      createdBySellerId: sellerId,
+    })
+    await mallService.setContributionLedger(mall.id, sellerId, ledgerId)
+  } catch (error) {
+    await refundSellerMallContribution(req, sellerId, body.prizePoolNgn, reference)
+    throw error
+  }
 
   res.status(201).json({ mall })
 }

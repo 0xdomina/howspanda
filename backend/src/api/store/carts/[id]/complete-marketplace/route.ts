@@ -8,6 +8,10 @@ import { REDEEMABLES_MODULE } from "../../../../../modules/redeemables"
 import RedeemablesModuleService from "../../../../../modules/redeemables/service"
 import { GROWTH_MODULE } from "../../../../../modules/growth"
 import GrowthModuleService from "../../../../../modules/growth/service"
+import MallModuleService from "../../../../../modules/mall/service"
+import { MALL_MODULE } from "../../../../../modules/mall"
+import BuyerWalletModuleService from "../../../../../modules/buyer-wallet/service"
+import { BUYER_WALLET_MODULE } from "../../../../../modules/buyer-wallet"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest,
@@ -45,6 +49,36 @@ export const POST = async (
         cart_id: cartId,
       },
     })
+
+    const mallId = cart?.metadata?.mall_id as string | undefined
+    if (mallId && result.order.email) {
+      const malls = req.scope.resolve<MallModuleService>(MALL_MODULE)
+      const mallResult = await malls.recordPurchase({
+        mallId,
+        buyerEmail: result.order.email,
+        orderId: result.order.id,
+      })
+      if (mallResult?.won) {
+        const wallet = req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
+        const { ledger } = await wallet.credit({
+          buyerEmail: result.order.email,
+          amount: mallResult.prizeAmount,
+          source: "mall_prize",
+          reference: result.order.id,
+        })
+        const prizes = await malls.listMallPrizes({
+          mall_id: mallId,
+          winner_buyer_email: result.order.email,
+        })
+        if (prizes.length) {
+          await malls.updateMallPrizes({
+            id: prizes[prizes.length - 1].id,
+            wallet_ledger_id: ledger.id,
+            claimed: true,
+          })
+        }
+      }
+    }
 
     if (consumption) {
       await redeemables.updateRedemptions([

@@ -499,11 +499,13 @@ export const PostMallCreateSchema = z.object({
   prizeWinnerCount: z.number().int().min(1),
   prizeDistribution: z.enum(["equal", "random"]),
   prizePoolNgn: z.number().positive(),
+  productIds: z.array(z.string().min(1)).min(1),
   durationDays: z.number().int().min(1).max(30).optional(),
 })
 
 export const PostMallJoinSchema = z.object({
   contributionNgn: z.number().positive(),
+  productIds: z.array(z.string().min(1)).min(1),
   redeemableId: z.string().min(1).optional(),
 })
 

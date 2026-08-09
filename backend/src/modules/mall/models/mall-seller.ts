@@ -13,6 +13,10 @@ const MallSeller = model.define("mkt_mall_seller", {
   }),
   seller_id: model.text(),
   contribution_ngn: model.bigNumber(),
+  // Selected published products. NULL keeps legacy malls compatible by
+  // including every published product from the participating seller.
+  product_ids: model.json().nullable(),
+  contribution_ledger_id: model.text().nullable(),
   // Optional redeemable gift attached by this seller (gift card, voucher, ticket)
   redeemable_id: model.text().nullable(),
   joined_at: model.dateTime(),

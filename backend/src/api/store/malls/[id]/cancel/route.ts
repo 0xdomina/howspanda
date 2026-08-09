@@ -8,9 +8,8 @@ import {
 } from "@medusajs/framework/utils"
 import MallModuleService from "../../../../../modules/mall/service"
 import { MALL_MODULE } from "../../../../../modules/mall"
-import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
-import type MarketplaceModuleService from "../../../../../modules/marketplace/service"
 import { requireSellerOwner } from "../../../../../lib/sellers/resolve-seller"
+import { refundSellerMallContribution } from "../../../../../lib/mall/contributions"
 
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
@@ -52,25 +51,16 @@ export const POST = async (
     )
   }
 
-  const marketplace =
-    req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
   const { mall: updated, refunds } = await mallService.cancel(id)
 
   // Credit every contributor's payout balance via the marketplace ledger.
   for (const refund of refunds) {
-    await marketplace.createCommissionLines([
-      {
-        order_id: `mall:refund:${id}:${refund.seller_id}`,
-        currency_code: "ngn",
-        order_total: refund.amount,
-        rate: 0,
-        commission_amount: 0,
-        net_amount: refund.amount,
-        status: "available",
-        available_at: new Date(),
-        seller_id: refund.seller_id,
-      },
-    ])
+    await refundSellerMallContribution(
+      req,
+      refund.seller_id,
+      refund.amount,
+      `${id}:${refund.seller_id}`
+    )
   }
 
   res.json({ mall: updated, refundCount: refunds.length })

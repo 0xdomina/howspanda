@@ -30,7 +30,7 @@ export type SellerAdmin = {
   }
 }
 
-type SellerProduct = {
+export type SellerProduct = {
   id: string
   title: string
   handle?: string

@@ -9,6 +9,10 @@ import {
 import MallModuleService from "../../../../../modules/mall/service"
 import { MALL_MODULE } from "../../../../../modules/mall"
 import { requireSellerPermission } from "../../../../../lib/sellers/resolve-seller"
+import {
+  debitSellerMallContribution,
+  refundSellerMallContribution,
+} from "../../../../../lib/mall/contributions"
 
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
@@ -38,6 +42,7 @@ export const POST = async (
   const { id } = req.params as { id: string }
   const body = req.validatedBody as {
     contributionNgn: number
+    productIds: string[]
     redeemableId?: string
   }
 
@@ -49,12 +54,33 @@ export const POST = async (
   }
 
   const mallService = req.scope.resolve<MallModuleService>(MALL_MODULE)
-  const sellerJoin = await mallService.joinAsSeller({
-    mallId: id,
+  const reference = `${id}:${sellerId}:${Date.now()}`
+  const ledgerId = await debitSellerMallContribution(
+    req,
     sellerId,
-    contributionNgn: body.contributionNgn,
-    redeemableId: body.redeemableId,
-  })
+    body.contributionNgn,
+    reference
+  )
+
+  let sellerJoin
+  try {
+    sellerJoin = await mallService.joinAsSeller({
+      mallId: id,
+      sellerId,
+      contributionNgn: body.contributionNgn,
+      productIds: body.productIds,
+      redeemableId: body.redeemableId,
+    })
+    await mallService.setContributionLedger(id, sellerId, ledgerId)
+  } catch (error) {
+    await refundSellerMallContribution(
+      req,
+      sellerId,
+      body.contributionNgn,
+      reference
+    )
+    throw error
+  }
 
   res.status(201).json({ sellerJoin })
 }

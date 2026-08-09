@@ -1,230 +1,34 @@
 "use client"
 
-import { useMemo, useTransition, useState } from "react"
+import { useMemo, useState, useTransition } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { joinMallAsBuyer, type MallWin } from "@lib/data/mall"
+import { joinMallAsBuyer, type Mall, type MallWin } from "@lib/data/mall"
+import { JoinMallForm } from "@modules/mall/components/seller-mall-tools"
+import type { SellerAdmin, SellerProduct } from "@lib/data/seller"
+import { sellerHasPermission } from "@lib/seller-permissions"
 
-const ngn = (v: number | string | undefined) =>
-  new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0,
-  }).format(Number(v ?? 0))
+const ngn = (value: number | string | undefined) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(Number(value ?? 0))
+const maskEmail = (email: string) => email.replace(/^(.).+(@.*)$/, "$1•••$2")
 
-// Leaderboard-style masking for public win tickers — never show a full email.
-const maskEmail = (email: string) => {
-  const [local, domain] = email.split("@")
-  if (!domain) return email
-  return `${local.slice(0, 1)}${"•".repeat(Math.min(3, Math.max(1, local.length - 1)))}@${domain}`
-}
+const WinTicker = ({ wins }: { wins: MallWin[] }) => wins.length ? (
+  <div className="mb-8 rounded-control border border-ink-hairline bg-white px-4 py-3"><p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Recent wins</p><ul className="mt-2 flex flex-col gap-1.5">{wins.map((win) => <li key={win.id} className="flex items-center justify-between gap-3 text-sm"><span className="truncate text-ink-muted"><span className="text-ink">{maskEmail(win.winner_buyer_email)}</span> won in <LocalizedClientLink href={`/malls/${win.mall_id}`} className="hover:underline">{win.mall_name}</LocalizedClientLink></span><span className="shrink-0 font-mono tabular-nums text-emerald-700">+{ngn(win.amount_ngn)}</span></li>)}</ul></div>
+) : null
 
-const WinTicker = ({ wins }: { wins: MallWin[] }) => {
-  if (!wins.length) return null
-  return (
-    <div className="mb-8 rounded-control border border-ink-hairline bg-white px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-        Recent wins
-      </p>
-      <ul className="mt-2 flex flex-col gap-1.5">
-        {wins.map((w) => (
-          <li
-            key={w.id}
-            className="flex items-center justify-between gap-3 text-sm"
-          >
-            <span className="truncate text-ink-muted">
-              <span className="text-ink">{maskEmail(w.winner_buyer_email)}</span>{" "}
-              won in{" "}
-              <LocalizedClientLink
-                href={`/malls/${w.mall_id}`}
-                className="underline-offset-2 hover:underline"
-              >
-                {w.mall_name}
-              </LocalizedClientLink>
-            </span>
-            <span className="shrink-0 font-mono tabular-nums text-emerald-700">
-              +{ngn(w.amount_ngn)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-const MallCard = ({
-  mall,
-  customerEmail,
-  isTop,
-}: {
-  mall: any
-  customerEmail: string | null
-  isTop?: boolean
-}) => {
+const MallCard = ({ mall, customerEmail, rank }: { mall: Mall; customerEmail: string | null; rank: number }) => {
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-
   const join = () => {
-    setMessage(null)
-    if (!customerEmail) {
-      setMessage("Sign in to your account to join this mall.")
-      return
-    }
-    startTransition(async () => {
-      const res = await joinMallAsBuyer(mall.id, customerEmail)
-      setMessage(
-        res.success ? "You're in! Purchases now count toward prize draws." : res.error
-      )
-    })
+    if (!customerEmail) { setMessage("Sign in to join this mall."); return }
+    startTransition(async () => { const result = await joinMallAsBuyer(mall.id, customerEmail); setMessage(result.success ? "You are in. Your purchases will count automatically." : result.error) })
   }
-
-  const statusLabel: Record<string, string> = {
-    pending: "Gathering sellers",
-    active: "Live now",
-    settling: "Settling",
-    expired: "Expired",
-    cancelled: "Cancelled",
-    closed: "Closed",
-  }
-
-  return (
-    <div className="figma-surface flex flex-col p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <LocalizedClientLink href={`/malls/${mall.id}`}>
-              <h3 className="font-display text-lg font-medium text-ink hover:underline">
-                {mall.name}
-              </h3>
-            </LocalizedClientLink>
-            {isTop && (
-              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                Top Mall
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-ink-muted line-clamp-2">
-            {mall.description || "A community sales event."}
-          </p>
-        </div>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-            mall.status === "active"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-ink/10 text-ink"
-          }`}
-        >
-          {statusLabel[mall.status] ?? mall.status}
-        </span>
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-medium bg-ink/5 px-2 py-2">
-          <p className="text-xs text-ink-muted">Prize pool</p>
-          <p className="mt-0.5 font-mono tabular-nums text-sm text-ink">
-            {ngn(mall.prize_pool_ngn)}
-          </p>
-        </div>
-        <div className="rounded-medium bg-ink/5 px-2 py-2">
-          <p className="text-xs text-ink-muted">Prizes</p>
-          <p className="mt-0.5 font-mono tabular-nums text-sm text-ink">
-            {mall.prize_winner_count}
-          </p>
-        </div>
-        <div className="rounded-medium bg-ink/5 px-2 py-2">
-          <p className="text-xs text-ink-muted">Sellers</p>
-          <p className="mt-0.5 font-mono tabular-nums text-sm text-ink">
-            {mall.target_sellers}
-          </p>
-        </div>
-      </div>
-
-      {mall.status === "pending" || mall.status === "active" ? (
-        <div className="mt-4">
-          {customerEmail ? (
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={join}
-              className="w-full rounded-control bg-ink px-3 py-3 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-            >
-              {isPending ? "Joining…" : "Join this mall"}
-            </button>
-          ) : (
-            <LocalizedClientLink
-              href="/account"
-              className="block w-full rounded-control border border-ink-strong px-3 py-3 text-center text-sm font-medium text-ink hover:bg-ink hover:text-white"
-            >
-              Sign in to join
-            </LocalizedClientLink>
-          )}
-          {message && <p className="mt-2 text-xs text-ink-muted">{message}</p>}
-        </div>
-      ) : (
-        <p className="mt-4 text-sm text-ink-muted">This mall is no longer open.</p>
-      )}
-    </div>
-  )
+  const pending = mall.status === "pending"
+  return <article className="figma-surface flex flex-col p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><LocalizedClientLink href={`/malls/${mall.id}`}><h2 className="font-display text-lg font-medium text-ink hover:underline">{mall.name}</h2></LocalizedClientLink><span className="text-xs text-ink-muted">Rank #{rank}</span>{rank === 1 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Top mall</span>}</div><p className="mt-1 line-clamp-2 text-sm text-ink-muted">{mall.description || "A community shopping event."}</p></div><span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${pending ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>{pending ? "Pending launch" : "Shopping open"}</span></div><div className="mt-4 grid grid-cols-3 gap-2 text-center"><div className="rounded-medium bg-ink/5 px-2 py-2"><p className="text-xs text-ink-muted">Pool</p><p className="mt-0.5 font-mono text-sm text-ink">{ngn(mall.prize_pool_ngn)}</p></div><div className="rounded-medium bg-ink/5 px-2 py-2"><p className="text-xs text-ink-muted">Paid</p><p className="mt-0.5 font-mono text-sm text-ink">{ngn(mall.paid_out_ngn)}</p></div><div className="rounded-medium bg-ink/5 px-2 py-2"><p className="text-xs text-ink-muted">Community</p><p className="mt-0.5 font-mono text-sm text-ink">{mall.seller_count ?? 0}/{mall.target_sellers} sellers</p></div></div>{pending && <p className="mt-3 text-xs text-amber-700">{mall.buyer_count ?? 0}/{mall.target_buyers} buyers joined. Products are visible, but checkout is locked until launch.</p>}{(pending || mall.status === "active") && <div className="mt-4">{customerEmail ? <button type="button" disabled={isPending} onClick={join} className="w-full rounded-control bg-ink px-3 py-3 text-sm font-medium text-white disabled:opacity-50">{isPending ? "Joining…" : "Join this mall"}</button> : <LocalizedClientLink href="/account" className="block w-full rounded-control border border-ink-strong px-3 py-3 text-center text-sm font-medium text-ink">Sign in to join</LocalizedClientLink>}{message && <p className="mt-2 text-xs text-ink-muted">{message}</p>}</div>}</article>
 }
 
-const MallsClient = ({
-  malls,
-  wins = [],
-  customerEmail,
-}: {
-  malls: any[]
-  wins?: MallWin[]
-  customerEmail: string | null
-}) => {
-  // The "Top Mall" is the active mall with the biggest net prize pool.
-  const topId = useMemo(() => {
-    let best: string | null = null
-    let bestPool = -1
-    for (const mall of malls) {
-      const pool = Number(mall.prize_pool_ngn ?? 0)
-      if (pool > bestPool) {
-        bestPool = pool
-        best = mall.id
-      }
-    }
-    return best
-  }, [malls])
-
-  return (
-    <div data-testid="malls-page" className="figma-container flex-1 py-10 small:py-16">
-      <div className="mb-8 max-w-2xl">
-        <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">
-          Malls
-        </h1>
-        <p className="mt-2 max-w-xl text-sm text-ink-muted">
-          Community sales events. Join with one click, shop goods from the
-          participating stores, and every purchase enters you in a prize draw
-          funded by the sellers.
-        </p>
-      </div>
-
-      <WinTicker wins={wins} />
-
-      {malls.length === 0 ? (
-        <div className="rounded-control border border-dashed border-ink-hairline bg-white py-16 text-center">
-          <p className="text-ink-muted">No malls are open right now.</p>
-          <p className="mt-1 text-sm text-ink-muted">
-            Check back soon — a seller near you may be starting one.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 small:grid-cols-2">
-          {malls.map((mall) => (
-            <MallCard
-              key={mall.id}
-              mall={mall}
-              customerEmail={customerEmail}
-              isTop={mall.id === topId}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
+const MallsClient = ({ malls, wins = [], customerEmail, seller = null, sellerProducts = [], sellerBalanceNgn = null }: { malls: Mall[]; wins?: MallWin[]; customerEmail: string | null; seller?: SellerAdmin | null; sellerProducts?: SellerProduct[]; sellerBalanceNgn?: number | null }) => {
+  const rankedMalls = useMemo(() => [...malls].sort((a, b) => Number(b.prize_pool_ngn) - Number(a.prize_pool_ngn)), [malls])
+  const hasSellerTools = !!seller && sellerHasPermission(seller, "malls")
+  return <div data-testid="malls-page" className="figma-container flex-1 py-10 small:py-16"><div className="mb-8 max-w-2xl"><h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">Malls</h1><p className="mt-2 max-w-xl text-sm text-ink-muted">Community shopping events. Join early, browse featured products, and shop when a mall reaches its launch target.</p></div>{hasSellerTools && <section className="mb-8 rounded-large border border-ink-hairline bg-paper-surface p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-display text-xl font-medium text-ink">For your store</h2><p className="mt-1 text-sm text-ink-muted">Create a mall or join one that is still gathering sellers.</p></div><LocalizedClientLink href="/malls/create" className="rounded-control bg-ink px-4 py-2 text-sm font-medium text-white">Create a mall</LocalizedClientLink></div><div className="mt-5"><JoinMallForm malls={rankedMalls} products={sellerProducts} availableBalanceNgn={sellerBalanceNgn} onDone={() => window.location.reload()} /></div></section>}<WinTicker wins={wins} />{!rankedMalls.length ? <div className="rounded-control border border-dashed border-ink-hairline bg-white py-16 text-center"><p className="text-ink-muted">No malls are gathering or live right now.</p><p className="mt-1 text-sm text-ink-muted">Check back soon for the next community event.</p></div> : <div className="grid grid-cols-1 gap-4 small:grid-cols-2">{rankedMalls.map((mall, index) => <MallCard key={mall.id} mall={mall} customerEmail={customerEmail} rank={index + 1} />)}</div>}</div>
 }
 
 export default MallsClient
