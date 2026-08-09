@@ -119,7 +119,8 @@ export const createOrderReview = async (
   orderId: string,
   email: string,
   rating: number,
-  comment?: string
+  comment?: string,
+  productRatings?: { product_id: string; rating: number }[]
 ): Promise<BuyerActionResult> => {
   try {
     await sdk.client.fetch(`/store/orders/${orderId}/review`, {
@@ -128,6 +129,7 @@ export const createOrderReview = async (
         email,
         rating,
         comment: comment || undefined,
+        product_ratings: productRatings?.length ? productRatings : undefined,
       },
     })
     return { success: true, error: null }

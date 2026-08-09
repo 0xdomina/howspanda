@@ -2,7 +2,7 @@ import { sdk } from "@lib/config"
 
 export type KycLevel =
   | "unverified"
-  | "phone_verified"
+  | "email_verified"
   | "profile_completed"
   | "identity_verified"
 
@@ -98,9 +98,8 @@ export const retrieveKycStatus = async (
 }
 
 export const requestKycOtp = async (input: {
-  email?: string
-  phone?: string
-  channel: "email" | "phone"
+  email: string
+  channel: "email"
   destination: string
 }): Promise<{ ok: boolean; code: string | null; error: string | null }> => {
   try {
@@ -118,9 +117,8 @@ export const requestKycOtp = async (input: {
 }
 
 export const verifyKycOtp = async (input: {
-  email?: string
-  phone?: string
-  channel: "email" | "phone"
+  email: string
+  channel: "email"
   destination: string
   code: string
 }): Promise<{ ok: boolean; profile: KycProfileView | null; error: string | null }> => {

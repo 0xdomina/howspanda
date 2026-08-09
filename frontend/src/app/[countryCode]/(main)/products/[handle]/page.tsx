@@ -5,6 +5,7 @@ import { getRegion, listRegions } from "@lib/data/regions"
 import ProductTemplate from "@modules/products/templates"
 import { HttpTypes } from "@medusajs/types"
 import { getBaseURL } from "@lib/util/env"
+import { retrieveProductRatingSummary } from "@lib/data/reviews"
 
 type Props = {
   params: Promise<{ countryCode: string; handle: string }>
@@ -133,12 +134,15 @@ export default async function ProductPage(props: Props) {
     notFound()
   }
 
+  const ratingSummary = await retrieveProductRatingSummary(pricedProduct.id)
+
   return (
     <ProductTemplate
       product={pricedProduct}
       region={region}
       countryCode={params.countryCode}
       images={images}
+      ratingSummary={ratingSummary}
     />
   )
 }

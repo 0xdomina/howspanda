@@ -549,7 +549,6 @@ export const PostDeliveryConfirmSchema = z.object({
 
 // Chat + POD verification (Phase 12)
 export const PostDeliveryChatSchema = z.object({
-  senderEmail: z.string().email(),
   body: z.string().min(1).max(2000),
 })
 
@@ -563,30 +562,21 @@ export const PostDeliveryVerifySchema = z.object({
   purpose: z.enum(["pickup", "delivery"]),
 })
 
-// KYC (Phase 14): identity ladder keyed by the signup identifier (email OR
-// phone). The signup identifier is already verified; `destination` carries
-// the complementary identifier being verified during KYC.
+// KYC uses email OTP only. Phone remains a contact field, not a verification
+// rung, until a real provider is connected.
 export const PostKycRequestSchema = z
   .object({
-    email: z.string().email().optional(),
-    phone: z.string().min(7).optional(),
-    channel: z.enum(["email", "phone"]),
+    email: z.string().email(),
+    channel: z.literal("email"),
     destination: z.string().min(3),
-  })
-  .refine((b) => b.email || b.phone, {
-    message: "Provide at least an email or a phone number",
   })
 
 export const PostKycVerifySchema = z
   .object({
-    email: z.string().email().optional(),
-    phone: z.string().min(7).optional(),
-    channel: z.enum(["email", "phone"]),
+    email: z.string().email(),
+    channel: z.literal("email"),
     destination: z.string().min(3),
     code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
-  })
-  .refine((b) => b.email || b.phone, {
-    message: "Provide at least an email or a phone number",
   })
 
 // Auth OTP (Phase: true OTP for signup verify + forgot-password reset). The
@@ -1349,9 +1339,32 @@ export default defineMiddlewares({
       middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryConfirmSchema)],
     },
     {
+      // Public job details remain browseable, but an optional session allows
+      // accepted job parties to receive the courier's contact number.
+      matcher: "/store/delivery-jobs/:id",
+      methods: ["GET"],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
+      matcher: "/store/delivery-jobs/:id/chat",
+      methods: ["GET"],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+      ],
+    },
+    {
       matcher: "/store/delivery-jobs/:id/chat",
       methods: ["POST"],
-      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryChatSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostDeliveryChatSchema),
+      ],
     },
     {
       matcher: "/store/delivery-jobs/:id/verify/pickup",

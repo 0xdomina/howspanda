@@ -20,7 +20,6 @@ export const POST = async (
 
   const { code } = await kyc.requestOtp({
     email: body.email,
-    phone: body.phone,
     channel: body.channel,
     destination: body.destination,
   })

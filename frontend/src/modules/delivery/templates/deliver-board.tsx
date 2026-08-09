@@ -136,7 +136,7 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
         <p className="mt-2 max-w-xl text-sm text-ink-muted">
           Browse open delivery jobs near you. Make an offer, pick up the package,
           and get paid on confirmed delivery. Couriers are verified account holders —
-          sign in, verify your phone, and apply to deliver.
+          sign in, verify your ID, and start delivering from the same account.
         </p>
       </div>
 

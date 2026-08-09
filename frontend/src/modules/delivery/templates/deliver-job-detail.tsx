@@ -253,6 +253,14 @@ const DeliverJobDetailClient = ({
                   <span className="text-ink-muted">Recipient phone:</span> {job.destination_phone}
                 </p>
               )}
+              {job.courier_phone && (
+                <p className="text-ink">
+                  <span className="text-ink-muted">Courier phone:</span>{" "}
+                  <a href={`tel:${job.courier_phone}`} className="underline underline-offset-2">
+                    {job.courier_phone}
+                  </a>
+                </p>
+              )}
               {job.package_weight && (
                 <p className="text-ink">
                   <span className="text-ink-muted">Weight:</span> {job.package_weight}
@@ -435,8 +443,7 @@ const DeliverJobDetailClient = ({
                     {isPending ? "Sending…" : "Send offer"}
                   </button>
                   <p className="mt-2 text-xs text-ink-muted">
-                    You&apos;ll need an approved courier application and a verified
-                    phone number to send an offer.
+                    A verified ID on your How&apos;s u account unlocks courier offers.
                   </p>
                 </>
               ) : (

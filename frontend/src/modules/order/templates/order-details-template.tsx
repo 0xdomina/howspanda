@@ -8,6 +8,7 @@ import Items from "@modules/order/components/items"
 import OrderDetails from "@modules/order/components/order-details"
 import OrderSummary from "@modules/order/components/order-summary"
 import ShippingDetails from "@modules/order/components/shipping-details"
+import BuyerOrderActions from "@modules/order/components/buyer-actions"
 import React from "react"
 
 type OrderDetailsTemplateProps = {
@@ -37,6 +38,11 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
         <Items order={order} />
         <ShippingDetails order={order} />
         <OrderSummary order={order} />
+        <BuyerOrderActions
+          orderId={order.id}
+          email={order.email ?? ""}
+          items={(order.items ?? []) as any}
+        />
         <Help />
       </div>
     </div>

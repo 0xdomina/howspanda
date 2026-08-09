@@ -207,7 +207,20 @@ class ReviewsModuleService extends MedusaService({
     const average = count
       ? Math.round((live.reduce((a, r) => a + r.rating, 0) / count) * 10) / 10
       : 0
-    return { average, count }
+    return {
+      average,
+      count,
+      reviews: live
+        .filter((r) => r.review)
+        .map((r) => ({
+          id: r.review!.id,
+          rating: r.rating,
+          comment: r.review!.comment,
+          reply_body: r.review!.reply_body,
+          created_at: r.review!.created_at,
+          buyer_email: r.review!.buyer_email,
+        })),
+    }
   }
 }
 

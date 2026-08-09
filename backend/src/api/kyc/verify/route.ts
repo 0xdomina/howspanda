@@ -15,7 +15,6 @@ export const POST = async (
 
   const result = await kyc.verifyOtp({
     email: body.email,
-    phone: body.phone,
     channel: body.channel,
     destination: body.destination,
     code: body.code,

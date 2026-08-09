@@ -13,7 +13,7 @@ import { MedusaError } from "@medusajs/framework/utils"
 export type OtpSendResult = string | null
 
 export async function sendOtp(input: {
-  channel: "email" | "phone"
+  channel: "email"
   destination: string
   code: string
 }): Promise<OtpSendResult> {
@@ -37,8 +37,6 @@ export async function sendOtp(input: {
       return input.code
     case "email":
       return sendEmail(input.destination, input.code)
-    case "whatsapp":
-      return sendWhatsApp(input.destination, input.code)
     default:
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,

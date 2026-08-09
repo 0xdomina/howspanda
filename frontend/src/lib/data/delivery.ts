@@ -28,6 +28,7 @@ export type DeliveryJob = {
   cancelled_at?: string | null
   cancel_reason?: string | null
   cancel_requires_sender_approval?: boolean
+  courier_phone?: string | null
   created_at: string
   updated_at: string
   offers?: any[]
@@ -152,9 +153,11 @@ export const retrieveDeliveryJob = async (
   id: string
 ): Promise<DeliveryJob | null> => {
   try {
+    const headers = await getAuthHeaders()
     return await sdk.client
       .fetch<{ job: DeliveryJob }>(`/store/delivery-jobs/${id}`, {
         method: "GET",
+        headers,
         cache: "no-store",
       })
       .then(({ job }) => job)
@@ -315,13 +318,15 @@ export const cancelDeliveryJob = async (
 
 export const listDeliveryMessages = async (
   jobId: string,
-  email?: string
+  _email?: string
 ): Promise<any[]> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) return []
     return await sdk.client
       .fetch<{ messages: any[] }>(`/store/delivery-jobs/${jobId}/chat`, {
         method: "GET",
-        query: email ? { email } : undefined,
+        headers,
         cache: "no-store",
       })
       .then(({ messages }) => messages ?? [])
@@ -333,13 +338,18 @@ export const listDeliveryMessages = async (
 
 export const sendDeliveryMessage = async (
   jobId: string,
-  senderEmail: string,
+  _senderEmail: string,
   body: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) {
+      return { success: false, error: "Sign in to send a message." }
+    }
     await sdk.client.fetch(`/store/delivery-jobs/${jobId}/chat`, {
       method: "POST",
-      body: { senderEmail, body },
+      headers,
+      body: { body },
     })
     return { success: true, error: null }
   } catch (error: any) {

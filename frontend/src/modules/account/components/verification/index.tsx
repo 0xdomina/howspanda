@@ -20,7 +20,7 @@ import {
   type ExtractedNinDoc,
 } from "@lib/ocr/id-card"
 
-type StepKey = "email" | "phone" | "profile" | "identity"
+type StepKey = "email" | "profile" | "identity"
 
 type StepDef = {
   key: StepKey
@@ -35,12 +35,6 @@ const baseSteps: StepDef[] = [
     label: "Verify your email",
     done: (kyc) => !!kyc?.email_verified,
     unlocks: "Create orders and receive payments",
-  },
-  {
-    key: "phone",
-    label: "Verify your phone number",
-    done: (kyc) => !!kyc?.phone_verified,
-    unlocks: "The first rung toward selling and delivering",
   },
   {
     key: "profile",
@@ -157,112 +151,9 @@ const EmailStep = ({
   )
 }
 
-const PhoneStep = ({
-  email,
-  phone,
-  onDone,
-}: {
-  email: string
-  phone: string
-  onDone: (p: KycProfileView) => void
-}) => {
-  const [number, setNumber] = useState(phone)
-  const [code, setCode] = useState("")
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [hint, setHint] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-
-  const send = () => {
-    setError(null)
-    if (number.replace(/[^\d+]/g, "").length < 7) {
-      setError("Enter a valid phone number.")
-      return
-    }
-    startTransition(async () => {
-      const res = await requestKycOtp({
-        email,
-        channel: "phone",
-        destination: number.trim(),
-      })
-      if (res.ok) {
-        setSent(true)
-        setHint(
-          res.code
-            ? `Dev code sent: ${res.code}`
-            : "A verification code was sent to your phone."
-        )
-      } else {
-        setError(res.error ?? "Could not send the code.")
-      }
-    })
-  }
-
-  const verify = () => {
-    setError(null)
-    startTransition(async () => {
-      const res = await verifyKycOtp({
-        email,
-        channel: "phone",
-        destination: number.trim(),
-        code: code.trim(),
-      })
-      if (res.ok && res.profile) {
-        onDone(res.profile)
-      } else {
-        setError(res.error ?? "Could not verify the code.")
-      }
-    })
-  }
-
-  return (
-    <div className="space-y-3">
-      <input
-        value={number}
-        onChange={(e) => setNumber(e.target.value)}
-        inputMode="tel"
-        placeholder="+234…"
-        className={inputClass}
-      />
-      {!sent ? (
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={send}
-          className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-        >
-          {isPending ? "Sending…" : "Send code to my phone"}
-        </button>
-      ) : (
-        <>
-          <input
-            value={code}
-            onChange={(e) =>
-              setCode(e.target.value.replace(/[^\d]/g, "").slice(0, 6))
-            }
-            inputMode="numeric"
-            placeholder="••••••"
-            className={inputClass}
-          />
-          <button
-            type="button"
-            disabled={code.length !== 6 || isPending}
-            onClick={verify}
-            className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-          >
-            {isPending ? "Verifying…" : "Verify"}
-          </button>
-        </>
-      )}
-      {hint && <p className="text-xs text-ink-muted">{hint}</p>}
-      {error && <p className="text-sm text-rose-600">{error}</p>}
-    </div>
-  )
-}
-
 // Personal profile rung: names exactly as on the ID card plus residence
-// address. Filling these (after phone verification) reaches profile_completed,
-// which unlocks selling + couriering. The optional bank account is where
+// address. Filling these after email verification reaches profile_completed,
+// which unlocks seller setup. The optional bank account is where
 // withdrawals land; postal code is suggested from the device location but can
 // be overridden or left blank.
 const ProfileStep = ({
@@ -931,13 +822,6 @@ const VerificationClient = ({
               <div className="mt-4">
                 {step.key === "email" && (
                   <EmailStep email={email} onDone={(p) => setProfile(p)} />
-                )}
-                {step.key === "phone" && (
-                  <PhoneStep
-                    email={email}
-                    phone={phone}
-                    onDone={(p) => setProfile(p)}
-                  />
                 )}
                 {step.key === "profile" && (
                   <ProfileStep

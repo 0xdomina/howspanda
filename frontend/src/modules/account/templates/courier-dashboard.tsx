@@ -125,8 +125,8 @@ const CourierDashboard = ({
       <div>
         <h1 className="font-display text-2xl font-medium text-ink">Courier</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Sign in, complete your profile, and verify your ID to unlock courier
-          applications and delivery offers.
+          Your buyer or seller account can unlock courier features with a
+          verified ID. No second account is needed.
         </p>
       </div>
 

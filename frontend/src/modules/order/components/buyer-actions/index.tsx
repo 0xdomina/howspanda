@@ -24,9 +24,16 @@ const labelClass = "text-sm font-medium text-ink"
 export default function BuyerOrderActions({
   orderId,
   email: knownEmail,
+  items = [],
 }: {
   orderId: string
   email: string
+  items?: {
+    id: string
+    product_id?: string | null
+    product_title?: string | null
+    thumbnail?: string | null
+  }[]
 }) {
   const router = useRouter()
   const [email, setEmail] = useState(knownEmail ?? "")
@@ -39,6 +46,7 @@ export default function BuyerOrderActions({
   const [tipNote, setTipNote] = useState("")
   const [rating, setRating] = useState("5")
   const [comment, setComment] = useState("")
+  const [productRatings, setProductRatings] = useState<Record<string, string>>({})
   const [isPending, startTransition] = useTransition()
 
   const refresh = (message: string | null = null) => {
@@ -277,7 +285,7 @@ export default function BuyerOrderActions({
             </div>
           </div>
 
-          {!multiSeller ? (
+          {anyDelivered && !multiSeller ? (
             <div className="border-t border-ink-hairline pt-5 flex flex-col gap-y-3">
               <label className={labelClass}>Review this order</label>
               <div className="flex items-center gap-2">
@@ -302,6 +310,37 @@ export default function BuyerOrderActions({
                 className={`block w-full ${inputClass}`}
                 data-testid="review-comment-input"
               />
+              {items.some((item) => item.product_id) && (
+                <div className="space-y-2 rounded-control border border-ink-hairline p-3">
+                  <p className="text-sm font-medium text-ink">Rate each product</p>
+                  {items
+                    .filter((item) => item.product_id)
+                    .map((item) => (
+                      <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate text-ink-muted">
+                          {item.product_title ?? "Product"}
+                        </span>
+                        <select
+                          value={productRatings[item.product_id as string] ?? "5"}
+                          onChange={(event) =>
+                            setProductRatings((current) => ({
+                              ...current,
+                              [item.product_id as string]: event.target.value,
+                            }))
+                          }
+                          className="rounded-medium border border-ink-hairline bg-paper px-2 py-1 text-sm text-ink"
+                          aria-label={`Rating for ${item.product_title ?? "product"}`}
+                        >
+                          {[5, 4, 3, 2, 1].map((value) => (
+                            <option key={value} value={value}>
+                              {value} stars
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                </div>
+              )}
               <div>
                 <Button
                   size="base"
@@ -313,7 +352,11 @@ export default function BuyerOrderActions({
                         orderId,
                         email,
                         Number(rating),
-                        comment
+                        comment,
+                        Object.entries(productRatings).map(([product_id, value]) => ({
+                          product_id,
+                          rating: Number(value),
+                        }))
                       )
                       if (r.success) {
                         setComment("")
@@ -329,10 +372,14 @@ export default function BuyerOrderActions({
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : multiSeller ? (
             <p className="text-sm text-ink-muted">
               This order has items from multiple stores — review each store&apos;s
               order from your account.
+            </p>
+          ) : (
+            <p className="text-sm text-ink-muted">
+              You can review each product after the order is delivered.
             </p>
           )}
 

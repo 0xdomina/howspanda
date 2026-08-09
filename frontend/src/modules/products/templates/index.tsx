@@ -10,6 +10,8 @@ import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-relat
 import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
 import { getBaseURL } from "@lib/util/env"
+import ProductReviews from "@modules/products/components/product-reviews"
+import type { ProductRatingSummary } from "@lib/data/reviews"
 
 import ProductActionsWrapper from "./product-actions-wrapper"
 
@@ -18,6 +20,7 @@ type ProductTemplateProps = {
   region: HttpTypes.StoreRegion
   countryCode: string
   images: HttpTypes.StoreProductImage[]
+  ratingSummary: ProductRatingSummary
 }
 
 const ProductTemplate: React.FC<ProductTemplateProps> = ({
@@ -25,6 +28,7 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
   region,
   countryCode,
   images,
+  ratingSummary,
 }) => {
   if (!product || !product.id) {
     return notFound()
@@ -78,6 +82,7 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
           <RelatedProducts product={product} countryCode={countryCode} />
         </Suspense>
       </div>
+      <ProductReviews summary={ratingSummary} />
     </>
   )
 }

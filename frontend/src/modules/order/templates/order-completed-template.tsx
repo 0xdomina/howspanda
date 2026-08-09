@@ -54,7 +54,11 @@ export default async function OrderCompletedTemplate({
           </h2>
           <Items order={order} />
           <CartTotals totals={order} />
-          <BuyerOrderActions orderId={order.id} email={order.email ?? ""} />
+          <BuyerOrderActions
+            orderId={order.id}
+            email={order.email ?? ""}
+            items={(order.items ?? []) as any}
+          />
           <ShippingDetails order={order} />
           <PaymentDetails order={order} />
           <Help />

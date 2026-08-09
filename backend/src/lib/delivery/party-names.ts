@@ -83,7 +83,8 @@ export async function resolvePartyNames(
 /** Attach names to a job's offers, parties, and messages in place. */
 export async function enrichJobWithPartyNames(
   req: MedusaRequest,
-  job: Record<string, any>
+  job: Record<string, any>,
+  viewerEmail?: string | null
 ): Promise<Record<string, any>> {
   const offers = Array.isArray(job.offers) ? job.offers : []
   const parties = Array.isArray(job.parties) ? job.parties : []
@@ -94,6 +95,23 @@ export async function enrichJobWithPartyNames(
     ...messages.map((m: any) => m.sender_email),
   ]
   const names = await resolvePartyNames(req, emails)
+  const delivery = req.scope.resolve<DeliveryModuleService>(DELIVERY_MODULE)
+  let courierPhone: string | null = null
+  const normalizedViewer = viewerEmail ? norm(viewerEmail) : null
+  const accepted = ["accepted", "in_transit", "delivered"].includes(job.status)
+  const isParty = normalizedViewer
+    ? parties.some((party: any) => norm(party.email) === normalizedViewer)
+    : false
+  if (accepted && isParty) {
+    const acceptedOffer = offers.find(
+      (offer: any) =>
+        offer.status === "accepted" || offer.id === job.accepted_offer_id
+    )
+    if (acceptedOffer?.courier_email) {
+      const courier = await delivery.getCourierProfile(acceptedOffer.courier_email)
+      courierPhone = courier?.phone ?? null
+    }
+  }
   return {
     ...job,
     offers: offers.map((o: any) => ({
@@ -108,6 +126,7 @@ export async function enrichJobWithPartyNames(
       ...m,
       sender_name: names[norm(m.sender_email)] ?? null,
     })),
+    courier_phone: courierPhone,
   }
 }
 

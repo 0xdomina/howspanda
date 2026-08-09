@@ -9,7 +9,7 @@ const CODE_LIFETIME_MS = 15 * 60 * 1000
 
 export type KycLevel =
   | "unverified"
-  | "phone_verified"
+  | "email_verified"
   | "profile_completed"
   | "identity_verified"
 
@@ -71,7 +71,7 @@ export function profileComplete(profile: {
 
 export function computeLevel(profile: {
   id_status: string
-  phone_verified_at: Date | null
+  email_verified_at: Date | null
   first_name?: string | null
   last_name?: string | null
   address?: string | null
@@ -82,11 +82,11 @@ export function computeLevel(profile: {
   if (profile.id_status === "verified") {
     return "identity_verified"
   }
-  if (profile.phone_verified_at) {
+  if (profile.email_verified_at) {
     if (profileComplete(profile)) {
       return "profile_completed"
     }
-    return "phone_verified"
+    return "email_verified"
   }
   return "unverified"
 }
@@ -94,7 +94,7 @@ export function computeLevel(profile: {
 // Numeric ordering of the ladder for gate comparisons.
 export const KYC_LEVEL_ORDER: Record<KycLevel, number> = {
   unverified: 0,
-  phone_verified: 1,
+  email_verified: 1,
   profile_completed: 2,
   identity_verified: 3,
 }
@@ -147,7 +147,7 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
     if (required === "identity_verified") {
       return "Upload and verify your ID card to unlock courier features."
     }
-      return "Complete your KYC profile (verified phone + personal details) to set up your store."
+    return "Verify your email and complete your profile to set up your store."
   }
 
   /**
@@ -446,19 +446,17 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    */
   async requestOtp(input: {
     email?: string | null
-    phone?: string | null
-    channel: "email" | "phone"
+    channel: "email"
     destination: string
   }): Promise<{ code: string | null }> {
     const code = String(randomInt(0, 1000000)).padStart(6, "0")
 
     const profile = await this.getOrCreateProfile({
       email: input.email,
-      phone: input.phone,
     })
     // OTPs are keyed by the profile's primary email (the seller's KYC key),
     // but a phone-first seller has no email yet — key by phone then.
-    const otpKey = profile.email ?? profile.phone ?? ""
+    const otpKey = profile.email ?? ""
 
     await this.createKycOtps({
       email: otpKey,
@@ -489,16 +487,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
    */
   async verifyOtp(input: {
     email?: string | null
-    phone?: string | null
-    channel: "email" | "phone"
+    channel: "email"
     destination: string
     code: string
   }): Promise<{ ok: boolean; profile: KycProfileView }> {
     const profile = await this.getOrCreateProfile({
       email: input.email,
-      phone: input.phone,
     })
-    const otpKey = profile.email ?? profile.phone ?? ""
+    const otpKey = profile.email ?? ""
 
     const [otp] = await this.listKycOtps(
       {
@@ -529,19 +525,11 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       used_at: new Date(),
     })
 
-    if (input.channel === "phone") {
-      await this.updateKycProfiles({
-        id: profile.id,
-        phone: input.destination.trim(),
-        phone_verified_at: new Date(),
-      })
-    } else if (input.channel === "email") {
-      await this.updateKycProfiles({
-        id: profile.id,
-        email: input.destination.trim().toLowerCase(),
-        email_verified_at: new Date(),
-      })
-    }
+    await this.updateKycProfiles({
+      id: profile.id,
+      email: input.destination.trim().toLowerCase(),
+      email_verified_at: new Date(),
+    })
 
     return {
       ok: true,
