@@ -6,6 +6,7 @@ import Thumbnail from "../thumbnail"
 import PreviewPrice from "./price"
 import WishlistButton from "@modules/wishlist/components/wishlist-button"
 import QuickView from "@modules/products/components/quick-view"
+import ProductShare from "@modules/products/components/product-share"
 
 export default async function ProductPreview({
   product,
@@ -42,7 +43,7 @@ export default async function ProductPreview({
           </div>
           </div>
         </LocalizedClientLink>
-        <div className="absolute right-3 top-3 z-10 flex flex-col gap-2"><WishlistButton item={{ id: product.id, handle: product.handle, title: product.title, thumbnail: product.thumbnail, price: cheapestPrice?.calculated_price }} /><QuickView item={{ title: product.title, description: product.description, thumbnail: product.thumbnail, price: cheapestPrice?.calculated_price, href: `/products/${product.handle}` }} /></div>
+        <div className="absolute right-3 top-3 z-10 flex flex-col gap-2"><WishlistButton item={{ id: product.id, handle: product.handle, title: product.title, thumbnail: product.thumbnail, price: cheapestPrice?.calculated_price }} /><QuickView item={{ title: product.title, description: product.description, thumbnail: product.thumbnail, price: cheapestPrice?.calculated_price, href: `/products/${product.handle}` }} /><ProductShare product={product} /></div>
       </div>
     </div>
   )

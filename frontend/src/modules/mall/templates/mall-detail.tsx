@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ShareButton from "@modules/common/components/share-button"
+import { useShareUrl } from "@lib/hooks/use-share-url"
 import { joinMallAsBuyer } from "@lib/data/mall"
 
 const ngn = (value: number | string | undefined) =>
@@ -49,6 +51,7 @@ const MallDetailClient = ({ mall, goods = [], customerEmail }: { mall: any; deta
   const alreadyJoined = customerEmail ? buyers.some((buyer: any) => buyer.buyer_email === customerEmail) : false
   const [joinMessage, setJoinMessage] = useState<string | null>(null)
   const [isJoining, startJoining] = useTransition()
+  const shareUrl = useShareUrl()
   const join = () => {
     if (!customerEmail) return
     startJoining(async () => {
@@ -70,6 +73,15 @@ const MallDetailClient = ({ mall, goods = [], customerEmail }: { mall: any; deta
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink">{mall.name}</h1>
             <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs text-ink">{statusLabel[mall.status] ?? mall.status}</span>
+            <ShareButton
+              entity="mall"
+              entityId={mall.id}
+              payload={{
+                url: shareUrl(`/malls/${mall.id}`),
+                text: `${mall.name} on How's u — a community sales event.`,
+                title: mall.name,
+              }}
+            />
           </div>
           <p className="mt-2 text-sm text-ink-muted">{mall.description || "A community shopping event."}</p>
 

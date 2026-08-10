@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react"
 
+import ShareButton from "@modules/common/components/share-button"
+import { useShareUrl } from "@lib/hooks/use-share-url"
 import { createSellerReferral, type SellerReferral } from "@lib/data/seller"
 
 const money = (amount: number | string | null | undefined) => {
@@ -71,6 +73,7 @@ const ReferralsClient = ({
   stats: { count: number; qualified_count: number; lifetime_earned: number }
 }) => {
   const [invitedCode, setInvitedCode] = useState<string | null>(null)
+  const shareUrl = useShareUrl()
 
   const buckets = [
     { label: "Invites", value: stats.count },
@@ -107,8 +110,21 @@ const ReferralsClient = ({
         </p>
         {invitedCode && (
           <div className="mt-3 rounded-medium bg-ink/5 border border-ink-hairline p-3">
-            <p className="text-xs text-ink-muted">Share this code with your buyer:</p>
-            <p className="mt-1 font-mono text-lg font-semibold text-ink">{invitedCode}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs text-ink-muted">Share this code with your buyer:</p>
+                <p className="mt-1 font-mono text-lg font-semibold text-ink">{invitedCode}</p>
+              </div>
+              <ShareButton
+                entity="referral"
+                entityId={invitedCode}
+                payload={{
+                  url: shareUrl("/account?mode=register"),
+                  text: `Join me on How's u — use my referral code ${invitedCode} when you sign up.`,
+                  title: "How's u referral",
+                }}
+              />
+            </div>
           </div>
         )}
         <div className="mt-4 max-w-sm">

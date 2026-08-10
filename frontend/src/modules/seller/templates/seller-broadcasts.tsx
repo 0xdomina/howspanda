@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react"
 
+import ShareButton from "@modules/common/components/share-button"
+import { useShareUrl } from "@lib/hooks/use-share-url"
 import {
   createSellerBroadcast,
   type SellerBroadcast,
@@ -213,7 +215,14 @@ const BroadcastComposer = ({
   )
 }
 
-const BroadcastList = ({ broadcasts }: { broadcasts: SellerBroadcast[] }) => {
+const BroadcastList = ({
+  broadcasts,
+  sellerHandle,
+}: {
+  broadcasts: SellerBroadcast[]
+  sellerHandle: string | null
+}) => {
+  const shareUrl = useShareUrl()
   if (broadcasts.length === 0) {
     return <p className="text-sm text-ink-muted">No broadcasts yet.</p>
   }
@@ -223,9 +232,23 @@ const BroadcastList = ({ broadcasts }: { broadcasts: SellerBroadcast[] }) => {
         <li key={b.id} className="py-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-ink">{b.title}</p>
-            <span className="shrink-0 rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink">
-              {TYPE_LABEL[b.type] ?? b.type}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="shrink-0 rounded-full bg-ink/5 px-2 py-0.5 text-xs text-ink">
+                {TYPE_LABEL[b.type] ?? b.type}
+              </span>
+              {sellerHandle && (
+                <ShareButton
+                  entity="broadcast"
+                  entityId={b.id}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-ink-hairline text-ink transition-colors duration-fast hover:bg-paper-tinted hover:text-ink active:scale-[0.96]"
+                  payload={{
+                    url: shareUrl(`/store/${sellerHandle}`),
+                    text: `${b.title} — ${b.body}`,
+                    title: b.title,
+                  }}
+                />
+              )}
+            </div>
           </div>
           <p className="mt-1 text-sm text-ink-muted">{b.body}</p>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
@@ -252,11 +275,13 @@ const SellerBroadcastsClient = ({
   remaining,
   followerCount,
   allowVoucher,
+  sellerHandle,
 }: {
   broadcasts: SellerBroadcast[]
   remaining: number
   followerCount: number
   allowVoucher: boolean
+  sellerHandle: string | null
 }) => {
   const [items, setItems] = useState(initial)
   const [left, setLeft] = useState(remaining)
@@ -288,7 +313,7 @@ const SellerBroadcastsClient = ({
       <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
         <h3 className="font-display text-lg font-medium text-ink">History</h3>
         <div className="mt-2">
-          <BroadcastList broadcasts={items} />
+          <BroadcastList broadcasts={items} sellerHandle={sellerHandle} />
         </div>
       </div>
     </div>

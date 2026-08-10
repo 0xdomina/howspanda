@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ShareButton from "@modules/common/components/share-button"
+import { useShareUrl } from "@lib/hooks/use-share-url"
 import {
   claimChallengeReward,
   type Challenge,
@@ -130,6 +132,7 @@ const ChallengeDetailClient = ({
 }) => {
   const [rewards, setRewards] = useState<ChallengeReward[]>(myRewards)
   const [message, setMessage] = useState<string | null>(null)
+  const shareUrl = useShareUrl()
 
   const endsAt = useMemo(() => formatDate(challenge.ends_at), [challenge.ends_at])
   const hasRewards = rewards.length > 0
@@ -147,21 +150,34 @@ const ChallengeDetailClient = ({
       className="figma-container flex-1 py-10 small:py-16"
     >
       <div className="mb-8 max-w-2xl">
-        <LocalizedClientLink
-          href="/challenges"
-          className="text-sm text-ink-muted hover:text-ink"
-        >
-          ← All challenges
-        </LocalizedClientLink>
-        <h1 className="mt-2 font-display text-3xl font-medium tracking-[-0.02em] text-ink">
-          {challenge.name}
-        </h1>
-        <p className="mt-2 max-w-xl text-sm text-ink-muted">
-          {challenge.description || "A limited-time campaign."}
-        </p>
-        <p className="mt-1 text-sm text-ink-muted">
-          {endsAt ? `Ends ${endsAt}` : "End date TBA"}
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <LocalizedClientLink
+              href="/challenges"
+              className="text-sm text-ink-muted hover:text-ink"
+            >
+              ← All challenges
+            </LocalizedClientLink>
+            <h1 className="mt-2 font-display text-3xl font-medium tracking-[-0.02em] text-ink">
+              {challenge.name}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm text-ink-muted">
+              {challenge.description || "A limited-time campaign."}
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">
+              {endsAt ? `Ends ${endsAt}` : "End date TBA"}
+            </p>
+          </div>
+          <ShareButton
+            entity="challenge"
+            entityId={challenge.id}
+            payload={{
+              url: shareUrl(`/challenges/${challenge.slug}`),
+              text: `${challenge.name} on How's u — invite friends and earn credits.`,
+              title: challenge.name,
+            }}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 small:grid-cols-2">

@@ -1,8 +1,10 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ShareButton from "@modules/common/components/share-button"
 import { getStoreProfile } from "@lib/data/follows"
 import FollowButton from "@modules/store/components/follow-button"
+import { getBaseURL } from "@lib/util/env"
 
 export async function generateMetadata({
   params,
@@ -78,11 +80,23 @@ export default async function StorePage({
             )}
           </div>
         </div>
-        <FollowButton
-          handle={handle}
-          initialFollowing={followed_by_viewer}
-          initialCount={follower_count}
-        />
+        <div className="flex items-center gap-2">
+          <FollowButton
+            handle={handle}
+            initialFollowing={followed_by_viewer}
+            initialCount={follower_count}
+          />
+          <ShareButton
+            entity="store"
+            entityId={seller.handle}
+            payload={{
+              url: `${getBaseURL()}/${countryCode}/store/${seller.handle}`,
+              text: `${seller.name} on How's u`,
+              title: seller.name,
+              image: seller.logo ?? undefined,
+            }}
+          />
+        </div>
       </section>
 
       {/* Recent broadcasts */}

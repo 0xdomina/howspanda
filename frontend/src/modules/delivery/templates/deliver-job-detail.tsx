@@ -2,6 +2,8 @@
 
 import { useTransition, useState } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ShareButton from "@modules/common/components/share-button"
+import { useShareUrl } from "@lib/hooks/use-share-url"
 import RouteMap from "@modules/delivery/components/route-map"
 import { getDisplayName } from "@lib/util/name"
 import {
@@ -69,6 +71,7 @@ const DeliverJobDetailClient = ({
   const email = customer?.email?.trim().toLowerCase() ?? ""
   const isSignedIn = !!email
   const displayName = getDisplayName(customer)
+  const shareUrl = useShareUrl()
   const [price, setPrice] = useState("")
   const [code, setCode] = useState("")
   const [codePurpose, setCodePurpose] = useState<"pickup" | "delivery">("pickup")
@@ -240,6 +243,15 @@ const DeliverJobDetailClient = ({
               >
                 {statusLabel[job.status] ?? job.status}
               </span>
+              <ShareButton
+                entity="delivery-job"
+                entityId={job.id}
+                payload={{
+                  url: shareUrl(`/deliver/${job.id}`),
+                  text: `${job.package_description} on How's u — a delivery job looking for a courier.`,
+                  title: job.package_description,
+                }}
+              />
             </div>
             <div className="mt-3 space-y-1.5 rounded-medium bg-ink/5 p-4 text-sm">
               <p className="text-ink">

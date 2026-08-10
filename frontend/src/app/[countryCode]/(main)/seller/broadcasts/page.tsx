@@ -25,6 +25,7 @@ export default async function SellerBroadcastsPage() {
       remaining={data?.remaining_this_week ?? 3}
       followerCount={data?.follower_count ?? 0}
       allowVoucher={seller.role !== "staff"}
+      sellerHandle={seller.seller?.handle ?? null}
     />
   )
 }

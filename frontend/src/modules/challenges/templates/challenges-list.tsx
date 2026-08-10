@@ -2,6 +2,8 @@
 
 import { useMemo } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ShareButton from "@modules/common/components/share-button"
+import { useShareUrl } from "@lib/hooks/use-share-url"
 import type { Challenge } from "@lib/data/challenges"
 
 const formatDate = (v: string | null | undefined) =>
@@ -26,6 +28,7 @@ const typeLabel: Record<Challenge["type"], { title: string; blurb: string }> = {
 const ChallengeCard = ({ challenge }: { challenge: Challenge }) => {
   const endsAt = useMemo(() => formatDate(challenge.ends_at), [challenge.ends_at])
   const meta = typeLabel[challenge.type] ?? typeLabel.arc_pool
+  const shareUrl = useShareUrl()
 
   return (
     <div className="figma-surface flex flex-col p-5">
@@ -40,9 +43,20 @@ const ChallengeCard = ({ challenge }: { challenge: Challenge }) => {
             {challenge.description || meta.blurb}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-          Live
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+            Live
+          </span>
+          <ShareButton
+            entity="challenge"
+            entityId={challenge.id}
+            payload={{
+              url: shareUrl(`/challenges/${challenge.slug}`),
+              text: `${challenge.name} on How's u — invite friends and earn credits.`,
+              title: challenge.name,
+            }}
+          />
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-center">
