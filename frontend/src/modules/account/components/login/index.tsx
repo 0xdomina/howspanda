@@ -4,6 +4,7 @@ import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
 import Input from "@modules/common/components/input"
 import GoogleSignIn from "@modules/account/components/google-signin"
+import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { useActionState } from "react"
 
 type Props = {
@@ -18,7 +19,7 @@ const Login = ({ setCurrentView }: Props) => {
       className="max-w-sm w-full flex flex-col items-center"
       data-testid="login-page"
     >
-      <h1 className="text-large-semi uppercase mb-6">Welcome back</h1>
+      <h1 className="text-large-semi uppercase mb-6">Sign in</h1>
       <p className="text-center text-base-regular text-ui-fg-base mb-8">
         Sign in to keep shopping, selling, and delivering on How&rsquo;s u.
       </p>
@@ -67,6 +68,16 @@ const Login = ({ setCurrentView }: Props) => {
         </button>
         .
       </span>
+      <div className="mt-8 w-full border-t border-ink-hairline pt-6 text-center">
+        <p className="text-small-regular text-ui-fg-subtle">Running a store?</p>
+        <LocalizedClientLink
+          href="/seller"
+          className="mt-2 inline-block text-small-regular underline"
+          data-testid="seller-sign-in-link"
+        >
+          Sign in to Manage Business
+        </LocalizedClientLink>
+      </div>
     </div>
   )
 }

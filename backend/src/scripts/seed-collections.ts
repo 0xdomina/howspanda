@@ -49,6 +49,10 @@ const COLLECTION_GROUPS = [
 
 export default async function seedCollections({ container }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
+  if (process.env.SEED_DEMO_COLLECTIONS !== "true") {
+    logger.info("Skipping legacy demo collections.");
+    return;
+  }
   const productModuleService = container.resolve(Modules.PRODUCT);
 
   const existing = await productModuleService.listProductCollections({

@@ -22,10 +22,10 @@ const SellerLogin = ({ setCurrentView }: Props) => {
       data-testid="seller-login-page"
     >
       <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-ink mb-4">
-        Sign in to your How’s U account
+        Sign in to Manage Business
       </h1>
       <p className="text-center text-base-regular text-ink-muted mb-8">
-        Your existing How’s U account is also your seller account. Sign in once, then set up your store.
+        Use your store account to manage products, orders, and your storefront.
       </p>
       <form className="w-full" action={formAction}>
         <div className="flex flex-col w-full gap-y-2">
@@ -52,7 +52,7 @@ const SellerLogin = ({ setCurrentView }: Props) => {
         </SubmitButton>
       </form>
       <span className="mt-6 text-center text-small-regular text-ink-muted">
-        New to How’s U?{" "}
+        Need a store account?{" "}
         <LocalizedClientLink href="/account?mode=register" className="text-ink underline" data-testid="seller-create-account-button">
           Create your account
         </LocalizedClientLink>

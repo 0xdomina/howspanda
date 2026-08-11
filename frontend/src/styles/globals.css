@@ -32,6 +32,9 @@
 }
 
 :root {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: Fraunces, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --button-inverted: #db4444;
   --button-inverted-hover: #b92f2f;
   --button-inverted-pressed: #8f2424;

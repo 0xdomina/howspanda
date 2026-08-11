@@ -482,7 +482,10 @@ export default async function seedDemoData({ container }: ExecArgs) {
   });
   logger.info("Finished seeding publishable API key data.");
 
-  logger.info("Seeding product data...");
+  if (process.env.SEED_DEMO_PRODUCTS !== "true") {
+    logger.info("Skipping legacy demo product data.");
+  } else {
+    logger.info("Seeding product data...");
 
   const { result: categoryResult } = await createProductCategoriesWorkflow(
     container
@@ -1005,7 +1008,8 @@ export default async function seedDemoData({ container }: ExecArgs) {
       ],
     },
   });
-  logger.info("Finished seeding product data.");
+    logger.info("Finished seeding product data.");
+  }
 
   logger.info("Seeding inventory levels.");
 

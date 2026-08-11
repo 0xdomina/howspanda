@@ -11,15 +11,12 @@ export const metadata: Metadata = {
 
 export default async function Home(props: {
   params: Promise<{ countryCode: string }>
-  searchParams?: Promise<{ page?: string }>
 }) {
   const params = await props.params
-  const searchParams = await props.searchParams
-  const page = searchParams?.page ? parseInt(searchParams.page) : 1
 
   return (
     <>
-      <EcommerceHome countryCode={params.countryCode} page={page} />
+      <EcommerceHome countryCode={params.countryCode} />
       <Footer />
     </>
   )
