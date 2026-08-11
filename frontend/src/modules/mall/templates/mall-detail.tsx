@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ShareButton from "@modules/common/components/share-button"
 import { useShareUrl } from "@lib/hooks/use-share-url"
@@ -23,6 +23,29 @@ const statusLabel: Record<string, string> = {
 }
 
 const maskedEmail = (email: string) => email.replace(/^(.).+(@.*)$/, "$1•••$2")
+
+const MallCountdown = ({ expiresAt, status }: { expiresAt?: string | null; status: string }) => {
+  const [remainingMs, setRemainingMs] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!expiresAt || status === "pending") return
+    const update = () => setRemainingMs(Math.max(0, new Date(expiresAt).getTime() - Date.now()))
+    update()
+    const timer = window.setInterval(update, 1000)
+    return () => window.clearInterval(timer)
+  }, [expiresAt, status])
+
+  if (!expiresAt || status === "pending") return <span>Starts when live</span>
+  if (remainingMs === null) return <span>Counting down…</span>
+  if (remainingMs <= 0) return <span>Expired</span>
+
+  const totalSeconds = Math.floor(remainingMs / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return <span>{days}d {hours}h {minutes}m {seconds}s</span>
+}
 
 const GoodCard = ({ good, mallId, canShop }: { good: any; mallId: string; canShop: boolean }) => {
   const price = good.variants?.length
@@ -190,7 +213,8 @@ const MallDetailClient = ({
           {!shoppingOpen && mall.status === "pending" && <div className="mt-4 rounded-large border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-medium">This mall is not open for shopping yet.</p><p className="mt-1">Browse the featured products and join the community. Shopping opens after {mall.target_sellers} sellers and {mall.target_buyers} buyers join.</p></div>}
 
           <div className="mt-6 grid grid-cols-2 gap-3 small:grid-cols-5">
-            {[["Prize pool", ngn(mall.prize_pool_ngn)], ["Contributed", ngn(mall.contributed_ngn)], ["Paid out", ngn(paidOut)], ["Remaining", ngn(mall.remaining_ngn)], ["Ends", new Date(mall.expires_at).toLocaleDateString()]].map(([label, value]) => <div key={label} className="rounded-medium border border-ink-hairline bg-paper-surface p-3"><p className="text-xs text-ink-muted">{label}</p><p className="mt-1 font-mono tabular-nums text-sm text-ink">{value}</p></div>)}
+            {[["Prize pool", ngn(mall.prize_pool_ngn)], ["Contributed", ngn(mall.contributed_ngn)], ["Paid out", ngn(paidOut)], ["Remaining", ngn(mall.remaining_ngn)]].map(([label, value]) => <div key={label} className="rounded-medium border border-ink-hairline bg-paper-surface p-3"><p className="text-xs text-ink-muted">{label}</p><p className="mt-1 font-mono tabular-nums text-sm text-ink">{value}</p></div>)}
+            <div className="rounded-medium border border-brand/20 bg-brand/5 p-3"><p className="text-xs text-ink-muted">Countdown</p><p className="mt-1 font-mono tabular-nums text-sm text-ink"><MallCountdown expiresAt={mall.expires_at} status={mall.status} /></p></div>
           </div>
 
           <div className="mt-4 rounded-large border border-ink-hairline bg-paper-surface p-4">

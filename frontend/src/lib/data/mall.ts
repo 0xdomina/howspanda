@@ -27,7 +27,7 @@ export type Mall = {
   prizes?: MallPrize[]
   starts_at?: string | null
   ends_at?: string | null
-  expires_at: string
+  expires_at: string | null
   created_at: string
 }
 
@@ -194,13 +194,9 @@ export const listSellerMalls = async (): Promise<Mall[]> => {
 export const createMall = async (input: {
   name: string
   description?: string
-  targetSellers?: number
-  targetBuyers?: number
   prizeWinnerCount: number
-  prizeDistribution: "equal" | "random"
   prizePoolNgn: number
   productIds: string[]
-  durationDays?: number
 }): Promise<{ success: boolean; error: string | null }> => {
   try {
     const headers = await getSellerAuthHeaders()
@@ -251,8 +247,7 @@ export const joinMallAsSeller = async (
 
 // Author-only mall lifecycle after expiry.
 export const relaunchMall = async (
-  mallId: string,
-  durationDays?: number
+  mallId: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
     const headers = await getSellerAuthHeaders()
@@ -263,7 +258,6 @@ export const relaunchMall = async (
     await sdk.client.fetch(`/store/malls/${mallId}/relaunch`, {
       method: "POST",
       headers,
-      body: durationDays ? { durationDays } : {},
     })
 
     const tag = await getSellerCacheTag("seller")

@@ -48,8 +48,7 @@ export const POST = async (
     )
   }
 
-  const body = (req.body ?? {}) as { durationDays?: number }
-  const updated = await mallService.relaunch(id, body.durationDays)
+  const updated = await mallService.relaunch(id)
 
   res.json({ mall: updated })
 }

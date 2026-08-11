@@ -248,18 +248,29 @@ medusaIntegrationTestRunner({
           prizeWinnerCount: 1,
           prizeDistribution: "equal",
           prizePoolNgn: 20000,
-          targetSellers: 1,
-          targetBuyers: 1,
         })
         await mall.joinAsSeller({
           mallId: mallForDraw.id,
           sellerId,
           contributionNgn: 5000,
         })
+        for (let i = 2; i <= 5; i++) {
+          await mall.joinAsSeller({
+            mallId: mallForDraw.id,
+            sellerId: `draw-seller-${i}`,
+            contributionNgn: 1000,
+          })
+        }
         await mall.joinAsBuyer({
           mallId: mallForDraw.id,
           buyerEmail: "draw-buyer@howsu.local",
         })
+        for (let i = 2; i <= 10; i++) {
+          await mall.joinAsBuyer({
+            mallId: mallForDraw.id,
+            buyerEmail: `draw-buyer-${i}@howsu.local`,
+          })
+        }
         // thresholds met (1 seller + 1 buyer) → auto-active
         const active = await mall.getDetails(mallForDraw.id)
         expect(active.status).toEqual("active")
@@ -298,15 +309,20 @@ medusaIntegrationTestRunner({
           prizeWinnerCount: 1,
           prizeDistribution: "equal",
           prizePoolNgn: 20000,
-          targetSellers: 1,
-          targetBuyers: 5,
         })
         await mall.joinAsSeller({
           mallId: replayMall.id,
           sellerId,
           contributionNgn: 5000,
         })
-        for (let i = 1; i <= 5; i++) {
+        for (let i = 2; i <= 5; i++) {
+          await mall.joinAsSeller({
+            mallId: replayMall.id,
+            sellerId: `replay-seller-${i}`,
+            contributionNgn: 1000,
+          })
+        }
+        for (let i = 1; i <= 10; i++) {
           await mall.joinAsBuyer({
             mallId: replayMall.id,
             buyerEmail: `replay-buyer-${i}@howsu.local`,

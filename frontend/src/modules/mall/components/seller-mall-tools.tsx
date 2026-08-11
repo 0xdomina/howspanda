@@ -106,10 +106,6 @@ export const CreateMallForm = ({
   const [description, setDescription] = useState("")
   const [prizePoolNgn, setPrizePoolNgn] = useState("")
   const [prizeWinnerCount, setPrizeWinnerCount] = useState("3")
-  const [targetSellers, setTargetSellers] = useState("5")
-  const [targetBuyers, setTargetBuyers] = useState("10")
-  const [durationDays, setDurationDays] = useState("7")
-  const [prizeDistribution, setPrizeDistribution] = useState<"equal" | "random">("equal")
   const [selected, setSelected] = useState(publishedIds)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -131,10 +127,6 @@ export const CreateMallForm = ({
         description: description.trim() || undefined,
         prizePoolNgn: pool,
         prizeWinnerCount: Number(prizeWinnerCount),
-        prizeDistribution,
-        targetSellers: Number(targetSellers),
-        targetBuyers: Number(targetBuyers),
-        durationDays: Number(durationDays),
         productIds: selected,
       })
       if (result.success) onDone()
@@ -146,25 +138,18 @@ export const CreateMallForm = ({
     <div className="rounded-large border border-ink-hairline bg-paper-surface p-5">
       <h2 className="font-display text-2xl font-medium text-ink">Create a mall</h2>
       <p className="mt-1 text-sm text-ink-muted">
-        Start a shopping event, choose the products to feature, and set the number of sellers and buyers needed to open it.
+        Start a shopping event, choose the products to feature, and set the opening contribution and number of winners.
       </p>
       <div className="mt-5 space-y-4">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mall name" className={inputClass} />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What makes this mall special?" className={inputClass} />
         <div className="rounded-medium bg-ink/5 p-3 text-xs text-ink-muted">
           <p className="font-medium text-ink">Mall setup numbers</p>
-          <p className="mt-1">Contribution is your opening prize pool. Winners is the number of buyers who can receive a prize. Sellers needed and buyers needed are the launch targets; shopping stays closed until both targets are met.</p>
+          <p className="mt-1">Your mall opens after 5 sellers and 10 buyers join. The 10-day countdown begins only when it goes live. You choose the opening contribution and number of winners.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <input type="number" min="1" value={prizePoolNgn} onChange={(e) => setPrizePoolNgn(e.target.value)} placeholder="Your contribution (₦)" className={inputClass} />
           <input type="number" min="1" value={prizeWinnerCount} onChange={(e) => setPrizeWinnerCount(e.target.value)} placeholder="Winners" className={inputClass} />
-          <input type="number" min="2" value={targetSellers} onChange={(e) => setTargetSellers(e.target.value)} placeholder="Sellers needed" className={inputClass} />
-          <input type="number" min="2" value={targetBuyers} onChange={(e) => setTargetBuyers(e.target.value)} placeholder="Buyers needed" className={inputClass} />
-          <input type="number" min="1" max="30" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} placeholder="Duration (days)" className={inputClass} />
-          <select value={prizeDistribution} onChange={(e) => setPrizeDistribution(e.target.value as "equal" | "random")} className={inputClass}>
-            <option value="equal">Equal prizes</option>
-            <option value="random">Random prizes</option>
-          </select>
         </div>
         {availableBalanceNgn != null && (
           <p className="text-xs text-ink-muted">Available store balance: {ngn(availableBalanceNgn)}. Contributions are reserved from this balance.</p>

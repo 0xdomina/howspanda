@@ -5,9 +5,9 @@ import MallBuyer from "./models/mall-buyer"
 import MallPrize from "./models/mall-prize"
 import MallPurchase from "./models/mall-purchase"
 
-const DEFAULT_TARGET_SELLERS = 5
-const DEFAULT_TARGET_BUYERS = 10
-const MAX_MALL_DURATION_DAYS = 30
+const FIXED_TARGET_SELLERS = 5
+const FIXED_TARGET_BUYERS = 10
+const MALL_LIFESPAN_DAYS = 10
 
 // Locked economics: 20% platform tax on every seller contribution to the prize
 // pool (₦100 pledged → ₦20 platform → ₦80 pool). The pool is displayed NET so
@@ -25,10 +25,11 @@ export type CreateMallInput = {
   name: string
   description?: string
   createdBySellerId: string
+  // Kept for compatibility with older callers. Platform rules ignore these.
   targetSellers?: number
   targetBuyers?: number
   prizeWinnerCount: number
-  prizeDistribution: "equal" | "random"
+  prizeDistribution?: "equal" | "random"
   prizePoolNgn: number
   productIds?: string[]
   durationDays?: number
@@ -68,13 +69,6 @@ class MallModuleService extends MedusaService({
       )
     }
     const now = new Date()
-    const durationDays = Math.min(
-      input.durationDays ?? 7,
-      MAX_MALL_DURATION_DAYS
-    )
-    const expiresAt = new Date(
-      now.getTime() + durationDays * 24 * 60 * 60 * 1000
-    )
     // 20% platform tax: the pledge is the gross contribution, the pool the net.
     const netPool = netOfTax(input.prizePoolNgn)
     const created = await this.createMalls({
@@ -82,14 +76,14 @@ class MallModuleService extends MedusaService({
       description: input.description ?? null,
       created_by_seller_id: input.createdBySellerId,
       status: "pending",
-      target_sellers: input.targetSellers ?? DEFAULT_TARGET_SELLERS,
-      target_buyers: input.targetBuyers ?? DEFAULT_TARGET_BUYERS,
+      target_sellers: FIXED_TARGET_SELLERS,
+      target_buyers: FIXED_TARGET_BUYERS,
       prize_winner_count: input.prizeWinnerCount,
-      prize_distribution: input.prizeDistribution,
+      prize_distribution: "equal",
       prize_pool_ngn: netPool,
       contributed_ngn: input.prizePoolNgn,
       remaining_ngn: netPool,
-      expires_at: expiresAt,
+      expires_at: null,
     })
     await this.createMallSellers({
       mall: created.id,
@@ -314,10 +308,14 @@ class MallModuleService extends MedusaService({
     if (mall[0].status !== "pending") {
       return mall[0]
     }
+    const expiresAt = new Date(
+      new Date().getTime() + MALL_LIFESPAN_DAYS * 24 * 60 * 60 * 1000
+    )
     const updated = await this.updateMalls({
       id: mallId,
       status: "active",
       starts_at: new Date(),
+      expires_at: expiresAt,
     })
     return updated
   }
@@ -473,7 +471,7 @@ class MallModuleService extends MedusaService({
 
   // Re-launch an expired mall: straight to live, same sellers and buyers, with
   // a fresh clock. Nothing is refunded — the pool (net) carries over.
-  async relaunch(mallId: string, durationDays?: number) {
+  async relaunch(mallId: string) {
     const mall = await this.listMalls(
       { id: mallId },
       { take: 1 }
@@ -491,9 +489,8 @@ class MallModuleService extends MedusaService({
       )
     }
     const now = new Date()
-    const days = Math.min(durationDays ?? 7, MAX_MALL_DURATION_DAYS)
     const expiresAt = new Date(
-      now.getTime() + days * 24 * 60 * 60 * 1000
+      now.getTime() + MALL_LIFESPAN_DAYS * 24 * 60 * 60 * 1000
     )
     return await this.updateMalls({
       id: mallId,
@@ -501,6 +498,9 @@ class MallModuleService extends MedusaService({
       starts_at: now,
       ends_at: null,
       expires_at: expiresAt,
+      prize_distribution: "equal",
+      target_sellers: FIXED_TARGET_SELLERS,
+      target_buyers: FIXED_TARGET_BUYERS,
     })
   }
 

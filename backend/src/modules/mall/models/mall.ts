@@ -41,7 +41,8 @@ const Mall = model.define("mkt_mall", {
   // Time bounds
   starts_at: model.dateTime().nullable(),
   ends_at: model.dateTime().nullable(),
-  expires_at: model.dateTime(),
+  // Pending malls have no countdown yet. This is set when the mall goes live.
+  expires_at: model.dateTime().nullable(),
   // Relations
   sellers: model.hasMany(() => MallSeller, {
     mappedBy: "mall",

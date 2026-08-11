@@ -512,13 +512,10 @@ export const PostChallengeSettleSchema = z.object({
 export const PostMallCreateSchema = z.object({
   name: z.string().min(2),
   description: z.string().max(500).optional(),
-  targetSellers: z.number().int().min(2).optional(),
-  targetBuyers: z.number().int().min(2).optional(),
   prizeWinnerCount: z.number().int().min(1),
-  prizeDistribution: z.enum(["equal", "random"]),
+  prizeDistribution: z.enum(["equal", "random"]).optional(),
   prizePoolNgn: z.number().positive(),
   productIds: z.array(z.string().min(1)).min(1),
-  durationDays: z.number().int().min(1).max(30).optional(),
 })
 
 export const PostMallJoinSchema = z.object({
