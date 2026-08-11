@@ -10,7 +10,7 @@ import { KYC_MODULE } from "../modules/kyc"
 import DeliveryModuleService from "../modules/delivery/service"
 import { DELIVERY_MODULE } from "../modules/delivery"
 
-const PASSWORD = process.env.SEED_TEST_PASSWORD ?? "HowsuTest123!"
+const PASSWORD = process.env.SEED_TEST_PASSWORD ?? "HowsU2026!"
 
 // The platform is progressive, not separate: a new signup is a buyer; the KYC
 // ladder lifts the SAME account into seller (store) then courier features.
@@ -51,29 +51,29 @@ type Account =
 const ACCOUNTS: Account[] = [
   {
     key: "buyer",
-    email: "buyer@howsu.test",
-    first_name: "Ada",
-    last_name: "Okafor",
+    email: "amara.okeke@howsu.test",
+    first_name: "Amara",
+    last_name: "Okeke",
     level: "buyer",
-    phone: "+2348000000001",
+    phone: "+2348031002001",
   },
   {
     key: "seller",
-    email: "seller@howsu.test",
-    first_name: "Bisi",
-    last_name: "Adebayo",
+    email: "tunde.balogun@howsu.test",
+    first_name: "Tunde",
+    last_name: "Balogun",
     level: "seller",
-    phone: "+2348000000002",
-    store: { name: "Bisi Boutique", handle: "bisi-boutique" },
+    phone: "+2348031002002",
+    store: { name: "Tunde Essentials", handle: "tunde-essentials" },
   },
   {
     key: "courier",
-    email: "courier@howsu.test",
-    first_name: "Chidi",
-    last_name: "Nwosu",
+    email: "kemi.adeyemi@howsu.test",
+    first_name: "Kemi",
+    last_name: "Adeyemi",
     level: "courier",
-    phone: "+2348000000003",
-    courier: { name: "Chidi Nwosu", city: "Ikeja", vehicle: "Motorcycle" },
+    phone: "+2348031002003",
+    courier: { name: "Kemi Adeyemi", city: "Ikeja", vehicle: "Motorcycle" },
   },
 ]
 
@@ -140,11 +140,21 @@ export default async function seedTestAccounts({ container }: ExecArgs) {
   for (const acc of ACCOUNTS) {
     // 1. Authentication credential — the same identity the storefront uses.
     let authIdentityId: string | null = null
-    const existing = await auth.listAuthIdentities({ entity_id: acc.email })
-    if (existing.length) {
+    const identities = await auth.listAuthIdentities(
+      {},
+      { relations: ["provider_identities"] }
+    )
+    const existing = identities.find((identity: any) =>
+      identity.provider_identities?.some(
+        (providerIdentity: any) =>
+          providerIdentity.entity_id === acc.email &&
+          providerIdentity.provider === "emailpass"
+      )
+    )
+    if (existing) {
       // A fully registered account already owns this identity (actor attached)
       // — skip it so re-runs are safe.
-      const meta = existing[0].app_metadata
+      const meta = existing.app_metadata
       const actorAssigned =
         !!meta && typeof meta === "object" && Object.keys(meta).length > 0
       if (actorAssigned) {
@@ -152,7 +162,7 @@ export default async function seedTestAccounts({ container }: ExecArgs) {
         summary.push({ email: acc.email, level: acc.level, status: "skipped" })
         continue
       }
-      authIdentityId = existing[0].id
+      authIdentityId = existing.id
       logger.info(`${acc.email} already has an identity — reusing it`)
     } else {
       const reg = await auth.register("emailpass", {

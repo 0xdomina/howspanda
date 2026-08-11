@@ -15,6 +15,7 @@
   "scripts": {
     "build": "medusa build",
     "seed": "medusa exec ./src/scripts/seed.ts",
+    "seed:accounts": "medusa exec ./src/scripts/seed-test-accounts.ts",
     "seed:collections": "medusa exec ./src/scripts/seed-collections.ts",
     "start": "medusa start",
     "dev": "medusa develop",
