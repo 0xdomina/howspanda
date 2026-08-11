@@ -143,6 +143,84 @@
     backdrop-filter: blur(18px);
   }
 
+  /* Calm glass layer for the seller workspace. Content stays readable and
+     controls remain direct instead of turning the dashboard into decoration. */
+  .seller-workspace {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(219, 68, 68, 0.09), transparent 28rem),
+      radial-gradient(circle at 96% 14%, rgba(65, 105, 225, 0.08), transparent 24rem),
+      #f6f7f9;
+  }
+
+  .seller-workspace .figma-surface {
+    border-color: rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: 0 14px 36px rgba(20, 24, 32, 0.06);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    backdrop-filter: blur(22px) saturate(1.25);
+  }
+
+  .seller-workspace [class*="rounded-large"][class*="bg-paper-surface"],
+  .seller-workspace [class*="rounded-control"][class*="bg-white"] {
+    border-color: rgba(255, 255, 255, 0.78);
+    background-color: rgba(255, 255, 255, 0.64);
+    box-shadow: 0 12px 30px rgba(20, 24, 32, 0.05);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+    backdrop-filter: blur(18px) saturate(1.18);
+  }
+
+  .seller-workspace .figma-button {
+    box-shadow: 0 8px 18px rgba(219, 68, 68, 0.18);
+    transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .seller-workspace .figma-button:hover {
+    box-shadow: 0 10px 22px rgba(219, 68, 68, 0.24);
+    transform: translateY(-1px);
+  }
+
+  .seller-workspace .figma-button:active,
+  .seller-workspace button:active,
+  .seller-workspace a:active {
+    transform: scale(0.98);
+  }
+
+  .seller-workspace input,
+  .seller-workspace textarea,
+  .seller-workspace select {
+    background-color: rgba(255, 255, 255, 0.72);
+    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  }
+
+  .seller-workspace input:focus,
+  .seller-workspace textarea:focus,
+  .seller-workspace select:focus {
+    background-color: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 3px rgba(219, 68, 68, 0.12);
+  }
+
+  .seller-nav,
+  .seller-shell-header {
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.62);
+    box-shadow: 0 14px 36px rgba(20, 24, 32, 0.06);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    backdrop-filter: blur(22px) saturate(1.25);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seller-workspace .figma-button,
+    .seller-workspace button,
+    .seller-workspace a,
+    .seller-workspace input,
+    .seller-workspace textarea,
+    .seller-workspace select {
+      transition: none;
+    }
+  }
+
   .rounded-large.border.border-ink-hairline.bg-paper-surface {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   }

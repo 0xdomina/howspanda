@@ -22,8 +22,8 @@ export default function SellerSetupTemplate({ customer, kyc }: SellerSetupTempla
   const canSell = kyc?.level === "profile_completed" || kyc?.level === "identity_verified"
 
   return (
-    <div className="figma-container flex min-h-[calc(100vh-180px)] items-center justify-center py-12 small:py-20">
-      <div className="figma-surface w-full max-w-[560px] p-6 small:p-10">
+    <div className="seller-workspace figma-container flex min-h-[calc(100vh-180px)] items-center justify-center py-12 small:py-20">
+      <div className="figma-surface w-full max-w-[560px] rounded-[24px] p-6 small:p-10">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand">Seller setup</p>
         <h1 className="mt-3 font-display text-3xl font-medium tracking-[-0.02em] text-ink small:text-4xl">
           Turn your How’s U account into a store

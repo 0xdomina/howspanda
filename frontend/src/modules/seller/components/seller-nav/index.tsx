@@ -38,34 +38,50 @@ export default function SellerNav({ seller }: { seller: SellerNavSeller }) {
   const { countryCode } = useParams() as { countryCode: string }
 
   const handleLogout = async () => sellerSignout(countryCode)
-  const active = (href: string) => route.split(countryCode)[1] === href
+  const active = (href: string) =>
+    href === "/seller" ? route.endsWith("/seller") : route.includes(href)
+  const manageOpen = manageLinks.some(([href]) => active(href))
 
   return (
-    <nav className="small:sticky small:top-28" data-testid="seller-nav">
-      <div className="flex gap-2 overflow-x-auto pb-4 small:grid small:gap-1">
+    <nav className="seller-nav rounded-[22px] p-3 small:sticky small:top-28" data-testid="seller-nav">
+      <div className="grid grid-cols-5 gap-1 pb-1 small:grid-cols-1 small:gap-1">
         {primaryLinks.map(([href, label, permission]) => {
           if (permission && !sellerHasPermission(seller, permission)) return null
           return (
-            <LocalizedClientLink key={href} href={href} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors ${active(href) ? "bg-ink text-white" : "text-ink-muted hover:bg-paper-tinted hover:text-ink"}`}>
+            <LocalizedClientLink
+              key={href}
+              href={href}
+              className={`min-w-0 rounded-xl px-1 py-2.5 text-center text-xs transition-colors duration-fast small:px-3 small:text-left small:text-sm ${active(href) ? "bg-ink text-white shadow-sm" : "text-ink-muted hover:bg-white/70 hover:text-ink"}`}
+            >
               {label}
             </LocalizedClientLink>
           )
         })}
       </div>
-      <details className="mt-4 border-t border-ink-hairline pt-4">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-ink">Manage business</summary>
-        <div className="mt-3 grid gap-1 pl-2">
+      <details open={manageOpen} className="mt-4 border-t border-black/10 pt-4">
+        <summary className="cursor-pointer list-none rounded-xl px-3 py-2 text-sm font-semibold text-ink hover:bg-white/60">Manage business</summary>
+        <div className="mt-2 grid gap-1 pl-1">
           {manageLinks.map(([href, label, permission]) => {
             const allowed =
               permission === "owner"
                 ? seller.role === "owner"
                 : sellerHasPermission(seller, permission)
             if (!allowed) return null
-            return <LocalizedClientLink key={href} href={href} className={`rounded px-3 py-2 text-sm ${active(href) ? "bg-paper-tinted font-semibold text-ink" : "text-ink-muted hover:text-ink"}`}>{label}</LocalizedClientLink>
+            return (
+              <LocalizedClientLink
+                key={href}
+                href={href}
+                className={`rounded-xl px-3 py-2 text-sm transition-colors duration-fast ${active(href) ? "bg-white/80 font-semibold text-ink shadow-sm" : "text-ink-muted hover:bg-white/60 hover:text-ink"}`}
+              >
+                {label}
+              </LocalizedClientLink>
+            )
           })}
         </div>
       </details>
-      <button type="button" onClick={handleLogout} className="mt-5 px-4 text-sm text-ink-muted hover:text-ink">Log out</button>
+      <button type="button" onClick={handleLogout} className="mt-5 w-full rounded-xl px-3 py-2 text-left text-sm text-ink-muted transition-colors duration-fast hover:bg-white/60 hover:text-ink">
+        Log out
+      </button>
     </nav>
   )
 }
