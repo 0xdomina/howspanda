@@ -22,8 +22,8 @@ export default async function Nav() {
   ])
 
   return (
-    <div className="sticky top-0 z-50 bg-white">
-      <header className="border-b border-ink-hairline bg-white">
+    <div className="glass-nav sticky top-0 z-50">
+      <header className="border-b border-ink-hairline">
         <nav className="figma-container flex min-h-[78px] items-center justify-between gap-6 py-4" aria-label="Main navigation">
           <div>
             <SideMenu regions={regions} locales={locales} currentLocale={currentLocale} />

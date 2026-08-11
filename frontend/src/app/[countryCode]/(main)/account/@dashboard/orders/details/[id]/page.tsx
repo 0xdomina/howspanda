@@ -1,4 +1,5 @@
 import { retrieveOrder } from "@lib/data/orders"
+import { MEDUSA_BACKEND_URL } from "@lib/config"
 import OrderDetailsTemplate from "@modules/order/templates/order-details-template"
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
@@ -29,5 +30,5 @@ export default async function OrderDetailPage(props: Props) {
     notFound()
   }
 
-  return <OrderDetailsTemplate order={order} />
+  return <OrderDetailsTemplate order={order} backendUrl={MEDUSA_BACKEND_URL} />
 }

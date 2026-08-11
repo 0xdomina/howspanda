@@ -9,7 +9,7 @@ export default function CheckoutLayout({
 }) {
   return (
     <div className="relative min-h-screen w-full bg-[#fafafa]">
-      <div className="border-b border-ink-hairline bg-white">
+      <div className="glass-nav border-b border-ink-hairline">
         <nav className="figma-container flex min-h-[78px] items-center justify-between">
           <LocalizedClientLink
             href="/cart"

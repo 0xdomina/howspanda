@@ -90,6 +90,10 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   }
 
   const url = `${getBaseURL()}/${params.countryCode}/products/${handle}`
+  const productVideo =
+    typeof product.metadata?.product_video === "string"
+      ? product.metadata.product_video
+      : null
 
   return {
     title: `${product.title} | How's u`,
@@ -100,6 +104,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       description: product.description ?? product.title,
       url,
       images: product.thumbnail ? [product.thumbnail] : [],
+      videos: productVideo ? [productVideo] : undefined,
       type: "website",
       siteName: "How's u",
     },
@@ -128,13 +133,14 @@ export default async function ProductPage(props: Props) {
     queryParams: { handle: params.handle },
   }).then(({ response }) => response.products[0])
 
-  const images = getImagesForVariant(pricedProduct, selectedVariantId)
-
   if (!pricedProduct) {
     notFound()
   }
 
-  const ratingSummary = await retrieveProductRatingSummary(pricedProduct.id)
+  const images = getImagesForVariant(pricedProduct, selectedVariantId)
+  const ratingSummary = await retrieveProductRatingSummary(pricedProduct.id).catch(
+    () => ({ average: 0, count: 0, reviews: [] })
+  )
 
   return (
     <ProductTemplate

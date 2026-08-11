@@ -54,11 +54,7 @@ const Register = ({ setCurrentView }: Props) => {
         return
       }
       setSent(true)
-      setHint(
-        res.code
-          ? `Dev code sent: ${res.code}`
-          : "A verification code was sent to your email."
-      )
+      setHint("A verification code was sent to your email.")
     })
   }
 

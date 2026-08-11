@@ -7,6 +7,7 @@ import {
 } from "@medusajs/framework/http"
 import {
   ContainerRegistrationKeys,
+  MedusaError,
   remoteQueryObjectFromString,
 } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
@@ -22,6 +23,10 @@ import { PatchSellerMeSchema } from "./sellers/me/route"
 import { PostCourierApplySchema } from "./store/couriers/apply/route"
 import { assertCryptoAllowedForCart } from "../lib/payments/seller-crypto-gate"
 import { CRYPTO_USDC_ID } from "../lib/payments/fees"
+import {
+  BANK_TRANSFER_PROVIDER_ID,
+  getBankTransferSellerForCart,
+} from "../lib/payments/bank-transfer-gate"
 
 // Abuse-throttling for sensitive routes. Keyed by identity where the request
 // body already carries the actor's email (so NAT'd users behind one IP are not
@@ -354,6 +359,19 @@ export const PostRequestReturnSchema = z.object({
 
 export const PostCancelReturnSchema = z.object({
   email: z.string().email(),
+})
+
+// Buyer submits bank-transfer proof; the seller rejects it with a note.
+export const PostBankProofSchema = z.object({
+  email: z.string().email(),
+  reference: z.string().trim().min(1),
+  proof_url: z.string().trim().min(1).max(500).optional(),
+  amount: z.number().positive().optional(),
+  note: z.string().trim().min(1).max(500).optional(),
+})
+
+export const PostBankProofRejectSchema = z.object({
+  note: z.string().trim().min(1).max(500),
 })
 
 // Admin escrow intervention
@@ -747,6 +765,49 @@ const enforceCryptoSellerGate: MedusaRequestHandler = async (req, res, next) => 
   }
 }
 
+// Bank-transfer rail gate: a pp_system_default (manual) payment session may
+// only be created for a cart that can actually receive a direct-to-seller
+// transfer — a single seller with a verified bank payout account.
+const enforceBankTransferGate: MedusaRequestHandler = async (req, res, next) => {
+  try {
+    const providerId = (req.body as { provider_id?: string } | undefined)
+      ?.provider_id
+    if (providerId !== BANK_TRANSFER_PROVIDER_ID) {
+      return next()
+    }
+
+    const collectionId = (req.params as { id?: string }).id
+    if (!collectionId) {
+      return next()
+    }
+
+    const remoteQuery = req.scope.resolve(ContainerRegistrationKeys.REMOTE_QUERY)
+    const [link] = await remoteQuery(
+      remoteQueryObjectFromString({
+        entryPoint: "cart_payment_collection",
+        variables: { filters: { payment_collection_id: collectionId } },
+        fields: ["cart_id"],
+      })
+    )
+
+    const cartId = link?.cart_id
+    if (!cartId) {
+      return next()
+    }
+
+    const seller = await getBankTransferSellerForCart(req.scope, cartId)
+    if (!seller) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Bank transfer is unavailable for this cart — it must contain a single store with a verified payout account."
+      )
+    }
+    return next()
+  } catch (e) {
+    return next(e)
+  }
+}
+
 export default defineMiddlewares({
   routes: [
     {
@@ -978,6 +1039,36 @@ export default defineMiddlewares({
       ],
     },
     {
+      // Buyer view of their direct-to-seller bank transfer (account, reference,
+      // proof status, rejection note + recheck deadline).
+      matcher: "/store/orders/:id/bank-transfer",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        ESCROW_STATUS_RATE_LIMIT,
+      ],
+    },
+    {
+      matcher: "/store/orders/:id/bank-proof",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+        CHECKOUT_RATE_LIMIT,
+        validateAndTransformBody(PostBankProofSchema),
+      ],
+    },
+    {
+      // Seller rejects the buyer's proof with a note (opens the recheck
+      // window). Auth comes from the /sellers/* matcher above.
+      matcher: "/sellers/orders/:id/bank-proof/reject",
+      methods: ["POST"],
+      middlewares: [validateAndTransformBody(PostBankProofRejectSchema)],
+    },
+    {
       matcher: "/store/orders/:id/review",
       methods: ["POST"],
       middlewares: [
@@ -1033,11 +1124,12 @@ export default defineMiddlewares({
       middlewares: [CHECKOUT_RATE_LIMIT],
     },
     {
-      // Per-seller crypto gate: reject crypto-usdc session creation when any
-      // seller in the cart disabled crypto payments.
+      // Per-seller gates on payment session creation: reject a crypto-usdc
+      // session when any seller disabled crypto, and a bank-transfer session
+      // when the cart can't receive a direct-to-seller transfer.
       matcher: "/store/payment-collections/:id/payment-sessions",
       methods: ["POST"],
-      middlewares: [enforceCryptoSellerGate],
+      middlewares: [enforceCryptoSellerGate, enforceBankTransferGate],
     },
     {
       matcher: "/store/reviews/:id",

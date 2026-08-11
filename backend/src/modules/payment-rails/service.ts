@@ -54,7 +54,9 @@ class PaymentRailModuleService extends MedusaService({ PaymentRail }) {
       return {
         key: row.key,
         providerId: row.provider_id,
-        label: row.label || meta?.label || row.key,
+        // Registry label wins so rail renames propagate to already-seeded rows;
+        // the persisted row is the fallback for custom labels.
+        label: meta?.label ?? row.label ?? row.key,
         kind: row.kind || meta?.kind || "manual",
         enabled: row.enabled,
         mode: isRailKey(row.key) ? railMode(row.key) : "mock",

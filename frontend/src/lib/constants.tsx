@@ -19,7 +19,7 @@ export const paymentInfoMap: Record<
     icon: <Cash />,
   },
   pp_system_default: {
-    title: "Manual Payment",
+    title: "Pay by Bank Transfer",
     icon: <CreditCard />,
   },
   // Add more payment providers here

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 
 import { ArrowRightMini } from "@medusajs/icons"
 import { Text, clx, useToggleState } from "@medusajs/ui"
@@ -29,7 +30,7 @@ const menuLinks = [
   ["Mall", "/malls"],
   ["Campaigns", "/challenges"],
   ["Jobs", "/deliver"],
-  ["Buyer AI", "/demo/ai-chat"],
+  ["Buyer AI", "/ai"],
   ["Wishlist", "/wishlist"],
   ["Account", "/account"],
   ["Cart", "/cart"],
@@ -53,6 +54,15 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
     }
     document.addEventListener("keydown", closeOnEscape)
     return () => document.removeEventListener("keydown", closeOnEscape)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
   }, [isOpen])
 
   const closeMenu = () => setIsOpen(false)
@@ -80,20 +90,21 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
         )}
       </button>
 
-      {isOpen && (
+      {isOpen && typeof document !== "undefined"
+        ? createPortal(
         <>
           <button
             type="button"
             aria-label="Close menu"
             onClick={closeMenu}
-            className="fixed inset-0 z-[50] bg-ink/20 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[70] bg-ink/20 backdrop-blur-[2px]"
           />
           <aside
             id="global-side-menu"
             data-testid="nav-menu-popup"
             role="dialog"
             aria-modal="true"
-            className="soft-glass fixed inset-y-2 left-2 z-[51] flex w-[calc(100%-1rem)] flex-col justify-between rounded-rounded p-6 text-sm text-ink shadow-modal transition-transform duration-200 sm:w-[min(420px,calc(100%-1rem))]"
+            className="soft-glass fixed inset-y-2 left-2 z-[71] flex w-[calc(100%-1rem)] flex-col justify-between rounded-rounded p-6 text-sm text-ink shadow-modal transition-transform duration-200 sm:w-[min(420px,calc(100%-1rem))]"
           >
             <div className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-2">
               <div className="flex items-center justify-between gap-4">
@@ -134,8 +145,10 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
               <Text className="flex justify-between txt-compact-small">© {new Date().getFullYear()} How&rsquo;s U.</Text>
             </div>
           </aside>
-        </>
-      )}
+        </>,
+        document.body
+      )
+        : null}
     </>
   )
 }

@@ -11,7 +11,7 @@ const Stars = ({ rating }: { rating: number }) => {
 }
 
 const ProductReviews = ({ summary }: { summary: ProductRatingSummary }) => (
-  <section className="figma-container mb-16 small:mb-24" aria-labelledby="reviews-heading">
+  <section className="figma-container mb-16 small:mb-24" id="reviews" aria-labelledby="reviews-heading">
     <div className="border-t border-ink-hairline pt-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

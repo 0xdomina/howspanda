@@ -15,9 +15,24 @@ type SharePayload = {
   url: string
   text: string
   title?: string
+  description?: string
   image?: string
   hashtags?: string[]
   handle?: string
+}
+
+/**
+ * Message people actually receive: title + short text + link, so a share is
+ * never a bare URL. Upstream apps render a rich visual preview from the OG
+ * tags on the destination page.
+ */
+const buildShareMessage = (payload: SharePayload) => {
+  const parts: string[] = []
+  if (payload.title) parts.push(payload.title)
+  if (payload.text && payload.text !== payload.title) parts.push(payload.text)
+  if (payload.description) parts.push(payload.description)
+  parts.push(payload.url)
+  return parts.join("\n")
 }
 
 const enc = (s: string) => encodeURIComponent(s)
@@ -106,4 +121,12 @@ const shareViaNative = async (payload: SharePayload): Promise<ShareResult> => {
 }
 
 export type { ShareTarget, SharePayload, ShareResult }
-export { buildLinks, openLink, fireShareEvent, copyText, shareViaNative, isWebShareSupported }
+export {
+  buildLinks,
+  buildShareMessage,
+  openLink,
+  fireShareEvent,
+  copyText,
+  shareViaNative,
+  isWebShareSupported,
+}

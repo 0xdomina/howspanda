@@ -9,14 +9,17 @@ import OrderDetails from "@modules/order/components/order-details"
 import OrderSummary from "@modules/order/components/order-summary"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import BuyerOrderActions from "@modules/order/components/buyer-actions"
+import BankTransferCard from "@modules/order/components/bank-transfer"
 import React from "react"
 
 type OrderDetailsTemplateProps = {
   order: HttpTypes.StoreOrder
+  backendUrl?: string
 }
 
 const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
   order,
+  backendUrl = "",
 }) => {
   return (
     <div className="flex flex-col justify-center gap-y-4">
@@ -42,6 +45,13 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
           orderId={order.id}
           email={order.email ?? ""}
           items={(order.items ?? []) as any}
+        />
+        <BankTransferCard
+          orderId={order.id}
+          email={order.email ?? ""}
+          orderTotal={order.total}
+          currencyCode={order.currency_code}
+          backendUrl={backendUrl}
         />
         <Help />
       </div>

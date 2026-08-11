@@ -10,6 +10,7 @@ import { getOrdersListWorkflow } from "@medusajs/medusa/core-flows"
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import type MarketplaceModuleService from "../../../modules/marketplace/service"
 import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
+import { toBankTransferView } from "../../../lib/bank-transfer/proof-view"
 
 export const GET = async (
   req: AuthenticatedMedusaRequest,
@@ -88,12 +89,24 @@ export const GET = async (
     ])
   )
 
+  // Attach each order's direct bank-transfer proof (status, reference, the
+  // buyer's uploaded evidence and note) so the seller dashboard can confirm or
+  // reject it inline.
+  const proofs = await marketplace.listPaymentProofs(
+    { order_id: orderIds, seller_id: sellerAdmin.seller.id },
+    { take: null }
+  )
+  const proofByOrder = new Map(
+    proofs.map((proof) => [proof.order_id, toBankTransferView(proof)])
+  )
+
   const orderRows = Array.isArray(orders) ? orders : orders.rows
 
   res.json({
     orders: orderRows.map((order) => ({
       ...order,
       escrow: lineByOrder.get(order.id) ?? null,
+      bank_transfer: proofByOrder.get(order.id) ?? null,
     })),
   })
 }

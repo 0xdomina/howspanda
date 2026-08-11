@@ -287,6 +287,49 @@ export const markOrderDelivered = async (orderId: string): Promise<string | null
   }
 }
 
+export const confirmBankTransfer = async (
+  orderId: string
+): Promise<string | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return "Not signed in as a seller."
+
+    await sdk.client.fetch(
+      `/sellers/orders/${orderId}/bank-proof/confirm`,
+      { method: "POST", headers }
+    )
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
+
+    return null
+  } catch (error: any) {
+    return error.toString()
+  }
+}
+
+export const rejectBankTransfer = async (
+  orderId: string,
+  note: string
+): Promise<string | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return "Not signed in as a seller."
+
+    await sdk.client.fetch(
+      `/sellers/orders/${orderId}/bank-proof/reject`,
+      { method: "POST", headers, body: { note } }
+    )
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTag(tag, "max")
+
+    return null
+  } catch (error: any) {
+    return error.toString()
+  }
+}
+
 export const confirmReturnReceived = async (
   orderId: string
 ): Promise<string | null> => {

@@ -42,11 +42,6 @@ const ChatMessage = ({ message }: { message: AiChatMessage }) => {
         }`}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
-        {message.provider ? (
-          <p className="mt-1 text-[10px] uppercase tracking-wide text-ink-muted">
-            answered by {message.provider}
-          </p>
-        ) : null}
       </div>
     </div>
   )
@@ -120,8 +115,6 @@ export default function ChatBox() {
         {
           role: "assistant",
           content: res.reply ?? "",
-          provider: res.provider,
-          model_id: res.model_id,
         },
       ])
     })
@@ -139,8 +132,8 @@ export default function ChatBox() {
         {quota ? (
           <span className="rounded-full bg-paper-tinted px-3 py-1 text-xs text-ink-muted">
             {quota.remaining > 0
-              ? `${quota.remaining} free chats left today`
-              : "Daily free chats used up"}
+              ? `${quota.remaining} chats left today`
+              : "Today’s chat limit has been reached"}
           </span>
         ) : null}
       </div>

@@ -23,6 +23,16 @@ type ProductTemplateProps = {
   ratingSummary: ProductRatingSummary
 }
 
+const Stars = ({ average }: { average: number }) => {
+  const rounded = Math.max(0, Math.min(5, Math.round(average)))
+  return (
+    <span className="text-amber-500" aria-label={`${average} out of 5 stars`}>
+      {"★".repeat(rounded)}
+      <span className="text-ink/20">{"★".repeat(5 - rounded)}</span>
+    </span>
+  )
+}
+
 const ProductTemplate: React.FC<ProductTemplateProps> = ({
   product,
   region,
@@ -34,44 +44,77 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
     return notFound()
   }
 
+  const videoUrl =
+    typeof product.metadata?.product_video === "string"
+      ? product.metadata.product_video
+      : null
+
   return (
     <>
       <div
         className="figma-container relative flex flex-col gap-8 py-10 small:flex-row small:items-start"
         data-testid="product-container"
       >
-        <div className="order-2 flex w-full flex-col gap-y-6 py-8 small:order-3 small:sticky small:top-28 small:max-w-[300px] small:py-0">
-          <div className="flex items-start justify-between gap-4">
-            <ProductInfo product={product} />
-            <ShareButton
-              entity="product"
-              entityId={product.id}
-              payload={{
-                url: `${getBaseURL()}/${countryCode}/products/${product.handle}`,
-                text: `${product.title} on How's u`,
-                title: product.title,
-                image: product.thumbnail ?? undefined,
-                hashtags: product.collection ? [product.collection.handle] : [],
-              }}
-            />
-          </div>
-          <ProductTabs product={product} />
+        <div className="order-1 w-full min-w-0 flex-1">
+          <ImageGallery images={images} videoUrl={videoUrl} title={product.title} />
         </div>
-        <div className="order-1 relative block w-full small:order-2">
-          <ImageGallery images={images} />
-        </div>
-        <div className="order-3 flex w-full flex-col gap-y-12 py-8 small:order-3 small:sticky small:top-28 small:max-w-[300px] small:py-0">
-          <Suspense
-            fallback={
-              <ProductActions
-                disabled={true}
-                product={product}
-                region={region}
+
+        <div className="order-2 flex w-full flex-col gap-y-8 small:sticky small:top-28 small:max-w-[400px]">
+          <div className="glass-panel rounded-control p-6 small:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <ProductInfo product={product} />
+              </div>
+              <ShareButton
+                entity="product"
+                entityId={product.id}
+                payload={{
+                  url: `${getBaseURL()}/${countryCode}/products/${product.handle}`,
+                  text: `${product.title} on How's u`,
+                  title: product.title,
+                  description: product.description || undefined,
+                  image: product.thumbnail || undefined,
+                  hashtags: product.collection ? [product.collection.handle] : [],
+                }}
               />
-            }
-          >
-            <ProductActionsWrapper id={product.id} region={region} />
-          </Suspense>
+            </div>
+
+            <div className="mt-4">
+              {ratingSummary.count > 0 ? (
+                <a
+                  href="#reviews"
+                  className="flex items-center gap-2 text-sm text-ink transition-colors hover:text-brand"
+                >
+                  <Stars average={ratingSummary.average} />
+                  <span className="font-medium">
+                    {ratingSummary.average.toFixed(1)}
+                  </span>
+                  <span className="text-ink-muted">
+                    ({ratingSummary.count} review
+                    {ratingSummary.count === 1 ? "" : "s"})
+                  </span>
+                </a>
+              ) : (
+                <p className="text-xs text-ink-muted">No reviews yet</p>
+              )}
+            </div>
+
+            <div className="mt-6 border-t border-ink-hairline pt-6">
+              <Suspense
+                fallback={
+                  <ProductActions
+                    disabled={true}
+                    product={product}
+                    region={region}
+                  />
+                }
+              >
+                <ProductActionsWrapper id={product.id} region={region} />
+              </Suspense>
+            </div>
+          </div>
+
+          <ProductTabs product={product} />
         </div>
       </div>
       <div

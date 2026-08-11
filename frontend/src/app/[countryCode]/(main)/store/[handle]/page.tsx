@@ -9,13 +9,33 @@ import { getBaseURL } from "@lib/util/env"
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ handle: string }>
+  params: Promise<{ handle: string; countryCode: string }>
 }): Promise<Metadata> {
-  const { handle } = await params
+  const { handle, countryCode } = await params
   const profile = await getStoreProfile(handle).catch(() => null)
+  const title = profile?.seller.name ?? handle
+  const description =
+    profile?.seller.description ?? `Shop ${title} on How's u`
+  const image = profile?.seller.logo ?? undefined
+  const url = `${getBaseURL()}/${countryCode}/store/${handle}`
   return {
-    title: profile?.seller.name ?? handle,
-    description: profile?.seller.description ?? undefined,
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      images: image ? [image] : [],
+      type: "website",
+      siteName: "How's u",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
   }
 }
 
@@ -37,7 +57,7 @@ export default async function StorePage({
   return (
     <div className="figma-container flex flex-col gap-12 py-10 small:py-16">
       {/* Store header */}
-      <section className="figma-surface flex flex-col gap-6 p-6 small:flex-row small:items-start small:justify-between small:p-8">
+      <section className="glass-panel flex flex-col gap-6 rounded-control p-6 small:flex-row small:items-start small:justify-between small:p-8">
         <div className="flex items-start gap-4">
           {seller.logo ? (
             // eslint-disable-next-line @next/next/no-img-element

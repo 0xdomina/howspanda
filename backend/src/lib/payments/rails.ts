@@ -46,9 +46,14 @@ export const RAILS: RailMeta[] = [
     kind: "crypto",
   },
   {
+    // The manual payment provider, surfaced as the direct-to-seller bank
+    // transfer rail. The buyer pays the seller's verified bank account
+    // directly (no platform custody) and uploads proof; the seller confirms
+    // or rejects with a note. Always on, but only offered for carts that
+    // qualify (see bank-transfer-gate).
     key: "system_default",
     providerId: "pp_system_default",
-    label: "Manual Payment",
+    label: "Pay by Bank Transfer",
     kind: "manual",
   },
 ]

@@ -2,7 +2,9 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveSeller, listSellerOrders } from "@lib/data/seller"
+import { MEDUSA_BACKEND_URL } from "@lib/config"
 import OrderActions from "@modules/seller/components/order-actions"
+import SellerBankTransfer from "@modules/seller/components/bank-transfer"
 import { sellerHasPermission } from "@lib/seller-permissions"
 
 export const metadata: Metadata = {
@@ -36,16 +38,22 @@ export default async function SellerOrdersPage() {
           {orders.map((order: any) => (
             <li
               key={order.id}
-              className="flex items-center justify-between gap-4 bg-white p-4"
+              className="flex flex-col bg-white p-4"
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-ink font-medium truncate">{order.display_id}</p>
-                <p className="text-sm text-ink-muted truncate">
-                  {order.items?.length ?? 0}{" "}
-                  {order.items?.length === 1 ? "item" : "items"}
-                </p>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-ink font-medium truncate">{order.display_id}</p>
+                  <p className="text-sm text-ink-muted truncate">
+                    {order.items?.length ?? 0}{" "}
+                    {order.items?.length === 1 ? "item" : "items"}
+                  </p>
+                </div>
+                <OrderActions order={order} />
               </div>
-              <OrderActions order={order} />
+              <SellerBankTransfer
+                order={order}
+                backendUrl={MEDUSA_BACKEND_URL}
+              />
             </li>
           ))}
         </ul>

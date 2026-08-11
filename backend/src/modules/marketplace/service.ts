@@ -4,11 +4,14 @@ import SellerAdmin from "./models/seller-admin"
 import CommissionLine from "./models/commission-line"
 import Payout from "./models/payout"
 import PayoutAccount from "./models/payout-account"
+import PaymentProof from "./models/payment-proof"
 
 const DEFAULT_RETURN_WINDOW_DAYS = 3
 const DEFAULT_FALLBACK_RELEASE_DAYS = 30
 const DEFAULT_MIN_PAYOUT_NGN = 5000
+const DEFAULT_RECHECK_HOURS = 24
 const DAY_MS = 24 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
 
 export type CurrencyBalance = {
   pending: number
@@ -27,6 +30,7 @@ class MarketplaceModuleService extends MedusaService({
   CommissionLine,
   Payout,
   PayoutAccount,
+  PaymentProof,
 }) {
   returnWindowDays(): number {
     const parsed = Number(process.env.ESCROW_RETURN_WINDOW_DAYS)
@@ -409,6 +413,189 @@ class MarketplaceModuleService extends MedusaService({
     }
 
     return updated
+  }
+
+  // ── direct-to-seller bank transfer (payment proof) ────────────────────────
+
+  /** Recheck window after a seller rejects a proof — the transfer may still be
+   *  landing (network delays). Default 24h, env BANK_TRANSFER_RECHECK_HOURS. */
+  bankTransferRecheckMs(): number {
+    const hours = Number(process.env.BANK_TRANSFER_RECHECK_HOURS)
+    return Number.isFinite(hours) && hours > 0
+      ? hours * HOUR_MS
+      : DEFAULT_RECHECK_HOURS * HOUR_MS
+  }
+
+  /** The per-order narration reference a buyer must include in the transfer. */
+  bankTransferReference(displayId: string | number): string {
+    return `HYS-${displayId}`
+  }
+
+  /** Single proof row for a (order, seller) pair, or null. */
+  async bankTransferForOrder(orderId: string, sellerId: string) {
+    const [proof] = await this.listPaymentProofs(
+      { order_id: orderId, seller_id: sellerId },
+      { take: 1 }
+    )
+    return proof ?? null
+  }
+
+  /** Creates the awaiting_proof row at order completion. Idempotent. */
+  async createBankTransferProof(input: {
+    orderId: string
+    sellerId: string
+    buyerEmail: string
+    reference: string
+    currencyCode?: string
+    bank: Record<string, unknown>
+  }) {
+    const existing = await this.bankTransferForOrder(
+      input.orderId,
+      input.sellerId
+    )
+    if (existing) {
+      return existing
+    }
+    return this.createPaymentProofs({
+      order_id: input.orderId,
+      seller_id: input.sellerId,
+      buyer_email: input.buyerEmail,
+      reference: input.reference,
+      currency_code: input.currencyCode ?? "ngn",
+      bank: input.bank,
+      status: "awaiting_proof" as const,
+    })
+  }
+
+  /** Buyer uploads proof. Re-submission is allowed from `rejected` (recheck
+   *  window) and resets the rejection. The reference must match the one the
+   *  seller was told to expect. */
+  async submitBankTransferProof(
+    orderId: string,
+    sellerId: string,
+    input: { reference: string; proofUrl?: string; amount?: number; note?: string }
+  ) {
+    const proof = await this.bankTransferForOrder(orderId, sellerId)
+    if (!proof) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        "No bank transfer order found"
+      )
+    }
+    if (!["awaiting_proof", "rejected"].includes(proof.status)) {
+      throw new MedusaError(
+        MedusaError.Types.CONFLICT,
+        `This order's payment is already ${proof.status}`
+      )
+    }
+    if (
+      input.reference.trim().toUpperCase() !==
+      proof.reference.trim().toUpperCase()
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `The reference doesn't match — use ${proof.reference} in your transfer narration`
+      )
+    }
+
+    const [updated] = await this.updatePaymentProofs([
+      {
+        id: proof.id,
+        status: "submitted" as const,
+        proof_url: input.proofUrl ?? null,
+        buyer_note: input.note ?? null,
+        amount: input.amount ?? null,
+        submitted_at: new Date(),
+        rejection_note: null,
+        recheck_until: null,
+        rejected_at: null,
+      },
+    ])
+    return updated
+  }
+
+  /** Seller confirms the money arrived. Allowed from `submitted` AND `rejected`
+   *  — a transfer that lands during the recheck window can still be confirmed. */
+  async confirmBankTransferProof(orderId: string, sellerId: string) {
+    const proof = await this.bankTransferForOrder(orderId, sellerId)
+    if (!proof) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        "No bank transfer order found"
+      )
+    }
+    if (proof.status === "confirmed") {
+      return proof
+    }
+    if (!["submitted", "rejected"].includes(proof.status)) {
+      throw new MedusaError(
+        MedusaError.Types.CONFLICT,
+        `There is no payment to confirm for this order (${proof.status})`
+      )
+    }
+    const [updated] = await this.updatePaymentProofs([
+      {
+        id: proof.id,
+        status: "confirmed" as const,
+        confirmed_at: new Date(),
+        rejection_note: null,
+        recheck_until: null,
+      },
+    ])
+    return updated
+  }
+
+  /** Seller rejects the proof with a note. Opens the recheck window instead of
+   *  cancelling — the payment may still be in flight. */
+  async rejectBankTransferProof(
+    orderId: string,
+    sellerId: string,
+    note: string,
+    now: Date = new Date()
+  ) {
+    const proof = await this.bankTransferForOrder(orderId, sellerId)
+    if (!proof) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_FOUND,
+        "No bank transfer order found"
+      )
+    }
+    if (proof.status !== "submitted") {
+      throw new MedusaError(
+        MedusaError.Types.CONFLICT,
+        `There is no pending payment proof to reject (${proof.status})`
+      )
+    }
+    const [updated] = await this.updatePaymentProofs([
+      {
+        id: proof.id,
+        status: "rejected" as const,
+        rejection_note: note,
+        rejected_at: now,
+        recheck_until: new Date(now.getTime() + this.bankTransferRecheckMs()),
+      },
+    ])
+    return updated
+  }
+
+  /** Recheck sweep: rejected proofs whose window lapsed become `expired`. The
+   *  caller cancels the order and notifies both sides. */
+  async expireRejectedProofs(now: Date = new Date()) {
+    const overdue = await this.listPaymentProofs(
+      { status: "rejected", recheck_until: { $lte: now } },
+      { take: null }
+    )
+    if (!overdue.length) {
+      return []
+    }
+    await this.updatePaymentProofs(
+      overdue.map((proof) => ({
+        id: proof.id,
+        status: "expired" as const,
+        expired_at: now,
+      }))
+    )
+    return overdue
   }
 }
 

@@ -37,11 +37,7 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
         return
       }
       setSent(true)
-      setHint(
-        res.code
-          ? `Dev code sent: ${res.code}`
-          : "A reset code was sent to your email."
-      )
+      setHint("A reset code was sent to your email.")
     })
   }
 

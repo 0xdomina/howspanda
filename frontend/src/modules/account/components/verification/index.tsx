@@ -82,11 +82,7 @@ const EmailStep = ({
       })
       if (res.ok) {
         setSent(true)
-        setHint(
-          res.code
-            ? `Dev code sent: ${res.code}`
-            : "A verification code was sent to your email."
-        )
+        setHint("A verification code was sent to your email.")
       } else {
         setError(res.error ?? "Could not send the code.")
       }
@@ -633,9 +629,8 @@ export const IdentityStep = ({
       {mode === "upload" && stage === "idle" && (
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
-            Upload a clear photo of your National ID card. We read it locally
-            to help fill the form, then validate the original image securely on
-            the backend. The raw image is not kept in public storage.
+            Upload a clear photo of your National ID card. We&rsquo;ll use it to
+            help complete your details before you submit them for review.
           </p>
           <input
             type="file"

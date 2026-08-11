@@ -1,0 +1,74 @@
+import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { MedusaError } from "@medusajs/framework/utils"
+import { randomUUID } from "crypto"
+import { mkdir, writeFile } from "fs/promises"
+import path from "path"
+import multer from "multer"
+import { sniffMedia } from "../../../lib/upload/sniff"
+
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024
+
+// Buyer proof-of-payment upload (bank transfer screenshots). Guests upload
+// without a session, so this is deliberately image-only and public — the
+// proof becomes useful only once it is bound to an order via
+// POST /store/orders/:id/bank-proof, which enforces email ownership.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: IMAGE_MAX_BYTES, files: 1 },
+}).single("file")
+
+const parseMultipart = (req: unknown, res: unknown) =>
+  new Promise<void>((resolve, reject) => {
+    upload(req, res, (err?: unknown) => (err ? reject(err) : resolve()))
+  })
+
+type UploadRequest = MedusaRequest & {
+  file?: {
+    originalname: string
+    mimetype: string
+    size: number
+    buffer: Buffer
+  }
+  body: { kind?: string } & Record<string, unknown>
+}
+
+export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
+  const uploadReq = req as UploadRequest
+
+  try {
+    await parseMultipart(uploadReq, res)
+  } catch (err: any) {
+    if (err?.code === "LIMIT_FILE_SIZE") {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `File too large — max ${IMAGE_MAX_BYTES / 1024 / 1024}MB`
+      )
+    }
+    throw err
+  }
+
+  const file = uploadReq.file
+  if (!file) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Missing file part")
+  }
+
+  const sniffed = sniffMedia(file.buffer)
+  if (sniffed.kind !== "image") {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Only image files are allowed"
+    )
+  }
+
+  const filename = `${randomUUID()}.${sniffed.ext}`
+  const dir = path.join(process.cwd(), "uploads", "proof")
+  await mkdir(dir, { recursive: true })
+  await writeFile(path.join(dir, filename), file.buffer)
+
+  res.json({
+    url: `/uploads/proof/${filename}`,
+    kind: "image",
+    mime: sniffed.mime,
+    size: file.size,
+  })
+}

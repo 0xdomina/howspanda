@@ -112,8 +112,23 @@
     @apply inline-flex items-center justify-center rounded-control bg-brand px-8 py-4 text-sm font-medium text-white transition-colors duration-fast hover:bg-[#b92f2f] focus-visible:outline-brand;
   }
 
-  .figma-surface {
+.figma-surface {
     @apply rounded-control border border-ink-hairline bg-paper-surface;
+  }
+
+  /* Frosted glass panel for key surfaces (product summary, overlays, nav). */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(24px) saturate(1.4);
+  }
+
+  .glass-nav {
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
   }
 
   /* Use glass as a quiet layer for overlays; keep product and seller content opaque. */

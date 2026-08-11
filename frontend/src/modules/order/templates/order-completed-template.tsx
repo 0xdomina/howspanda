@@ -8,8 +8,10 @@ import OrderDetails from "@modules/order/components/order-details"
 import ShareButton from "@modules/common/components/share-button"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
+import BankTransferCard from "@modules/order/components/bank-transfer"
 import { HttpTypes } from "@medusajs/types"
 import { getBaseURL } from "@lib/util/env"
+import { MEDUSA_BACKEND_URL } from "@lib/config"
 
 type OrderCompletedTemplateProps = {
   order: HttpTypes.StoreOrder
@@ -58,6 +60,13 @@ export default async function OrderCompletedTemplate({
             orderId={order.id}
             email={order.email ?? ""}
             items={(order.items ?? []) as any}
+          />
+          <BankTransferCard
+            orderId={order.id}
+            email={order.email ?? ""}
+            orderTotal={order.total}
+            currencyCode={order.currency_code}
+            backendUrl={MEDUSA_BACKEND_URL}
           />
           <ShippingDetails order={order} />
           <PaymentDetails order={order} />
