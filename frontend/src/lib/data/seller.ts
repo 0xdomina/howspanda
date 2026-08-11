@@ -2,6 +2,7 @@
 
 import { sdk } from "@lib/config"
 import { redirect } from "next/navigation"
+import { signout as customerSignout } from "./customer"
 import { revalidateTag } from "next/cache"
 import { getAuthHeaders, getCacheTag } from "./cookies"
 import {
@@ -196,7 +197,13 @@ export async function upgradeCustomerToSeller(
 
 export async function sellerSignout(countryCode: string) {
   await removeSellerAuthToken()
-  redirect(`/${countryCode}/seller`)
+  // Seller access is normally an additive capability on the customer
+  // session. Signing out from Manage Business must therefore end the one
+  // account session as well.
+  if (hasAuth(await getAuthHeaders())) {
+    return customerSignout(countryCode)
+  }
+  redirect(`/${countryCode}/account`)
 }
 
 export const listSellerProducts = async (): Promise<SellerProduct[]> => {

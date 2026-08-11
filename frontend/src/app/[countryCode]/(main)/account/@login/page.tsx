@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   description: "Sign in to your How's u account.",
 }
 
-export default function Login() {
-  return <LoginTemplate />
+export default async function Login({
+  params,
+}: {
+  params: Promise<{ countryCode: string }>
+}) {
+  const { countryCode } = await params
+  return <LoginTemplate countryCode={countryCode} />
 }

@@ -204,12 +204,14 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       if (phone && !existing.phone && phone !== existing.phone) {
         return this.updateKycProfiles({ id: existing.id, phone })
       }
-      // Anchor an unlinked profile to its owner when the user is now known.
+      // Anchor only an unlinked profile. A single account may unlock seller
+      // features later, so upgrading must not move its KYC record away from
+      // the customer account that owns it.
       if (
         input.userType &&
         input.userId &&
-        (existing.user_type !== input.userType ||
-          existing.user_id !== input.userId)
+        !existing.user_type &&
+        !existing.user_id
       ) {
         return this.updateKycProfiles({
           id: existing.id,
@@ -319,13 +321,13 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
     if (!profile) {
       return null
     }
-    // Anchor an unlinked profile to its owner when the user is known now
-    // (e.g. the profile was created through a public email-keyed flow first).
+    // Anchor only an unlinked profile. Customer, seller, and courier access
+    // can all belong to the same person and must share one KYC record.
     if (
       input.userType &&
       input.userId &&
-      (profile.user_type !== input.userType ||
-        profile.user_id !== input.userId)
+      !profile.user_type &&
+      !profile.user_id
     ) {
       const linked = await this.updateKycProfiles({
         id: profile.id,

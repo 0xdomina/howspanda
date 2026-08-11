@@ -100,6 +100,7 @@ export default async function SellerDashboardPage() {
   const available = Number(ngn?.available ?? 0)
   const canViewMoney = seller.role !== "staff"
   const canViewProducts = sellerHasPermission(seller, "products")
+  const canViewAi = sellerHasPermission(seller, "ai")
 
   return (
     <div data-testid="seller-dashboard-page">
@@ -124,6 +125,18 @@ export default async function SellerDashboardPage() {
           </p>
         </div>
       </div>
+
+      {canViewAi && (
+        <div className="mb-8 flex flex-col gap-4 figma-surface p-5 small:flex-row small:items-center small:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-ink">Seller AI</p>
+            <p className="mt-1 text-sm text-ink-muted">Get help with listings, pricing, marketing, and store insights.</p>
+          </div>
+          <Button asChild>
+            <LocalizedClientLink href="/seller/ai">Open Seller AI</LocalizedClientLink>
+          </Button>
+        </div>
+      )}
 
       {products.length === 0 && (
         <div className="flex flex-col gap-4">

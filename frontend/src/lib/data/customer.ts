@@ -15,6 +15,7 @@ import {
   removeCartId,
   setAuthToken,
 } from "./cookies"
+import { setSellerAuthToken } from "./seller-cookies"
 
 export const retrieveCustomer =
   async (): Promise<HttpTypes.StoreCustomer | null> => {
@@ -134,17 +135,39 @@ export async function signup(_currentState: unknown, formData: FormData) {
 export async function login(_currentState: unknown, formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
+  const countryCode = (formData.get("countryCode") as string) || "ng"
 
   try {
-    await sdk.auth
-      .login("customer", "emailpass", { email, password })
-      .then(async (token) => {
-        await setAuthToken(token as string)
-        const customerCacheTag = await getCacheTag("customers")
-        revalidateTag(customerCacheTag, "max")
+    const customerToken = await sdk.auth.login("customer", "emailpass", {
+      email,
+      password,
+    })
+    await setAuthToken(customerToken as string)
+    // Some legacy seller identities can authenticate through the customer
+    // provider but do not have a customer record. Treat those as seller
+    // sessions so the single sign-in form still reaches Manage Business.
+    await sdk.client.fetch("/store/customers/me", {
+      method: "GET",
+      headers: { authorization: `Bearer ${customerToken as string}` },
+      cache: "no-store",
+    })
+    const customerCacheTag = await getCacheTag("customers")
+    revalidateTag(customerCacheTag, "max")
+  } catch (customerError: any) {
+    // Existing stores created before unified accounts used the seller actor.
+    // Keep those accounts reachable through the one public sign-in form while
+    // all new upgrades continue using the customer session.
+    let sellerToken: unknown
+    try {
+      sellerToken = await sdk.auth.login("seller", "emailpass", {
+        email,
+        password,
       })
-  } catch (error: any) {
-    return error.toString()
+    } catch {
+      return customerError.toString()
+    }
+    await setSellerAuthToken(sellerToken as string)
+    redirect(`/${countryCode}/seller`)
   }
 
   try {

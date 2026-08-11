@@ -4,14 +4,14 @@ import ErrorMessage from "@modules/checkout/components/error-message"
 import { SubmitButton } from "@modules/checkout/components/submit-button"
 import Input from "@modules/common/components/input"
 import GoogleSignIn from "@modules/account/components/google-signin"
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { useActionState } from "react"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
+  countryCode: string
 }
 
-const Login = ({ setCurrentView }: Props) => {
+const Login = ({ setCurrentView, countryCode }: Props) => {
   const [message, formAction] = useActionState(login, null)
 
   return (
@@ -21,9 +21,10 @@ const Login = ({ setCurrentView }: Props) => {
     >
       <h1 className="text-large-semi uppercase mb-6">Sign in</h1>
       <p className="text-center text-base-regular text-ui-fg-base mb-8">
-        Sign in to keep shopping, selling, and delivering on How&rsquo;s u.
+        Sign in to shop, sell, and deliver on How&rsquo;s u.
       </p>
       <form className="w-full" action={formAction}>
+        <input type="hidden" name="countryCode" value={countryCode} />
         <div className="flex flex-col w-full gap-y-2">
           <Input
             label="Email"
@@ -68,16 +69,6 @@ const Login = ({ setCurrentView }: Props) => {
         </button>
         .
       </span>
-      <div className="mt-8 w-full border-t border-ink-hairline pt-6 text-center">
-        <p className="text-small-regular text-ui-fg-subtle">Running a store?</p>
-        <LocalizedClientLink
-          href="/seller"
-          className="mt-2 inline-block text-small-regular underline"
-          data-testid="seller-sign-in-link"
-        >
-          Sign in to Manage Business
-        </LocalizedClientLink>
-      </div>
     </div>
   )
 }

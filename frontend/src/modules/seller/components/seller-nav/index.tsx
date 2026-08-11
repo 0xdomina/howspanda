@@ -30,7 +30,7 @@ const manageLinks = [
   ["/seller/referrals", "Referrals", "referrals"],
   ["/seller/redeemables", "Redeemables", "redeemables"],
   ["/seller/team", "Team", "owner"],
-  ["/seller/ai", "AI tools", "ai"],
+  ["/seller/ai", "Seller AI", "ai"],
 ] as const
 
 export default function SellerNav({ seller }: { seller: SellerNavSeller }) {

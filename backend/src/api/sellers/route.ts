@@ -54,6 +54,10 @@ export const POST = async (
   await kyc.assertLevel({
     email: sellerData.admin.email,
     phone: sellerData.admin.phone,
+    userType: req.auth_context?.actor_type === "customer" ? "customer" : null,
+    userId: req.auth_context?.actor_type === "customer"
+      ? req.auth_context.actor_id
+      : null,
     required: kyc.requiredUnlockLevel(),
   })
 

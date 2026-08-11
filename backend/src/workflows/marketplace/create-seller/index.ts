@@ -85,6 +85,10 @@ const createSellerWorkflow = createWorkflow(
       email: input.admin.email,
       phone: input.admin.phone,
       sellerAdminId: sellerAdmin.id,
+      // Customer upgrades already have a platform KYC profile. Keep that
+      // record anchored to the customer account instead of creating a second
+      // seller-specific identity profile.
+      skip: input.preserveCustomerAuth,
     })
 
     provisionSellerWalletStep({

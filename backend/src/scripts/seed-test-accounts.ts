@@ -201,9 +201,30 @@ export default async function seedTestAccounts({ container }: ExecArgs) {
     }
 
     if (acc.level === "seller") {
-      // Seller level: a store is created for this account. Callers can act on
-      // seller routes either as a seller-actor or (via auth_identity) customer.
-      const { result } = await createSellerWorkflow(container).run({
+      // Seller level: the same customer account owns the store. Seller access
+      // is an additive capability, not a second login identity.
+      const { result: customer } = await createCustomerAccountWorkflow(
+        container
+      ).run({
+        input: {
+          authIdentityId,
+          customerData: {
+            email: acc.email,
+            first_name: acc.first_name,
+            last_name: acc.last_name,
+          },
+        },
+      })
+      await liftKyc(kyc, {
+        email: acc.email,
+        phone: acc.phone,
+        first_name: acc.first_name,
+        last_name: acc.last_name,
+        userType: "customer",
+        userId: customer.id,
+        target: "profile_completed",
+      })
+      await createSellerWorkflow(container).run({
         input: {
           name: acc.store!.name,
           handle: acc.store!.handle,
@@ -213,18 +234,8 @@ export default async function seedTestAccounts({ container }: ExecArgs) {
             last_name: acc.last_name,
           },
           authIdentityId,
-          preserveCustomerAuth: false,
+          preserveCustomerAuth: true,
         },
-      })
-      const sellerAdminId: string | undefined = result.seller.admins?.[0]?.id
-      await liftKyc(kyc, {
-        email: acc.email,
-        phone: acc.phone,
-        first_name: acc.first_name,
-        last_name: acc.last_name,
-        userType: "seller",
-        userId: sellerAdminId,
-        target: "profile_completed",
       })
       summary.push({ email: acc.email, level: "seller", status: "created" })
       continue

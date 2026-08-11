@@ -9,6 +9,7 @@ type SeedSellerKycStepInput = {
   email?: string
   phone?: string
   sellerAdminId: string
+  skip?: boolean
 }
 
 // The identifier a seller signs up with (email or phone) IS their verified
@@ -20,6 +21,9 @@ type SeedSellerKycStepInput = {
 const seedSellerKycStep = createStep(
   "seed-seller-kyc-step",
   async (input: SeedSellerKycStepInput, { container }) => {
+    if (input.skip) {
+      return new StepResponse(null, null)
+    }
     const kyc: KycModuleService = container.resolve(KYC_MODULE)
     const profile = await kyc.getOrCreateProfile({
       email: input.email,

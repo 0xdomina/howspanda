@@ -13,7 +13,7 @@ export enum LOGIN_VIEW {
   FORGOT_PASSWORD = "forgot-password",
 }
 
-const LoginTemplate = () => {
+const LoginTemplate = ({ countryCode }: { countryCode: string }) => {
   const searchParams = useSearchParams()
   const [currentView, setCurrentView] = useState(() => {
     const mode = searchParams.get("mode")
@@ -24,7 +24,7 @@ const LoginTemplate = () => {
     <div className="figma-container flex min-h-[calc(100vh-180px)] items-center justify-center py-12 small:py-20">
       <div className="figma-surface w-full max-w-[480px] p-6 small:p-10">
         {currentView === "sign-in" ? (
-          <Login setCurrentView={setCurrentView} />
+          <Login setCurrentView={setCurrentView} countryCode={countryCode} />
         ) : currentView === "forgot-password" ? (
           <ForgotPassword setCurrentView={setCurrentView} />
         ) : (
