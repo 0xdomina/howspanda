@@ -1,13 +1,11 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
+import { useMemo } from "react"
 
-import { joinMallAsBuyer, type Mall, type MallWin } from "@lib/data/mall"
-import type { SellerAdmin, SellerProduct } from "@lib/data/seller"
+import { type Mall, type MallWin } from "@lib/data/mall"
+import type { SellerAdmin } from "@lib/data/seller"
 import { sellerHasPermission } from "@lib/seller-permissions"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import { JoinMallForm } from "@modules/mall/components/seller-mall-tools"
 
 const ngn = (value: number | string | undefined) =>
   new Intl.NumberFormat("en-NG", {
@@ -38,39 +36,8 @@ const WinTicker = ({ wins }: { wins: MallWin[] }) =>
     </div>
   ) : null
 
-const MallCard = ({
-  mall,
-  customerEmail,
-  rank,
-}: {
-  mall: Mall
-  customerEmail: string | null
-  rank: number
-}) => {
-  const router = useRouter()
-  const { countryCode } = useParams<{ countryCode: string }>()
-  const [message, setMessage] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+const MallCard = ({ mall, rank }: { mall: Mall; rank: number }) => {
   const pending = mall.status === "pending"
-  const alreadyJoined = Boolean(
-    customerEmail && mall.buyers?.some((buyer) => buyer.buyer_email === customerEmail)
-  )
-
-  const join = () => {
-    if (!customerEmail) {
-      setMessage("Sign in to join this mall.")
-      return
-    }
-
-    startTransition(async () => {
-      const result = await joinMallAsBuyer(mall.id, customerEmail)
-      if (result.success) {
-        router.push(`/${countryCode}/malls/${mall.id}`)
-      } else {
-        setMessage(result.error)
-      }
-    })
-  }
 
   return (
     <article className="figma-surface flex flex-col p-5">
@@ -98,23 +65,9 @@ const MallCard = ({
 
       {pending && <p className="mt-3 text-xs text-amber-700">{mall.buyer_count ?? 0}/{mall.target_buyers} buyers joined. Products are visible, but checkout is locked until launch.</p>}
 
-      <div className="mt-4 grid gap-2">
-        <LocalizedClientLink href={`/malls/${mall.id}`} className="block w-full rounded-control border border-ink-strong px-3 py-3 text-center text-sm font-medium text-ink transition-colors duration-200 hover:bg-ink hover:text-white">
-          {pending ? "Browse products" : "View products & shop"}
-        </LocalizedClientLink>
-        {alreadyJoined ? (
-          <div className="rounded-control bg-emerald-50 px-3 py-3 text-center text-sm font-medium text-emerald-700">You&rsquo;re in</div>
-        ) : (pending || mall.status === "active") && (
-          customerEmail ? (
-            <button type="button" disabled={isPending} onClick={join} className="w-full rounded-control bg-ink px-3 py-3 text-sm font-medium text-white disabled:opacity-50">
-              {isPending ? "Joining…" : "Join this mall"}
-            </button>
-          ) : (
-            <LocalizedClientLink href="/account" className="block w-full rounded-control bg-ink px-3 py-3 text-center text-sm font-medium text-white">Sign in to join</LocalizedClientLink>
-          )
-        )}
-        {message && <p className="text-xs text-rose-700">{message}</p>}
-      </div>
+      <LocalizedClientLink href={`/malls/${mall.id}`} className="mt-4 block w-full rounded-control border border-ink-strong px-3 py-3 text-center text-sm font-medium text-ink transition-colors duration-200 hover:bg-ink hover:text-white">
+        {pending ? "Browse products and join" : "View products and shop"}
+      </LocalizedClientLink>
     </article>
   )
 }
@@ -124,15 +77,11 @@ const MallsClient = ({
   wins = [],
   customerEmail,
   seller = null,
-  sellerProducts = [],
-  sellerBalanceNgn = null,
 }: {
   malls: Mall[]
   wins?: MallWin[]
   customerEmail: string | null
   seller?: SellerAdmin | null
-  sellerProducts?: SellerProduct[]
-  sellerBalanceNgn?: number | null
 }) => {
   const rankedMalls = useMemo(
     () => [...malls].sort((a, b) => Number(b.prize_pool_ngn) - Number(a.prize_pool_ngn)),
@@ -156,19 +105,11 @@ const MallsClient = ({
         )}
       </div>
 
-      {hasSellerTools && (
-        <section className="mb-8 rounded-large border border-ink-hairline bg-paper-surface p-5">
-          <h2 className="font-display text-xl font-medium text-ink">Join a mall as a store</h2>
-          <p className="mt-1 text-sm text-ink-muted">Choose your products and reserve a contribution from your available store balance.</p>
-          <div className="mt-5"><JoinMallForm malls={rankedMalls} products={sellerProducts} availableBalanceNgn={sellerBalanceNgn} onDone={() => window.location.reload()} /></div>
-        </section>
-      )}
-
       <WinTicker wins={wins} />
       {!rankedMalls.length ? (
         <div className="rounded-control border border-dashed border-ink-hairline bg-white py-16 text-center"><p className="text-ink-muted">No malls are gathering or live right now.</p><p className="mt-1 text-sm text-ink-muted">Check back soon for the next community event.</p></div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 small:grid-cols-2">{rankedMalls.map((mall, index) => <MallCard key={mall.id} mall={mall} customerEmail={customerEmail} rank={index + 1} />)}</div>
+        <div className="grid grid-cols-1 gap-4 small:grid-cols-2">{rankedMalls.map((mall, index) => <MallCard key={mall.id} mall={mall} rank={index + 1} />)}</div>
       )}
     </div>
   )

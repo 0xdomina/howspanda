@@ -5,7 +5,10 @@ import { useState, useTransition } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ShareButton from "@modules/common/components/share-button"
 import { useShareUrl } from "@lib/hooks/use-share-url"
-import { joinMallAsBuyer } from "@lib/data/mall"
+import { joinMallAsBuyer, joinMallAsSeller } from "@lib/data/mall"
+import type { SellerAdmin, SellerProduct } from "@lib/data/seller"
+import { sellerHasPermission } from "@lib/seller-permissions"
+import { MallProductPicker } from "@modules/mall/components/seller-mall-tools"
 
 const ngn = (value: number | string | undefined) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(Number(value ?? 0))
@@ -39,7 +42,101 @@ const GoodCard = ({ good, mallId, canShop }: { good: any; mallId: string; canSho
   return canShop && good.handle ? <LocalizedClientLink href={`/products/${good.handle}?mall_id=${encodeURIComponent(mallId)}`} className="figma-surface group p-3 transition hover:border-ink">{content}</LocalizedClientLink> : <div className="figma-surface p-3">{content}</div>
 }
 
-const MallDetailClient = ({ mall, goods = [], customerEmail }: { mall: any; detail?: any; goods?: any[]; customerEmail?: string | null }) => {
+const SellerJoinPanel = ({
+  mall,
+  seller,
+  products,
+  availableBalanceNgn,
+  onDone,
+}: {
+  mall: any
+  seller: SellerAdmin
+  products: SellerProduct[]
+  availableBalanceNgn?: number | null
+  onDone: (message: string) => void
+}) => {
+  const [step, setStep] = useState<"contribution" | "products">("contribution")
+  const [contribution, setContribution] = useState("")
+  const [selected, setSelected] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const sellerId = seller.seller?.id
+  const alreadyJoined = !!sellerId && mall.sellers?.some((item: any) => item.seller_id === sellerId)
+
+  if (mall.status !== "pending" || !sellerHasPermission(seller, "malls")) return null
+
+  if (alreadyJoined) {
+    return <p className="mt-2 text-sm text-emerald-700">Your store is already participating in this mall.</p>
+  }
+
+  const continueToProducts = () => {
+    const amount = Number(contribution)
+    setError(null)
+    if (amount <= 0) {
+      setError("Enter the amount your store will contribute.")
+      return
+    }
+    if (availableBalanceNgn != null && amount > availableBalanceNgn) {
+      setError(`Your available store balance is ${ngn(availableBalanceNgn)}.`)
+      return
+    }
+    setStep("products")
+  }
+
+  const submit = () => {
+    setError(null)
+    if (!selected.length) {
+      setError("Select at least one published product to feature in this mall.")
+      return
+    }
+    startTransition(async () => {
+      const result = await joinMallAsSeller(mall.id, Number(contribution), selected)
+      if (result.success) onDone("Your store is in. The selected products are now part of this mall.")
+      else setError(result.error)
+    })
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      {step === "contribution" ? (
+        <>
+          <label className="block text-xs font-medium text-ink" htmlFor="mall-contribution">Store contribution</label>
+          <input id="mall-contribution" type="number" min="1" value={contribution} onChange={(event) => setContribution(event.target.value)} placeholder="Amount in ₦" className="w-full rounded-medium border border-ink-hairline bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-ink" />
+          <p className="text-xs text-ink-muted">This amount is reserved from your available store balance. You will choose the products next.</p>
+          {availableBalanceNgn != null && <p className="text-xs text-ink-muted">Available store balance: {ngn(availableBalanceNgn)}.</p>}
+          <button type="button" onClick={continueToProducts} className="w-full rounded-control bg-ink px-3 py-2.5 text-sm font-medium text-white">Continue to products</button>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <div><p className="text-xs font-medium text-ink">Store contribution</p><p className="font-mono text-sm text-ink">{ngn(Number(contribution))}</p></div>
+            <button type="button" onClick={() => setStep("contribution")} className="text-xs text-ink-muted underline underline-offset-2">Change</button>
+          </div>
+          <MallProductPicker products={products} selected={selected} onChange={setSelected} />
+          <button type="button" disabled={isPending} onClick={submit} className="w-full rounded-control bg-ink px-3 py-2.5 text-sm font-medium text-white disabled:opacity-50">{isPending ? "Joining…" : "Join as a store"}</button>
+        </>
+      )}
+      {error && <p className="text-sm text-rose-600">{error}</p>}
+    </div>
+  )
+}
+
+const MallDetailClient = ({
+  mall,
+  goods = [],
+  customerEmail,
+  seller = null,
+  sellerProducts = [],
+  sellerBalanceNgn = null,
+}: {
+  mall: any
+  detail?: any
+  goods?: any[]
+  customerEmail?: string | null
+  seller?: SellerAdmin | null
+  sellerProducts?: SellerProduct[]
+  sellerBalanceNgn?: number | null
+}) => {
   const router = useRouter()
   const sellers = mall?.sellers ?? []
   const buyers = mall?.buyers ?? []
@@ -63,6 +160,11 @@ const MallDetailClient = ({ mall, goods = [], customerEmail }: { mall: any; deta
         setJoinMessage(result.error)
       }
     })
+  }
+
+  const sellerJoinMessage = (message: string) => {
+    setJoinMessage(message)
+    router.refresh()
   }
 
   return (
@@ -114,6 +216,14 @@ const MallDetailClient = ({ mall, goods = [], customerEmail }: { mall: any; deta
             {!customerEmail ? <><p className="mt-1 text-sm text-ink-muted">Sign in to join and have your purchases count toward the draw.</p><LocalizedClientLink href="/account" className="mt-3 block rounded-control bg-ink px-3 py-2 text-center text-sm font-medium text-white">Sign in to join</LocalizedClientLink></> : alreadyJoined ? <p className="mt-2 text-sm text-emerald-700">You are in. {shoppingOpen ? "Your purchases count automatically." : "You are helping this mall reach its launch target."}</p> : <><p className="mt-1 text-sm text-ink-muted">Join with your How&apos;s U account. No second account is needed.</p><button type="button" disabled={isJoining} onClick={join} className="mt-3 w-full rounded-control bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{isJoining ? "Joining…" : "Join this mall"}</button></>}
             {joinMessage && <p className="mt-2 text-xs text-ink-muted">{joinMessage}</p>}
           </section>
+
+          {seller && (
+            <section className="rounded-large border border-brand/20 bg-brand/5 p-5">
+              <h2 className="font-display text-lg font-medium text-ink">Join as a store</h2>
+              <p className="mt-1 text-sm text-ink-muted">Add your store contribution, then choose the published products shoppers will see here.</p>
+              <SellerJoinPanel mall={mall} seller={seller} products={sellerProducts} availableBalanceNgn={sellerBalanceNgn} onDone={sellerJoinMessage} />
+            </section>
+          )}
 
           <section className="rounded-large border border-ink-hairline bg-paper-surface p-5"><h2 className="font-display text-lg font-medium text-ink">Prize winners</h2>{prizes.length ? <ul className="mt-3 divide-y divide-ink-hairline">{prizes.map((prize: any) => <li key={prize.id} className="flex items-center justify-between gap-2 py-2 text-sm"><span className="truncate text-ink-muted">{maskedEmail(prize.winner_buyer_email)}</span><span className="font-mono tabular-nums text-ink">{ngn(prize.amount_ngn)}</span><span className="text-xs text-emerald-700">{prize.claimed ? "Paid" : "Pending"}</span></li>)}</ul> : <p className="mt-2 text-sm text-ink-muted">Winners will appear here as prizes are drawn.</p>}</section>
         </aside>

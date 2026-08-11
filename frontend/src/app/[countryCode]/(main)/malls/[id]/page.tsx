@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveMall, listMallGoods } from "@lib/data/mall"
 import { retrieveCustomer } from "@lib/data/customer"
+import { listSellerProducts, retrieveSeller, retrieveSellerBalance } from "@lib/data/seller"
 import MallDetailClient from "@modules/mall/templates/mall-detail"
 
 export const metadata: Metadata = {
@@ -16,10 +17,13 @@ export default async function MallDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [mall, customer, goods] = await Promise.all([
+  const [mall, customer, goods, seller, sellerProducts, sellerBalance] = await Promise.all([
     retrieveMall(id).catch(() => null),
     retrieveCustomer().catch(() => null),
     listMallGoods(id).catch(() => []),
+    retrieveSeller().catch(() => null),
+    listSellerProducts().catch(() => []),
+    retrieveSellerBalance().catch(() => null),
   ])
 
   if (!mall) {
@@ -32,6 +36,13 @@ export default async function MallDetailPage({
       detail={mall}
       goods={goods}
       customerEmail={customer?.email ?? null}
+      seller={seller}
+      sellerProducts={sellerProducts}
+      sellerBalanceNgn={
+        sellerBalance?.balances?.ngn?.available == null
+          ? null
+          : Number(sellerBalance.balances.ngn.available) / 100
+      }
     />
   )
 }

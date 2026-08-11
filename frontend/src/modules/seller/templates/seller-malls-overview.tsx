@@ -4,7 +4,7 @@ import { useState } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { cancelMall, relaunchMall, type Mall } from "@lib/data/mall"
 import type { SellerProduct } from "@lib/data/seller"
-import { CreateMallForm, JoinMallForm } from "@modules/mall/components/seller-mall-tools"
+import { CreateMallForm } from "@modules/mall/components/seller-mall-tools"
 
 const ngn = (value: number | string | undefined) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(Number(value ?? 0))
@@ -57,10 +57,13 @@ const SellerMallsOverview = ({
         <LocalizedClientLink href="/malls/create" className="rounded-control bg-ink px-4 py-2 text-sm font-medium text-white">Create a mall</LocalizedClientLink>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 small:grid-cols-2">
-        <CreateMallForm products={products} availableBalanceNgn={availableBalanceNgn} onDone={reload} />
-        <JoinMallForm malls={malls} products={products} availableBalanceNgn={availableBalanceNgn} onDone={reload} />
+      <div className="rounded-large border border-brand/20 bg-brand/5 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Join from the mall page</p>
+        <p className="mt-2 max-w-2xl text-sm text-ink-muted">Browse available malls, open one you like, then join as a buyer or as a store. Store participation starts with your contribution and the products you want to feature.</p>
+        <LocalizedClientLink href="/malls" className="mt-4 inline-flex rounded-control border border-ink-strong px-4 py-2 text-sm font-medium text-ink">Browse malls</LocalizedClientLink>
       </div>
+
+      <CreateMallForm products={products} availableBalanceNgn={availableBalanceNgn} onDone={reload} />
 
       <div className="rounded-large border border-ink-hairline bg-paper-surface p-5">
         <h3 className="font-display text-lg font-medium text-ink">Your mall activity</h3>

@@ -151,6 +151,10 @@ export const CreateMallForm = ({
       <div className="mt-5 space-y-4">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mall name" className={inputClass} />
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What makes this mall special?" className={inputClass} />
+        <div className="rounded-medium bg-ink/5 p-3 text-xs text-ink-muted">
+          <p className="font-medium text-ink">Mall setup numbers</p>
+          <p className="mt-1">Contribution is your opening prize pool. Winners is the number of buyers who can receive a prize. Sellers needed and buyers needed are the launch targets; shopping stays closed until both targets are met.</p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <input type="number" min="1" value={prizePoolNgn} onChange={(e) => setPrizePoolNgn(e.target.value)} placeholder="Your contribution (₦)" className={inputClass} />
           <input type="number" min="1" value={prizeWinnerCount} onChange={(e) => setPrizeWinnerCount(e.target.value)} placeholder="Winners" className={inputClass} />
