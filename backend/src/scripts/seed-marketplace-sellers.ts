@@ -430,19 +430,19 @@ async function seedProducts(container: any, account: SeedSeller, sellerAdminId: 
   let created = 0
 
   for (const item of account.products) {
-    if (ownedHandles.has(item.handle)) continue
     const existing = await productModule.listProducts({ handle: [item.handle] })
     if (existing.length) {
       const current = existing[0] as any
-      if (current.metadata?.seed_group === "marketplace-showcase") {
-        await productModule.updateProducts({
-          id: current.id,
+      await productModule.updateProducts(
+        { id: current.id },
+        {
           thumbnail: item.image,
           images: [{ url: item.image }],
-        })
-      }
+        }
+      )
       continue
     }
+    if (ownedHandles.has(item.handle)) continue
 
     const variants = item.variants?.length
       ? item.variants.map((variant) => ({
