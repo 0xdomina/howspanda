@@ -11,6 +11,7 @@ import { z } from "@medusajs/framework/zod"
 import { PostSellerMobileProductSchema } from "../../middlewares"
 import createSellerProductWorkflow from "../../../workflows/marketplace/create-seller-product"
 import { requireSellerPermission } from "../../../lib/sellers/resolve-seller"
+import { applyPromotionMetadata } from "../../../lib/marketplace-promotions"
 
 type MobileProductBody = z.infer<typeof PostSellerMobileProductSchema>
 
@@ -59,6 +60,11 @@ export const POST = async (
   await requireSellerPermission(req, "products")
   const body = req.validatedBody
   const product = toFullProductShape(body)
+
+  product.metadata = applyPromotionMetadata(product.metadata as Record<string, unknown> | undefined, {
+    flashSale: body.flash_sale,
+    homepageBanner: body.homepage_banner,
+  })
 
   // The product video lives in product metadata (feature-flagged), so the
   // product entity needs no new column.

@@ -46,6 +46,8 @@ export default async function EditProductPage({
         description={product.description}
         photo={product.thumbnail}
         videoUrl={product.metadata?.product_video ?? null}
+        flashSale={product.metadata?.flash_sale}
+        homepageBanner={product.metadata?.homepage_banner}
         variants={variants}
         showVideo={features?.product_video ?? false}
       />

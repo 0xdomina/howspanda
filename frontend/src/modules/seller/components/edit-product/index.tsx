@@ -23,6 +23,8 @@ const EditProduct = ({
   photo: initialPhoto,
   videoUrl: initialVideoUrl,
   variants: initialVariants,
+  flashSale: initialFlashSale,
+  homepageBanner: initialHomepageBanner,
   showVideo,
 }: {
   productId: string
@@ -36,6 +38,8 @@ const EditProduct = ({
     price?: number
     stock?: number
   }[]
+  flashSale?: boolean
+  homepageBanner?: boolean
   showVideo: boolean
 }) => {
   const router = useRouter()
@@ -43,6 +47,8 @@ const EditProduct = ({
   const [description, setDescription] = useState(initialDescription ?? "")
   const [photo, setPhoto] = useState(initialPhoto ?? "")
   const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl ?? null)
+  const [flashSale, setFlashSale] = useState(Boolean(initialFlashSale))
+  const [homepageBanner, setHomepageBanner] = useState(Boolean(initialHomepageBanner))
   const [variants, setVariants] = useState<VariantRow[]>(() =>
     initialVariants.map((v) => ({
       id: v.id,
@@ -62,6 +68,8 @@ const EditProduct = ({
       description?: string
       photo?: string
       videoUrl?: string | null
+      flashSale?: boolean
+      homepageBanner?: boolean
       variants?: {
         id: string
         price?: number
@@ -76,6 +84,8 @@ const EditProduct = ({
         price: v.price !== "" ? Number(v.price) : undefined,
         stock: v.stock !== "" ? Number(v.stock) : undefined,
       })),
+      flashSale,
+      homepageBanner,
     }
     if (showVideo && videoUrl !== undefined) update.videoUrl = videoUrl
 
@@ -177,6 +187,36 @@ const EditProduct = ({
             className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
             data-testid="product-description-input"
           />
+        </div>
+
+        <div className="grid gap-3 rounded-large border border-ink-hairline bg-paper-surface p-4">
+          <p className="text-sm font-medium text-ink">Promote this product</p>
+          <label className="flex items-start gap-3 text-sm text-ink-muted">
+            <input
+              type="checkbox"
+              checked={flashSale}
+              onChange={(event) => setFlashSale(event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand"
+              data-testid="flash-sale-checkbox"
+            />
+            <span>
+              <span className="block font-medium text-ink">Add to flash sale</span>
+              <span className="block text-xs text-ink-muted">This product appears in the current 3-day sale cycle.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-ink-muted">
+            <input
+              type="checkbox"
+              checked={homepageBanner}
+              onChange={(event) => setHomepageBanner(event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand"
+              data-testid="homepage-banner-checkbox"
+            />
+            <span>
+              <span className="block font-medium text-ink">Feature in the home banner</span>
+              <span className="block text-xs text-ink-muted">Up to five featured products rotate on the homepage.</span>
+            </span>
+          </label>
         </div>
 
         <ErrorMessage error={error} data-testid="edit-product-error" />

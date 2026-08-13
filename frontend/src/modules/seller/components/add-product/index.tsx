@@ -35,6 +35,8 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
   const [draftValue, setDraftValue] = useState("")
   const [photo, setPhoto] = useState("")
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [flashSale, setFlashSale] = useState(false)
+  const [homepageBanner, setHomepageBanner] = useState(false)
 
   // The backend accepts the full admin shape for products that carry
   // options/variants. We serialize it so the server action can forward it
@@ -293,6 +295,38 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
               className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
               data-testid="product-description-input"
             />
+          </div>
+
+          <div className="grid gap-3 rounded-large border border-ink-hairline bg-paper-surface p-4">
+            <p className="text-sm font-medium text-ink">Promote this product</p>
+            <label className="flex items-start gap-3 text-sm text-ink-muted">
+              <input
+                type="checkbox"
+                name="flash_sale"
+                checked={flashSale}
+                onChange={(event) => setFlashSale(event.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-brand"
+                data-testid="flash-sale-checkbox"
+              />
+              <span>
+                <span className="block font-medium text-ink">Add to flash sale</span>
+                <span className="block text-xs text-ink-muted">This product appears in the current 3-day sale cycle.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-ink-muted">
+              <input
+                type="checkbox"
+                name="homepage_banner"
+                checked={homepageBanner}
+                onChange={(event) => setHomepageBanner(event.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-brand"
+                data-testid="homepage-banner-checkbox"
+              />
+              <span>
+                <span className="block font-medium text-ink">Feature in the home banner</span>
+                <span className="block text-xs text-ink-muted">Up to five featured products rotate on the homepage.</span>
+              </span>
+            </label>
           </div>
 
           <ErrorMessage

@@ -7,6 +7,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { PatchSellerMobileProductSchema } from "../../../middlewares"
 import updateSellerProductWorkflow from "../../../../workflows/marketplace/update-seller-product"
 import { requireSellerPermission } from "../../../../lib/sellers/resolve-seller"
+import { applyPromotionMetadata } from "../../../../lib/marketplace-promotions"
 
 type PatchProductBody = z.infer<typeof PatchSellerMobileProductSchema>
 
@@ -32,18 +33,27 @@ export const PATCH = async (
   if (body.photo !== undefined) update.thumbnail = body.photo
   if (body.status !== undefined) update.status = body.status
 
-  // The product video lives in metadata; merge so we never clobber other keys.
-  if (body.video_url !== undefined) {
+  // Product media and promotion settings live in metadata; merge so we never
+  // clobber unrelated product metadata.
+  if (
+    body.video_url !== undefined ||
+    body.flash_sale !== undefined ||
+    body.homepage_banner !== undefined
+  ) {
     const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
     const { data: [current] } = await query.graph({
       entity: "product",
       fields: ["metadata"],
       filters: { id: req.params.id },
     })
-    update.metadata = {
+    const currentMetadata = {
       ...((current?.metadata ?? {}) as Record<string, unknown>),
-      product_video: body.video_url,
     }
+    if (body.video_url !== undefined) currentMetadata.product_video = body.video_url
+    update.metadata = applyPromotionMetadata(currentMetadata, {
+      flashSale: body.flash_sale,
+      homepageBanner: body.homepage_banner,
+    })
   }
 
   const { result } = await updateSellerProductWorkflow(req.scope).run({

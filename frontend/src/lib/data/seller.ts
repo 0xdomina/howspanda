@@ -38,7 +38,12 @@ export type SellerProduct = {
   description?: string
   thumbnail?: string | null
   status?: string
-  metadata?: { product_video?: string | null }
+  metadata?: {
+    product_video?: string | null
+    flash_sale?: boolean
+    flash_sale_cycle?: number
+    homepage_banner?: boolean
+  }
   images?: { url: string }[]
   options?: { title?: string; values?: { value?: string }[] }[]
   variants?: {
@@ -123,6 +128,8 @@ export async function sellerRegister(
 
     const tag = await getSellerCacheTag("seller")
     revalidateTag(tag, "max")
+    const productsTag = await getCacheTag("products")
+    revalidateTag(productsTag, "max")
 
     return null
   } catch (error: any) {
@@ -779,6 +786,8 @@ export const updateSellerProduct = async (
     description?: string
     photo?: string
     videoUrl?: string | null
+    flashSale?: boolean
+    homepageBanner?: boolean
     variants?: {
       id: string
       price?: number
@@ -797,6 +806,8 @@ export const updateSellerProduct = async (
       variants: update.variants,
     }
     if (update.videoUrl !== undefined) body.video_url = update.videoUrl
+    if (update.flashSale !== undefined) body.flash_sale = update.flashSale
+    if (update.homepageBanner !== undefined) body.homepage_banner = update.homepageBanner
 
     await sdk.client.fetch(`/sellers/products/${id}`, {
       method: "PATCH",
@@ -825,6 +836,8 @@ export const createSellerProduct = async (
     const description = formData.get("description") as string
     const photo = formData.get("photo") as string
     const videoUrl = formData.get("video_url") as string
+    const flashSale = formData.get("flash_sale") === "on"
+    const homepageBanner = formData.get("homepage_banner") === "on"
     const priceRaw = formData.get("price")
     const price = priceRaw !== "" && priceRaw != null ? Number(priceRaw) : undefined
     const stockRaw = formData.get("stock")
@@ -846,6 +859,8 @@ export const createSellerProduct = async (
             video_url: videoUrl || undefined,
             currency_code,
             status: "published",
+            flash_sale: flashSale,
+            homepage_banner: homepageBanner,
             options: variants.options,
             variants: variants.variants,
           }
@@ -858,6 +873,8 @@ export const createSellerProduct = async (
             stock,
             currency_code,
             status: "published",
+            flash_sale: flashSale,
+            homepage_banner: homepageBanner,
           },
     })
 
@@ -1182,6 +1199,8 @@ export const updateSellerTeamMemberPermissions = async (
 
     const tag = await getSellerCacheTag("seller")
     revalidateTag(tag, "max")
+    const productsTag = await getCacheTag("products")
+    revalidateTag(productsTag, "max")
 
     return { success: true, error: null }
   } catch (error: any) {

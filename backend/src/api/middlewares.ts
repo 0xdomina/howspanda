@@ -188,6 +188,8 @@ export const PostSellerMobileProductSchema = z.strictObject({
     .default("ngn")
     .transform((c) => c.toLowerCase()),
   status: z.enum(["draft", "published"]).optional(),
+  flash_sale: z.boolean().optional(),
+  homepage_banner: z.boolean().optional(),
   handle: z.string().optional(),
   images: z.array(z.object({ url: z.string().url() })).optional(),
   options: z
@@ -229,6 +231,8 @@ export const PatchSellerMobileProductSchema = z.strictObject({
   // null clears the product video; a URL replaces it.
   video_url: MEDIA_URL.nullable().optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
+  flash_sale: z.boolean().optional(),
+  homepage_banner: z.boolean().optional(),
   variants: z
     .array(
       z.object({

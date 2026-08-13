@@ -1,8 +1,11 @@
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ProductPreview from "@modules/products/components/product-preview"
 import AutoCarousel from "@modules/home/components/auto-carousel"
+import PromoBannerCarousel from "@modules/home/components/promo-banner-carousel"
+import FlashSaleCountdown from "@modules/home/components/flash-sale-countdown"
 import { getRegion } from "@lib/data/regions"
 import { listProductsWithSort } from "@lib/data/products"
+import { getFlashSaleCycle } from "@lib/util/flash-sales"
 import type { HttpTypes } from "@medusajs/types"
 
 function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -32,15 +35,25 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
   if (region) {
     const { response } = await listProductsWithSort({
       page: 1,
-      queryParams: { limit: 8 },
+      queryParams: { limit: 100 },
       sortBy: "created_at",
       countryCode,
     })
     products = response.products
   }
 
+  const cycle = getFlashSaleCycle()
+  const promotionMetadata = (product: HttpTypes.StoreProduct) =>
+    (product.metadata ?? {}) as Record<string, unknown>
+  const selectedFlash = products.filter((product) => {
+    const metadata = promotionMetadata(product)
+    return metadata.flash_sale === true && Number(metadata.flash_sale_cycle) === cycle.id
+  })
+  const hasConfiguredFlash = products.some((product) => promotionMetadata(product).flash_sale === true)
+  const selectedBanners = products.filter((product) => promotionMetadata(product).homepage_banner === true)
   const hasProducts = products.length > 0
-  const flash = products.slice(0, 6)
+  const flash = (hasConfiguredFlash ? selectedFlash : products).slice(0, 6)
+  const banners = (selectedBanners.length ? selectedBanners : products).slice(0, 5)
   const best = products.slice(0, 6).reverse()
   const explore = products.slice(0, 8)
 
@@ -53,17 +66,18 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
     <div className="bg-white">
       {hasProducts ? (
         <>
+          <PromoBannerCarousel products={banners} />
           <section className="figma-container py-16 small:py-24">
             <div className="flex flex-col justify-between gap-8 small:flex-row small:items-end">
               <SectionTitle eyebrow="Today’s" title="Flash Sales" />
-              <div className="flex items-center gap-3 text-sm font-semibold text-ink" aria-label="Flash sale countdown">
-                {[['Just', 'for'], ['today', 'only'], ['while', 'stocks last']].map(([value, label]) => (
-                  <span key={label} className="text-center"><strong className="block text-xl">{value}</strong>{label}</span>
-                ))}
-              </div>
+              <FlashSaleCountdown endsAt={cycle.endsAt} />
             </div>
             <div className="mt-10">
-              <AutoCarousel slides={slides(flash)} cardClassName="w-[64%] small:w-[44%] medium:w-[23%]" ariaLabel="Flash sale products" />
+              {flash.length ? (
+                <AutoCarousel slides={slides(flash)} cardClassName="w-[64%] small:w-[44%] medium:w-[23%]" ariaLabel="Flash sale products" />
+              ) : (
+                <EmptySlate message="New flash sale picks arrive every three days." />
+              )}
             </div>
             <div className="mt-8 text-center"><LocalizedClientLink href="/store" className="figma-button">View All Products</LocalizedClientLink></div>
           </section>
