@@ -2,7 +2,6 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveSeller } from "@lib/data/seller"
-import { retrieveFeatures } from "@lib/data/kyc"
 import { sellerHasPermission } from "@lib/seller-permissions"
 import AddProduct from "@modules/seller/components/add-product"
 
@@ -18,11 +17,9 @@ export default async function NewProductPage() {
     notFound()
   }
 
-  const features = await retrieveFeatures().catch(() => null)
-
   return (
     <div data-testid="new-product-page">
-      <AddProduct showVideo={features?.product_video ?? false} />
+      <AddProduct showVideo={true} />
     </div>
   )
 }

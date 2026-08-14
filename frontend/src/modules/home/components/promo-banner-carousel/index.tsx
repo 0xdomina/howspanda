@@ -25,13 +25,18 @@ export default function PromoBannerCarousel({
   if (!slides.length) return null
 
   const product = slides[active] ?? slides[0]
+  const bannerImage =
+    typeof product.metadata?.homepage_banner_image === "string"
+      ? product.metadata.homepage_banner_image
+      : product.thumbnail
 
   return (
     <section className="figma-container pt-8 small:pt-12" aria-label="Featured products">
       <div className="relative min-h-[360px] overflow-hidden rounded-[28px] bg-ink text-paper shadow-float small:min-h-[430px]">
-        {product.thumbnail && (
+        {bannerImage && (
           <Image
-            src={product.thumbnail}
+            key={product.id}
+            src={bannerImage}
             alt=""
             fill
             priority
@@ -45,7 +50,7 @@ export default function PromoBannerCarousel({
             <span>Featured on How’s U</span>
             <span>{String(active + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
           </div>
-          <div className="max-w-xl">
+          <div key={product.id} className="media-enter max-w-xl">
             <p className="mb-3 text-sm font-medium text-white/75">{product.title}</p>
             <h2 className="font-display text-4xl font-semibold tracking-tight text-white small:text-6xl">
               Fresh finds, made for your everyday.

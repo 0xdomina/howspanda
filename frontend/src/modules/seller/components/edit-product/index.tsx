@@ -20,7 +20,8 @@ const EditProduct = ({
   productId,
   title: initialTitle,
   description: initialDescription,
-  photo: initialPhoto,
+  photos: initialPhotos,
+  bannerUrl: initialBannerUrl,
   videoUrl: initialVideoUrl,
   variants: initialVariants,
   flashSale: initialFlashSale,
@@ -30,7 +31,8 @@ const EditProduct = ({
   productId: string
   title: string
   description?: string
-  photo?: string | null
+  photos?: string[]
+  bannerUrl?: string | null
   videoUrl?: string | null
   variants: {
     id: string
@@ -45,7 +47,8 @@ const EditProduct = ({
   const router = useRouter()
   const [title, setTitle] = useState(initialTitle)
   const [description, setDescription] = useState(initialDescription ?? "")
-  const [photo, setPhoto] = useState(initialPhoto ?? "")
+  const [photos, setPhotos] = useState<string[]>(initialPhotos ?? [])
+  const [bannerUrl, setBannerUrl] = useState<string | null>(initialBannerUrl ?? null)
   const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl ?? null)
   const [flashSale, setFlashSale] = useState(Boolean(initialFlashSale))
   const [homepageBanner, setHomepageBanner] = useState(Boolean(initialHomepageBanner))
@@ -66,7 +69,8 @@ const EditProduct = ({
     const update: {
       title?: string
       description?: string
-      photo?: string
+      photos?: string[]
+      bannerUrl?: string | null
       videoUrl?: string | null
       flashSale?: boolean
       homepageBanner?: boolean
@@ -78,7 +82,8 @@ const EditProduct = ({
     } = {
       title,
       description: description || undefined,
-      photo: photo || undefined,
+      photos,
+      bannerUrl,
       variants: variants.map((v) => ({
         id: v.id,
         price: v.price !== "" ? Number(v.price) : undefined,
@@ -117,8 +122,10 @@ const EditProduct = ({
           data-testid="product-title-input"
         />
         <ProductMedia
-          photo={photo}
-          onPhotoChange={setPhoto}
+          photos={photos}
+          onPhotosChange={setPhotos}
+          bannerUrl={bannerUrl}
+          onBannerChange={setBannerUrl}
           videoUrl={videoUrl}
           onVideoChange={setVideoUrl}
           showVideo={showVideo}

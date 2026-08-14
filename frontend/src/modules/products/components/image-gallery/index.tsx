@@ -21,7 +21,7 @@ const ImageGallery = ({ images, videoUrl, title }: ImageGalleryProps) => {
       .map((image) => ({ id: image.id, kind: "image" as const, url: image.url }))
 
     return videoUrl
-      ? [{ id: "product-video", kind: "video" as const, url: videoUrl }, ...imageItems]
+      ? [...imageItems, { id: "product-video", kind: "video" as const, url: videoUrl }]
       : imageItems
   }, [images, videoUrl])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -45,7 +45,7 @@ const ImageGallery = ({ images, videoUrl, title }: ImageGalleryProps) => {
 
   return (
     <div className="flex min-w-0 flex-col gap-3 small:flex-row-reverse">
-      <div className="relative aspect-[4/5] min-w-0 flex-1 overflow-hidden rounded-control border border-ink-hairline bg-paper-tinted shadow-float">
+      <div key={active.id} className="media-enter relative aspect-[4/5] min-w-0 flex-1 overflow-hidden rounded-control border border-ink-hairline bg-paper-tinted shadow-float">
         {active.kind === "video" ? (
           <video
             className="absolute inset-0 h-full w-full object-cover"

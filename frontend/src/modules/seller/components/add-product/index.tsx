@@ -33,7 +33,8 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
   const [variantType, setVariantType] = useState<VariantType>("Size")
   const [values, setValues] = useState<VariantValue[]>([])
   const [draftValue, setDraftValue] = useState("")
-  const [photo, setPhoto] = useState("")
+  const [photos, setPhotos] = useState<string[]>([])
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [flashSale, setFlashSale] = useState(false)
   const [homepageBanner, setHomepageBanner] = useState(false)
@@ -132,12 +133,15 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
           )}
 
           <ProductMedia
-            photo={photo}
-            onPhotoChange={setPhoto}
+            photos={photos}
+            onPhotosChange={setPhotos}
+            bannerUrl={bannerUrl}
+            onBannerChange={setBannerUrl}
             videoUrl={videoUrl}
             onVideoChange={setVideoUrl}
             showVideo={showVideo}
-            hiddenPhotoName="photo"
+            hiddenPhotosName="photos_json"
+            hiddenBannerName="banner_url"
             hiddenVideoName="video_url"
           />
 

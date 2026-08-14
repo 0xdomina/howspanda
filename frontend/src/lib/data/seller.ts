@@ -43,6 +43,7 @@ export type SellerProduct = {
     flash_sale?: boolean
     flash_sale_cycle?: number
     homepage_banner?: boolean
+    homepage_banner_image?: string | null
   }
   images?: { url: string }[]
   options?: { title?: string; values?: { value?: string }[] }[]
@@ -784,7 +785,8 @@ export const updateSellerProduct = async (
   update: {
     title?: string
     description?: string
-    photo?: string
+    photos?: string[]
+    bannerUrl?: string | null
     videoUrl?: string | null
     flashSale?: boolean
     homepageBanner?: boolean
@@ -802,7 +804,8 @@ export const updateSellerProduct = async (
     const body: Record<string, unknown> = {
       title: update.title,
       description: update.description,
-      photo: update.photo,
+      photos: update.photos,
+      banner_url: update.bannerUrl,
       variants: update.variants,
     }
     if (update.videoUrl !== undefined) body.video_url = update.videoUrl
@@ -834,7 +837,9 @@ export const createSellerProduct = async (
 
     const title = formData.get("title") as string
     const description = formData.get("description") as string
-    const photo = formData.get("photo") as string
+    const photosJson = formData.get("photos_json") as string
+    const photos = photosJson ? JSON.parse(photosJson) as string[] : []
+    const bannerUrl = formData.get("banner_url") as string
     const videoUrl = formData.get("video_url") as string
     const flashSale = formData.get("flash_sale") === "on"
     const homepageBanner = formData.get("homepage_banner") === "on"
@@ -855,7 +860,8 @@ export const createSellerProduct = async (
         ? {
             title,
             description,
-            photo: photo || undefined,
+            photos,
+            banner_url: bannerUrl || undefined,
             video_url: videoUrl || undefined,
             currency_code,
             status: "published",
@@ -867,7 +873,8 @@ export const createSellerProduct = async (
         : {
             title,
             description,
-            photo: photo || undefined,
+            photos,
+            banner_url: bannerUrl || undefined,
             video_url: videoUrl || undefined,
             price,
             stock,

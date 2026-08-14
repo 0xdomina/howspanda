@@ -26,7 +26,9 @@ type WorkflowInput = {
     title?: string
     description?: string
     thumbnail?: string | null
+    images?: { url: string }[]
     status?: "draft" | "published" | "archived"
+    metadata?: Record<string, unknown>
   }
   /**
    * Optional per-variant updates, keyed by existing variant id. Each may

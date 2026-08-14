@@ -177,6 +177,8 @@ export const PostSellerMobileProductSchema = z.strictObject({
   description: z.string().max(500).optional(),
   price: z.number().positive().optional(),
   photo: MEDIA_URL.optional(),
+  photos: z.array(MEDIA_URL).max(4).optional(),
+  banner_url: MEDIA_URL.optional(),
   // Product showcase video (feature-flagged). Stored in product metadata as
   // `product_video` so the product entity needs no new column.
   video_url: MEDIA_URL.optional(),
@@ -228,6 +230,8 @@ export const PatchSellerMobileProductSchema = z.strictObject({
   title: z.string().min(1).optional(),
   description: z.string().max(500).optional(),
   photo: MEDIA_URL.optional(),
+  photos: z.array(MEDIA_URL).max(4).optional(),
+  banner_url: MEDIA_URL.nullable().optional(),
   // null clears the product video; a URL replaces it.
   video_url: MEDIA_URL.nullable().optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),

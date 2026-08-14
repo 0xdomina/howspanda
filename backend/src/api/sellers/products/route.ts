@@ -27,8 +27,15 @@ type ProductPayload = HttpTypes.AdminCreateProduct & {
 function toFullProductShape(
   body: MobileProductBody
 ): ProductPayload {
+  const photos = body.photos ?? (body.photo ? [body.photo] : [])
+
   if (body.variants || body.options) {
-    return body as unknown as ProductPayload
+    const { photo: _photo, photos: _photos, banner_url: _bannerUrl, ...productBody } = body
+    return {
+      ...productBody,
+      thumbnail: photos[0] ?? null,
+      images: body.images ?? photos.map((url) => ({ url })),
+    } as unknown as ProductPayload
   }
 
   return {
@@ -36,8 +43,8 @@ function toFullProductShape(
     description: body.description,
     handle: body.handle,
     status: body.status ?? "published",
-    thumbnail: body.photo ?? null,
-    images: body.images ?? (body.photo ? [{ url: body.photo }] : []),
+    thumbnail: photos[0] ?? null,
+    images: body.images ?? photos.map((url) => ({ url })),
     options: [{ title: "One Size", values: ["One Size"] }],
     variants: [
       {
@@ -64,6 +71,7 @@ export const POST = async (
   product.metadata = applyPromotionMetadata(product.metadata as Record<string, unknown> | undefined, {
     flashSale: body.flash_sale,
     homepageBanner: body.homepage_banner,
+    homepageBannerImage: body.banner_url,
   })
 
   // The product video lives in product metadata (feature-flagged), so the

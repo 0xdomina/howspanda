@@ -2,7 +2,6 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveSeller, retrieveSellerProduct } from "@lib/data/seller"
-import { retrieveFeatures } from "@lib/data/kyc"
 import EditProduct from "@modules/seller/components/edit-product"
 import { sellerHasPermission } from "@lib/seller-permissions"
 
@@ -36,7 +35,8 @@ export default async function EditProductPage({
     stock: v.inventory_items?.[0]?.location_levels?.[0]?.stocked_quantity,
   }))
 
-  const features = await retrieveFeatures().catch(() => null)
+  const photos = (product.images ?? []).map((image) => image.url).filter(Boolean)
+  const orderedPhotos = photos.length ? photos : product.thumbnail ? [product.thumbnail] : []
 
   return (
     <div data-testid="edit-product-page">
@@ -44,12 +44,13 @@ export default async function EditProductPage({
         productId={product.id}
         title={product.title}
         description={product.description}
-        photo={product.thumbnail}
+        photos={orderedPhotos}
+        bannerUrl={product.metadata?.homepage_banner_image ?? null}
         videoUrl={product.metadata?.product_video ?? null}
         flashSale={product.metadata?.flash_sale}
         homepageBanner={product.metadata?.homepage_banner}
         variants={variants}
-        showVideo={features?.product_video ?? false}
+        showVideo={true}
       />
     </div>
   )

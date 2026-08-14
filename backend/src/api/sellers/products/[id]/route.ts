@@ -25,12 +25,19 @@ export const PATCH = async (
     title?: string
     description?: string
     thumbnail?: string | null
+    images?: { url: string }[]
     status?: "draft" | "published" | "archived"
     metadata?: Record<string, unknown>
   } = {}
   if (body.title !== undefined) update.title = body.title
   if (body.description !== undefined) update.description = body.description
-  if (body.photo !== undefined) update.thumbnail = body.photo
+  if (body.photos !== undefined) {
+    update.thumbnail = body.photos[0] ?? null
+    update.images = body.photos.map((url) => ({ url }))
+  } else if (body.photo !== undefined) {
+    update.thumbnail = body.photo
+    update.images = [{ url: body.photo }]
+  }
   if (body.status !== undefined) update.status = body.status
 
   // Product media and promotion settings live in metadata; merge so we never
@@ -38,7 +45,8 @@ export const PATCH = async (
   if (
     body.video_url !== undefined ||
     body.flash_sale !== undefined ||
-    body.homepage_banner !== undefined
+    body.homepage_banner !== undefined ||
+    body.banner_url !== undefined
   ) {
     const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
     const { data: [current] } = await query.graph({
@@ -53,6 +61,7 @@ export const PATCH = async (
     update.metadata = applyPromotionMetadata(currentMetadata, {
       flashSale: body.flash_sale,
       homepageBanner: body.homepage_banner,
+      homepageBannerImage: body.banner_url,
     })
   }
 

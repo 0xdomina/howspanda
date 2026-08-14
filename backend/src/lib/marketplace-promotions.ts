@@ -17,7 +17,11 @@ export const getFlashSaleCycle = (now = Date.now()) => {
 
 export const applyPromotionMetadata = (
   current: Record<string, unknown> = {},
-  options: { flashSale?: boolean; homepageBanner?: boolean },
+  options: {
+    flashSale?: boolean
+    homepageBanner?: boolean
+    homepageBannerImage?: string | null
+  },
   now = Date.now()
 ) => {
   const metadata = { ...current }
@@ -38,6 +42,15 @@ export const applyPromotionMetadata = (
 
   if (options.homepageBanner !== undefined) {
     metadata.homepage_banner = options.homepageBanner
+  }
+
+  if (options.homepageBannerImage !== undefined) {
+    if (options.homepageBannerImage) {
+      metadata.homepage_banner_image = options.homepageBannerImage
+      metadata.homepage_banner = true
+    } else {
+      delete metadata.homepage_banner_image
+    }
   }
 
   return metadata
