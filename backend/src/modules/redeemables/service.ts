@@ -9,6 +9,10 @@ export type MintInput = {
   seller_id: string
   type: RedeemableType
   title: string
+  design_variant?: string
+  background_image?: string | null
+  accent_color?: string | null
+  message?: string | null
   currency_code?: string
   face_value?: number
   discount_type?: "fixed" | "percent"
@@ -85,6 +89,10 @@ class RedeemablesModuleService extends MedusaService({
       code: generateCode(input.type),
       currency_code: input.currency_code ?? "ngn",
       title: input.title,
+      design_variant: input.design_variant ?? "sunset",
+      background_image: input.background_image ?? null,
+      accent_color: input.accent_color ?? null,
+      message: input.message ?? null,
       face_value: input.face_value ?? null,
       balance: input.type === "gift_card" ? input.face_value : null,
       discount_type: input.discount_type ?? null,
@@ -109,6 +117,10 @@ class RedeemablesModuleService extends MedusaService({
         seller_id: template.seller_id,
         type: template.type as RedeemableType,
         title: template.title,
+        design_variant: template.design_variant,
+        background_image: template.background_image,
+        accent_color: template.accent_color,
+        message: template.message,
         currency_code: template.currency_code,
         face_value: template.face_value
           ? Number(template.face_value)

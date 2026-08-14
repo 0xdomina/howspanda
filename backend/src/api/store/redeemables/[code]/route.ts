@@ -21,6 +21,10 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     redeemable: {
       type: redeemable.type,
       title: redeemable.title,
+      design_variant: redeemable.design_variant,
+      background_image: redeemable.background_image,
+      accent_color: redeemable.accent_color,
+      message: redeemable.message,
       status: redeemable.status,
       currency_code: redeemable.currency_code,
       face_value: redeemable.face_value,

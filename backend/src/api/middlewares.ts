@@ -397,6 +397,10 @@ export const PostEscrowReleaseSchema = z.object({
 export const PostSellerRedeemableSchema = z.object({
   type: z.enum(["gift_card", "voucher", "ticket"]),
   title: z.string().min(2),
+  design_variant: z.enum(["sunset", "midnight", "mint", "candy", "cobalt"]).default("sunset"),
+  background_image: z.string().url().nullable().optional(),
+  accent_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  message: z.string().max(180).nullable().optional(),
   face_value: z.number().positive().optional(),
   discount_type: z.enum(["fixed", "percent"]).optional(),
   discount_value: z.number().positive().optional(),

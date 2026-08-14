@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { ChangeEvent, useState, useTransition } from "react"
 
 import {
   cancelSellerRedeemable,
@@ -8,6 +8,8 @@ import {
   redeemInStore,
   type SellerRedeemable,
 } from "@lib/data/seller"
+import { encodeProductImage } from "@lib/media/image"
+import { uploadSellerMedia } from "@lib/data/seller-media"
 
 const money = (amount: number | string | null | undefined) => {
   const value = Number(amount ?? 0)
@@ -24,6 +26,42 @@ const typeLabel = (type: string) => {
   if (type === "voucher") return "Voucher"
   return "Ticket"
 }
+
+const designGradients: Record<string, string> = {
+  sunset: "linear-gradient(135deg,#ef4444,#f59e0b)",
+  midnight: "linear-gradient(135deg,#111827,#4338ca)",
+  mint: "linear-gradient(135deg,#047857,#a7f3d0)",
+  candy: "linear-gradient(135deg,#db2777,#c084fc)",
+  cobalt: "linear-gradient(135deg,#2563eb,#22d3ee)",
+}
+
+const RedeemablePreview = ({
+  type,
+  title,
+  message,
+  design,
+  image,
+  accentColor,
+  value,
+}: {
+  type: string
+  title: string
+  message: string
+  design: string
+  image: string
+  accentColor: string
+  value: string
+}) => (
+  <div className="relative min-h-[210px] overflow-hidden rounded-large p-5 text-white shadow-sm" style={{ background: designGradients[design] ?? designGradients.sunset }}>
+    {image && <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
+    <div className="absolute inset-0 bg-black/10" />
+    <div className="relative flex min-h-[170px] flex-col justify-between">
+      <div className="flex items-center justify-between"><span className="text-xs font-medium uppercase tracking-[0.16em] text-white/80">{typeLabel(type)}</span><span className="text-2xl">✦</span></div>
+      <div><h4 className="font-display text-2xl font-medium">{title || "Your title"}</h4><p className="mt-2 max-w-[250px] text-sm text-white/80">{message || "Add a message people will want to keep."}</p></div>
+      <div className="flex items-end justify-between"><span className="text-lg font-semibold">{value || "₦0"}</span><span className="rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: accentColor }}>Ready to share</span></div>
+    </div>
+  </div>
+)
 
 const RedeemInStore = () => {
   const [code, setCode] = useState("")
@@ -89,14 +127,37 @@ const RedeemInStore = () => {
 const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
   const [type, setType] = useState<"gift_card" | "voucher" | "ticket">("gift_card")
   const [title, setTitle] = useState("")
+  const [price, setPrice] = useState("")
   const [faceValue, setFaceValue] = useState("")
   const [discountType, setDiscountType] = useState<"fixed" | "percent">("fixed")
   const [discountValue, setDiscountValue] = useState("")
   const [quantity, setQuantity] = useState("1")
   const [email, setEmail] = useState("")
   const [expires, setExpires] = useState("")
+  const [design, setDesign] = useState<"sunset" | "midnight" | "mint" | "candy" | "cobalt">("sunset")
+  const [backgroundImage, setBackgroundImage] = useState("")
+  const [accentColor, setAccentColor] = useState("#ef4444")
+  const [message, setMessage] = useState("")
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const uploadBackground = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const blob = await encodeProductImage(file)
+      const result = await uploadSellerMedia(new File([blob], `redeemable-${Date.now()}.webp`, { type: blob.type }), "image")
+      if (result.url) setBackgroundImage(result.url)
+      else setError(result.error ?? "Could not upload that image.")
+    } catch (error: any) {
+      setError(error?.message ?? "Could not process that image.")
+    } finally {
+      setUploading(false)
+      event.target.value = ""
+    }
+  }
 
   const submit = () => {
     setError(null)
@@ -131,6 +192,11 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
       const res = await createSellerRedeemable({
         type,
         title: title.trim(),
+        price: price.trim() ? Number(price) : undefined,
+        design_variant: design,
+        background_image: backgroundImage || undefined,
+        accent_color: accentColor,
+        message: message.trim() || undefined,
         face_value: type === "voucher" ? undefined : Number(faceValue),
         discount_type: type === "voucher" ? discountType : undefined,
         discount_value: type === "voucher" ? Number(discountValue) : undefined,
@@ -140,11 +206,14 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
       })
       if (res.success) {
         setTitle("")
+        setPrice("")
         setFaceValue("")
         setDiscountValue("")
         setEmail("")
         setExpires("")
         setQuantity("1")
+        setMessage("")
+        setBackgroundImage("")
         onCreated(res.code ?? "")
       } else {
         setError(res.error)
@@ -153,7 +222,8 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="grid gap-6 large:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs text-ink-muted">Type</label>
@@ -185,6 +255,11 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
           placeholder={type === "gift_card" ? "e.g. Birthday gift card" : type === "voucher" ? "e.g. 10% off everything" : "e.g. Saturday market entry"}
           className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink"
         />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs text-ink-muted">Sell for (optional)</label>
+        <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} placeholder="e.g. 5000" inputMode="decimal" className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink" />
+        <p className="mt-1 text-xs text-ink-muted">Add a price to list it in your public store.</p>
       </div>
       {type === "voucher" ? (
         <div className="grid grid-cols-2 gap-3">
@@ -247,15 +322,28 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
           />
         </div>
       </div>
+      <div className="rounded-medium border border-ink-hairline bg-white/40 p-3">
+        <p className="text-sm font-medium text-ink">Make it memorable</p>
+        <p className="mt-1 text-xs text-ink-muted">Choose a look buyers will recognise when they receive it.</p>
+        <div className="mt-3 grid grid-cols-5 gap-2">
+          {(Object.keys(designGradients) as ("sunset" | "midnight" | "mint" | "candy" | "cobalt")[]).map((item) => <button key={item} type="button" aria-label={`${item} design`} onClick={() => { setDesign(item); setAccentColor({ sunset: "#ef4444", midnight: "#4338ca", mint: "#047857", candy: "#db2777", cobalt: "#2563eb" }[item]) }} className={`h-8 rounded-small border-2 ${design === item ? "border-ink" : "border-transparent"}`} style={{ background: designGradients[item] }} />)}
+        </div>
+        <div className="mt-3 flex items-center gap-3"><label className="text-xs text-ink-muted">Highlight</label><input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent" /></div>
+        <label className="mt-3 flex cursor-pointer items-center justify-center rounded-medium border border-dashed border-ink-hairline px-3 py-2 text-xs font-medium text-ink hover:bg-white">{uploading ? "Preparing image…" : backgroundImage ? "Change artwork" : "Add artwork (optional)"}<input type="file" accept="image/*" className="sr-only" onChange={uploadBackground} disabled={uploading} /></label>
+        {backgroundImage && <button type="button" onClick={() => setBackgroundImage("")} className="mt-2 text-xs text-rose-600 hover:underline">Remove artwork</button>}
+        <textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, 180))} rows={2} maxLength={180} placeholder="A little note for the recipient" className="mt-3 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink" />
+      </div>
       {error && <p className="text-sm text-rose-600">{error}</p>}
       <button
         type="button"
-        disabled={isPending}
+        disabled={isPending || uploading}
         onClick={submit}
         className="w-full rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
       >
         {isPending ? "Creating…" : `Create ${typeLabel(type).toLowerCase()}${quantity !== "1" ? "s" : ""}`}
       </button>
+      </div>
+      <div className="large:sticky large:top-6 large:self-start"><p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-ink-muted">Live preview</p><RedeemablePreview type={type} title={title} message={message} design={design} image={backgroundImage} accentColor={accentColor} value={type === "voucher" ? (discountValue ? `${discountType === "percent" ? `${discountValue}% off` : `₦${discountValue} off`}` : "") : faceValue ? `₦${faceValue}` : ""} /></div>
     </div>
   )
 }

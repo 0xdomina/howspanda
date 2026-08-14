@@ -26,7 +26,10 @@ export type SellerAdmin = {
     name?: string
     handle?: string
     logo?: string
+    cover_image?: string
     description?: string
+    accent_color?: string
+    theme?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
     crypto_payments_enabled?: boolean
   }
 }
@@ -519,6 +522,10 @@ export type SellerRedeemable = {
   status?: string
   currency_code?: string
   title?: string
+  design_variant?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
+  background_image?: string | null
+  accent_color?: string | null
+  message?: string | null
   face_value?: number | string | null
   balance?: number | string | null
   discount_type?: string | null
@@ -558,6 +565,10 @@ export const createSellerRedeemable = async (
   body: {
     type: "gift_card" | "voucher" | "ticket"
     title: string
+    design_variant?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
+    background_image?: string | null
+    accent_color?: string | null
+    message?: string | null
     face_value?: number
     discount_type?: "fixed" | "percent"
     discount_value?: number
@@ -579,10 +590,14 @@ export const createSellerRedeemable = async (
         body: {
           type: body.type,
           title: body.title,
+          design_variant: body.design_variant,
+          background_image: body.background_image,
+          accent_color: body.accent_color,
+          message: body.message,
+          price: body.price,
           face_value: body.face_value,
           discount_type: body.discount_type,
           discount_value: body.discount_value,
-          price: body.price,
           expires_at: body.expires_at || undefined,
           quantity: body.quantity,
           issued_to_email: body.issued_to_email || undefined,
@@ -1164,7 +1179,10 @@ export const updateSellerStore = async (body: {
   name?: string
   handle?: string
   logo?: string | null
+  cover_image?: string | null
   description?: string | null
+  accent_color?: string
+  theme?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
   crypto_payments_enabled?: boolean
   first_name?: string
   last_name?: string

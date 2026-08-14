@@ -6,6 +6,24 @@ import { getStoreProfile } from "@lib/data/follows"
 import FollowButton from "@modules/store/components/follow-button"
 import { getBaseURL } from "@lib/util/env"
 
+const money = (value: number | string | null | undefined) =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }).format(Number(value ?? 0))
+
+const visualFor = (type: string, variant?: string) => {
+  const defaults: Record<string, string> = {
+    sunset: "linear-gradient(135deg,#ef4444,#f59e0b)",
+    midnight: "linear-gradient(135deg,#111827,#4338ca)",
+    mint: "linear-gradient(135deg,#047857,#a7f3d0)",
+    candy: "linear-gradient(135deg,#db2777,#c084fc)",
+    cobalt: "linear-gradient(135deg,#2563eb,#22d3ee)",
+  }
+  return defaults[variant ?? ""] ?? (type === "ticket" ? defaults.cobalt : type === "voucher" ? defaults.mint : defaults.sunset)
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -57,17 +75,21 @@ export default async function StorePage({
   return (
     <div className="figma-container flex flex-col gap-12 py-10 small:py-16">
       {/* Store header */}
-      <section className="glass-panel flex flex-col gap-6 rounded-control p-6 small:flex-row small:items-start small:justify-between small:p-8">
-        <div className="flex items-start gap-4">
+      <section className="glass-panel relative overflow-hidden rounded-control p-6 small:p-8" style={{ borderColor: `${seller.accent_color ?? "#ef4444"}33` }}>
+        <div className="absolute inset-x-0 top-0 h-28 opacity-90" style={{ background: visualFor("store", seller.theme) }} />
+        {seller.cover_image && <img src={seller.cover_image} alt="" className="absolute inset-x-0 top-0 h-28 w-full object-cover opacity-70" />}
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-transparent to-white/90" />
+        <div className="relative flex flex-col gap-6 pt-10 small:flex-row small:items-end small:justify-between">
+        <div className="flex items-end gap-4">
           {seller.logo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={seller.logo}
               alt={seller.name}
-              className="h-16 w-16 rounded-full object-cover"
+              className="h-20 w-20 rounded-full border-4 border-white object-cover shadow-sm"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ink/10 text-xl font-medium text-ink">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-ink/10 text-xl font-medium text-ink shadow-sm">
               {seller.name.slice(0, 1).toUpperCase()}
             </div>
           )}
@@ -117,6 +139,7 @@ export default async function StorePage({
             }}
           />
         </div>
+        </div>
       </section>
 
       {/* Recent broadcasts */}
@@ -141,6 +164,29 @@ export default async function StorePage({
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {profile.redeemables.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div><p className="text-xs font-medium uppercase tracking-[0.16em] text-ink-muted">Made for sharing</p><h2 className="mt-1 font-display text-xl font-medium text-ink">Gift cards, tickets & vouchers</h2></div>
+            <span className="text-xs text-ink-muted">Pick a little joy</span>
+          </div>
+          <div className="grid gap-4 small:grid-cols-2 large:grid-cols-3">
+            {profile.redeemables.map((item) => (
+              <div key={item.id} className="group relative overflow-hidden rounded-control p-5 text-white shadow-sm transition-transform hover:-translate-y-1" style={{ background: visualFor(item.type, item.design_variant), borderColor: item.accent_color ?? undefined }}>
+                {item.background_image && <img src={item.background_image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
+                <div className="absolute inset-0 bg-black/10" />
+                <div className="relative">
+                  <div className="flex items-center justify-between"><span className="text-xs font-medium uppercase tracking-[0.16em] text-white/80">{item.type === "gift_card" ? "Gift card" : item.type === "voucher" ? "Voucher" : "Ticket"}</span><span className="text-xl">✦</span></div>
+                  <h3 className="mt-8 font-display text-xl font-medium">{item.title}</h3>
+                  {item.message && <p className="mt-2 line-clamp-2 text-sm text-white/80">{item.message}</p>}
+                  <div className="mt-7 flex items-end justify-between gap-3"><div><p className="text-xs text-white/70">{item.type === "voucher" ? `${item.discount_type === "percent" ? `${item.discount_value}% off` : `${money(item.discount_value)} off`}` : `${money(item.face_value)} value`}</p><p className="mt-1 text-lg font-semibold">{money(item.price)}</p></div>{item.product_handle && <LocalizedClientLink href={`/products/${item.product_handle}`} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-ink">Shop now</LocalizedClientLink>}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

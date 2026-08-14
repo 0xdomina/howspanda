@@ -19,7 +19,10 @@ export const PatchSellerMeSchema = z.strictObject({
   name: z.string().min(2).optional(),
   handle: z.string().min(2).optional(),
   logo: z.string().url().nullable().optional(),
+  cover_image: z.string().url().nullable().optional(),
   description: z.string().max(1000).nullable().optional(),
+  accent_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  theme: z.enum(["sunset", "midnight", "mint", "candy", "cobalt"]).optional(),
   // Owner-only store payment switch: OFF closes the crypto-usdc rail for this
   // seller (no crypto session can be created against their products).
   crypto_payments_enabled: z.boolean().optional(),
@@ -87,13 +90,19 @@ export const PATCH = async (
     name: string
     handle: string
     logo: string | null
+    cover_image: string | null
     description: string | null
+    accent_color: string
+    theme: string
     crypto_payments_enabled: boolean
   }> = {}
   if (body.name !== undefined) storeFields.name = body.name
   if (body.handle !== undefined) storeFields.handle = body.handle
   if (body.logo !== undefined) storeFields.logo = body.logo
+  if (body.cover_image !== undefined) storeFields.cover_image = body.cover_image
   if (body.description !== undefined) storeFields.description = body.description
+  if (body.accent_color !== undefined) storeFields.accent_color = body.accent_color
+  if (body.theme !== undefined) storeFields.theme = body.theme
   if (body.crypto_payments_enabled !== undefined) {
     storeFields.crypto_payments_enabled = body.crypto_payments_enabled
   }

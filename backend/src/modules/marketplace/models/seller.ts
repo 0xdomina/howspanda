@@ -9,7 +9,10 @@ const Seller = model.define("seller", {
   handle: model.text().unique(),
   name: model.text(),
   logo: model.text().nullable(),
+  cover_image: model.text().nullable(),
   description: model.text().nullable(),
+  accent_color: model.text().default("#ef4444"),
+  theme: model.text().default("sunset"),
   verification_status: model
     .enum(["unverified", "pending", "verified"])
     .default("unverified"),

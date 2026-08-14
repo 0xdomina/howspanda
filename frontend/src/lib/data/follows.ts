@@ -29,13 +29,31 @@ export type StoreProfile = {
     name: string
     handle: string
     logo: string | null
+    cover_image: string | null
     description: string | null
+    accent_color: string
+    theme: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
     verification_status: string
   }
   follower_count: number
   followed_by_viewer: boolean
   products: { id: string; title: string; handle: string; thumbnail: string | null }[]
-  redeemables: Record<string, unknown>[]
+  redeemables: {
+    id: string
+    type: "gift_card" | "voucher" | "ticket"
+    title: string
+    design_variant?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
+    background_image?: string | null
+    accent_color?: string | null
+    message?: string | null
+    price?: number | string | null
+    face_value?: number | string | null
+    balance?: number | string | null
+    discount_type?: string | null
+    discount_value?: number | null
+    expires_at?: string | null
+    product_handle?: string | null
+  }[]
   trust: { score: number | null; tier: string; review_count: number; avg_rating: number }
   broadcasts: StoreBroadcastSummary[]
 }

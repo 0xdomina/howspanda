@@ -30,7 +30,10 @@ export const GET = async (
       "name",
       "handle",
       "logo",
+      "cover_image",
       "description",
+      "accent_color",
+      "theme",
       "products.*",
     ],
     filters: { handle: req.params.handle },
@@ -55,7 +58,12 @@ export const GET = async (
   const now = Date.now()
   const forSale = active
     .filter((r) => !r.expires_at || new Date(r.expires_at).getTime() > now)
-    .map(({ code: _code, seller_id: _sid, ...publicFields }) => publicFields)
+    .map(({ code: _code, seller_id: _sid, ...publicFields }) => ({
+      ...publicFields,
+      product_handle:
+        (seller.products ?? []).find((p) => p?.id === publicFields.product_id)
+          ?.handle ?? null,
+    }))
 
   const trust = await getTrustScore(req.scope, seller.id)
 
@@ -73,7 +81,10 @@ export const GET = async (
       name: seller.name,
       handle: seller.handle,
       logo: seller.logo,
+      cover_image: seller.cover_image,
       description: seller.description,
+      accent_color: seller.accent_color,
+      theme: seller.theme,
       verification_status,
     },
     follower_count,
