@@ -8,13 +8,29 @@ if (process.env.MEDUSA_BACKEND_URL) {
   MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL
 }
 
+// Circle programmable wallet configuration
+// Set CIRCLE_API_BASE_URL and CIRCLE_ACCESS_TOKEN in .env
+// CIRCLE_API_BASE_URL: Circle API base (default: https://api.circle.com)
+// CIRCLE_ACCESS_TOKEN: Circle developer access token for programmable wallet
 export { MEDUSA_BACKEND_URL }
 
-export const sdk = new Medusa({
-  baseUrl: MEDUSA_BACKEND_URL,
-  debug: process.env.NODE_ENV === "development",
-  publishableKey: process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY,
-})
+export const circle = {
+  // Base URL for Circle API - default to production
+  get baseUrl(): string {
+    return process.env.CIRCLE_API_BASE_URL ?? "https://api.circle.com"
+  },
+  // Access token for Circle programmable wallet
+  get accessToken(): string | undefined {
+    return process.env.CIRCLE_ACCESS_TOKEN
+  },
+  // Check if Circle is configured
+  get isConfigured(): boolean {
+    return !!process.env.CIRCLE_ACCESS_TOKEN
+  },
+}
+
+// Export for convenience - whether Circle is configured
+export const isCircleConfigured = () => circle.isConfigured
 
 const originalFetch = sdk.client.fetch.bind(sdk.client)
 
