@@ -172,6 +172,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/payment-rails",
     },
     {
+      resolve: "./src/modules/platform-features",
+    },
+    {
       resolve: "./src/modules/follows",
     },
     {

@@ -16,6 +16,7 @@ import MallModuleService from "../../../../../modules/mall/service"
 import { MALL_MODULE } from "../../../../../modules/mall"
 import BuyerWalletModuleService from "../../../../../modules/buyer-wallet/service"
 import { BUYER_WALLET_MODULE } from "../../../../../modules/buyer-wallet"
+import { requirePlatformFeature } from "../../../../../lib/features/access"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest,
@@ -33,6 +34,10 @@ export const POST = async (
     filters: { id: cartId },
   })
   const code = cart?.metadata?.redeemable_code as string | undefined
+  const mallId = cart?.metadata?.mall_id as string | undefined
+  if (mallId) {
+    await requirePlatformFeature(req.scope, "malls")
+  }
 
   // consume first — the buyer must never be charged against a dead code;
   // the value comes back (compensation below) if anything downstream fails
@@ -54,7 +59,6 @@ export const POST = async (
       },
     })
 
-    const mallId = cart?.metadata?.mall_id as string | undefined
     if (mallId && result.order.email) {
       const malls = req.scope.resolve<MallModuleService>(MALL_MODULE)
       const mallResult = await malls.recordPurchase({

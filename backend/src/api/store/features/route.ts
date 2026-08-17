@@ -1,9 +1,12 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { featureFlags } from "../../../lib/features/flags"
+import { PLATFORM_FEATURES_MODULE } from "../../../modules/platform-features"
+import PlatformFeatureModuleService from "../../../modules/platform-features/service"
 
-// Public, secret-free feature toggles. The frontend polls this so UI (the NIN
-// verification step, the product video upload) appears instantly when a flag
-// is flipped on the server — no deploy or app update needed.
+// Public, secret-free feature toggles. The frontend reads this response to
+// hide disabled areas, while backend routes enforce the same state separately.
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-  res.json({ features: featureFlags() })
+  const features = req.scope.resolve<PlatformFeatureModuleService>(
+    PLATFORM_FEATURES_MODULE
+  )
+  res.json({ features: await features.getPublicFlags() })
 }

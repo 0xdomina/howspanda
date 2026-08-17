@@ -31,10 +31,11 @@ export type KycProfileView = {
   id_document_mime: string | null
 }
 
-// Server-side feature toggles (GET /store/features). The UI shows/hides the
-// NIN verification step based on nin_verification so flipping the env flag on
-// the backend surfaces the step on the next page load — no deploy needed.
+// Server-side feature toggles (GET /store/features). Product media remains a
+// core capability and is always true; the operations-controlled flags are
+// genuinely optional platform areas such as malls and identity verification.
 export type KycFeatures = {
+  malls: boolean
   nin_verification: boolean
   product_video: boolean
 }
@@ -47,12 +48,13 @@ export const retrieveFeatures = async (): Promise<KycFeatures> => {
         cache: "no-store",
       })
       .then(({ features }) => ({
+        malls: features?.malls ?? false,
         nin_verification: features?.nin_verification ?? false,
-        product_video: features?.product_video ?? false,
+        product_video: features?.product_video ?? true,
       }))
-      .catch(() => ({ nin_verification: false, product_video: false }))
+      .catch(() => ({ malls: false, nin_verification: false, product_video: true }))
   } catch {
-    return { nin_verification: false, product_video: false }
+    return { malls: false, nin_verification: false, product_video: true }
   }
 }
 

@@ -27,6 +27,7 @@ import {
   BANK_TRANSFER_PROVIDER_ID,
   getBankTransferSellerForCart,
 } from "../lib/payments/bank-transfer-gate"
+import { requirePlatformFeature } from "../lib/features/access"
 
 // Abuse-throttling for sensitive routes. Keyed by identity where the request
 // body already carries the actor's email (so NAT'd users behind one IP are not
@@ -120,6 +121,22 @@ const ADMIN_RATE_LIMIT = rateLimit({
   limit: 120,
   windowMs: 60 * 1000,
 })
+const MALL_FEATURE_GATE: MedusaRequestHandler = async (req, _res, next) => {
+  try {
+    await requirePlatformFeature(req.scope, "malls")
+    next()
+  } catch (error) {
+    next(error)
+  }
+}
+const NIN_FEATURE_GATE: MedusaRequestHandler = async (req, _res, next) => {
+  try {
+    await requirePlatformFeature(req.scope, "nin_verification")
+    next()
+  } catch (error) {
+    next(error)
+  }
+}
 // Follow/unfollow and giveaway claims are per-customer actor-keyed (abuse
 // throttling without locking a NAT'd household together).
 const FOLLOW_RATE_LIMIT = rateLimit({
@@ -718,6 +735,10 @@ export const PatchPaymentRailSchema = z.object({
   enabled: z.boolean(),
 })
 
+export const PatchPlatformFeatureSchema = z.object({
+  enabled: z.boolean(),
+})
+
 // Store broadcasts (followers). Body is additionally privacy-scanned in the
 // service (emails/phones rejected) so contact never leaks off-platform.
 export const PostBroadcastSchema = z
@@ -1258,7 +1279,7 @@ export default defineMiddlewares({
     {
       matcher: "/admin/malls/:id/go-live",
       methods: ["POST"],
-      middlewares: [ADMIN_RATE_LIMIT],
+      middlewares: [ADMIN_RATE_LIMIT, MALL_FEATURE_GATE],
     },
     {
       matcher: "/admin/payouts",
@@ -1372,15 +1393,23 @@ export default defineMiddlewares({
       // required (the store namespace enforces the key, we enforce the actor).
       matcher: "/store/malls",
       methods: ["GET"],
-      middlewares: [authenticate(["customer", "seller"], ["session", "bearer"])],
+      middlewares: [
+        MALL_FEATURE_GATE,
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+      ],
     },
     {
       matcher: "/store/malls",
       methods: ["POST"],
       middlewares: [
+        MALL_FEATURE_GATE,
         authenticate(["customer", "seller"], ["session", "bearer"]),
         validateAndTransformBody(PostMallCreateSchema),
       ],
+    },
+    {
+      matcher: "/store/malls/*",
+      middlewares: [MALL_FEATURE_GATE],
     },
     {
       // Public mall browsing can optionally annotate the signed-in buyer's
@@ -1634,6 +1663,7 @@ export default defineMiddlewares({
       middlewares: [
         authenticate(["customer", "seller"], ["session", "bearer"]),
         OTP_RATE_LIMIT,
+        NIN_FEATURE_GATE,
       ],
     },
     {
@@ -1698,6 +1728,19 @@ export default defineMiddlewares({
       middlewares: [
         ADMIN_RATE_LIMIT,
         validateAndTransformBody(PatchPaymentRailSchema),
+      ],
+    },
+    {
+      matcher: "/admin/features",
+      methods: ["GET"],
+      middlewares: [ADMIN_RATE_LIMIT],
+    },
+    {
+      matcher: "/admin/features/:key",
+      methods: ["PATCH"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PatchPlatformFeatureSchema),
       ],
     },
     {

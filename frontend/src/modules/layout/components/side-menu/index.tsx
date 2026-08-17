@@ -13,6 +13,7 @@ import X from "@modules/common/icons/x"
 import CountrySelect from "../country-select"
 import LanguageSelect from "../language-select"
 import SearchForm from "@modules/layout/components/search-form"
+import { retrieveFeatures } from "@lib/data/kyc"
 
 const marketplaceCategories = [
   { name: "Women's Fashion", href: "/store", subcategories: ["Dresses", "Tops & blouses", "Shoes", "Bags & accessories"] },
@@ -46,6 +47,17 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
   const countryToggleState = useToggleState()
   const languageToggleState = useToggleState()
   const [isOpen, setIsOpen] = useState(false)
+  const [mallsEnabled, setMallsEnabled] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    void retrieveFeatures().then((features) => {
+      if (mounted) setMallsEnabled(features.malls)
+    })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return
@@ -136,7 +148,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                 </div>
               </details>
               <ul className="grid gap-3">
-                {menuLinks.map(([name, href]) => <li key={name}><LocalizedClientLink href={href} onClick={closeMenu} className="font-display text-2xl leading-9 text-ink hover:text-ink-muted">{name}</LocalizedClientLink></li>)}
+                {menuLinks.filter(([name]) => name !== "Mall" || mallsEnabled).map(([name, href]) => <li key={name}><LocalizedClientLink href={href} onClick={closeMenu} className="font-display text-2xl leading-9 text-ink hover:text-ink-muted">{name}</LocalizedClientLink></li>)}
               </ul>
             </div>
             <div className="mt-6 flex flex-col gap-y-6">

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { retrieveSeller } from "@lib/data/seller"
 import { listSellerMalls } from "@lib/data/mall"
+import { retrieveFeatures } from "@lib/data/kyc"
 import SellerMallsClient from "@modules/seller/templates/seller-malls-overview"
 import { listSellerProducts, retrieveSellerBalance } from "@lib/data/seller"
 import { sellerHasPermission } from "@lib/seller-permissions"
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
 }
 
 export default async function SellerMallsPage() {
+  const features = await retrieveFeatures()
+  if (!features.malls) notFound()
+
   const seller = await retrieveSeller().catch(() => null)
   const [malls, products, balance] = await Promise.all([
     listSellerMalls().catch(() => []),

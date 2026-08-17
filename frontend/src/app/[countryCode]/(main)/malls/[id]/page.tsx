@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { retrieveMall, listMallGoods } from "@lib/data/mall"
 import { retrieveCustomer } from "@lib/data/customer"
 import { listSellerProducts, retrieveSeller, retrieveSellerBalance } from "@lib/data/seller"
+import { retrieveFeatures } from "@lib/data/kyc"
 import MallDetailClient from "@modules/mall/templates/mall-detail"
 
 export const metadata: Metadata = {
@@ -17,6 +18,9 @@ export default async function MallDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const features = await retrieveFeatures()
+  if (!features.malls) notFound()
+
   const [mall, customer, goods, seller, sellerProducts, sellerBalance] = await Promise.all([
     retrieveMall(id).catch(() => null),
     retrieveCustomer().catch(() => null),
