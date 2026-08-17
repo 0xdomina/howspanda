@@ -33,6 +33,36 @@ module.exports = defineConfig({
       cookieSecret: process.env.COOKIE_SECRET || DEV_COOKIE,
     }
   },
+  // Media storage on any S3-compatible object store (Backblaze B2 in
+  // production — B2 speaks the S3 API, so only endpoint/region differ from
+  // AWS). Activates only when S3_BUCKET + keys are set; otherwise Medusa's
+  // local-disk file service keeps dev working. Make the bucket's files
+  // public-read via the Backblaze bucket settings and point S3_URL at the
+  // bucket's public file host (or a CDN domain in front of it).
+  ...((process.env.S3_BUCKET &&
+    process.env.S3_ACCESS_KEY_ID &&
+    process.env.S3_SECRET_ACCESS_KEY)
+    ? {
+        file: {
+          providers: [
+            {
+              resolve: "@medusajs/file-s3",
+              id: "s3",
+              options: {
+                file_url: process.env.S3_URL,
+                access_key_id: process.env.S3_ACCESS_KEY_ID,
+                secret_access_key: process.env.S3_SECRET_ACCESS_KEY,
+                region: process.env.S3_REGION,
+                bucket: process.env.S3_BUCKET,
+                endpoint: process.env.S3_ENDPOINT,
+                prefix: process.env.S3_PREFIX || "",
+                cache_control: "public, max-age=31536000, immutable",
+              },
+            },
+          ],
+        },
+      }
+    : {}),
   modules: [
     {
       // Default auth module with an additional `phone` provider so sellers

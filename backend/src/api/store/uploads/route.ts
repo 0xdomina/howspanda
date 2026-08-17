@@ -1,5 +1,5 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { MedusaError } from "@medusajs/framework/utils"
+import { MedusaError, Modules } from "@medusajs/framework/utils"
 import { randomUUID } from "crypto"
 import { mkdir, writeFile } from "fs/promises"
 import path from "path"
@@ -61,6 +61,36 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
 
   const filename = `${randomUUID()}.${sniffed.ext}`
+  if (
+    process.env.S3_BUCKET &&
+    process.env.S3_ACCESS_KEY_ID &&
+    process.env.S3_SECRET_ACCESS_KEY
+  ) {
+    const fileService = req.scope.resolve(Modules.FILE) as unknown as {
+      upload(input: {
+        filename: string
+        mimeType: string
+        content: string
+        access: "public"
+      }): Promise<{ url: string; key: string }>
+    }
+    const uploaded = await fileService.upload({
+      // Keep payment proofs in a separate key namespace inside the configured
+      // media bucket so they can be migrated to a private bucket later.
+      filename: `proof/${filename}`,
+      mimeType: sniffed.mime,
+      content: file.buffer.toString("base64"),
+      access: "public",
+    })
+    res.json({
+      url: uploaded.url,
+      kind: "image",
+      mime: sniffed.mime,
+      size: file.size,
+    })
+    return
+  }
+
   const dir = path.join(process.cwd(), "uploads", "proof")
   await mkdir(dir, { recursive: true })
   await writeFile(path.join(dir, filename), file.buffer)

@@ -141,6 +141,7 @@ export class ArcUserWalletSigner implements UserWalletSigner {
   async checkSpend(input: {
     reference: string
     tx_hash?: string | null
+    provider_id?: string | null
   }): Promise<WalletSpendResult> {
     // Real receipt polling: the spend row's tx_hash (returned at broadcast)
     // drives the verdict. A missing receipt simply means the tx is still in

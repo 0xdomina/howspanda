@@ -71,6 +71,15 @@ const CHECKOUT_RATE_LIMIT = rateLimit({
   limit: 60,
   windowMs: 15 * 60 * 1000,
 })
+const UPLOAD_RATE_LIMIT = rateLimit({
+  name: "upload",
+  limit: 30,
+  windowMs: 15 * 60 * 1000,
+  keyOf: (req) => {
+    const authed = req as AuthenticatedMedusaRequest
+    return (authed.auth_context?.actor_id as string) ?? undefined
+  },
+})
 const MALL_RATE_LIMIT = rateLimit({
   name: "mall",
   limit: 30,
@@ -373,7 +382,31 @@ export const PostCancelReturnSchema = z.object({
 export const PostBankProofSchema = z.object({
   email: z.string().email(),
   reference: z.string().trim().min(1),
-  proof_url: z.string().trim().min(1).max(500).optional(),
+  // Payment proofs must point to a file uploaded through our image-only
+  // proof endpoint. Accepting arbitrary URLs here would let a buyer persist
+  // third-party pixels or markup-looking media that the seller UI later
+  // renders as an image.
+  proof_url: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((value) => {
+      if (/^\/uploads\/proof\/[\w.-]+$/.test(value)) return true
+      if (!process.env.S3_URL) return false
+      try {
+        const candidate = new URL(value)
+        const configured = new URL(process.env.S3_URL)
+        const prefix = configured.pathname.replace(/\/$/, "")
+        return (
+          candidate.protocol === "https:" &&
+          candidate.origin === configured.origin &&
+          candidate.pathname.startsWith(`${prefix}/`)
+        )
+      } catch {
+        return false
+      }
+    }, "Invalid proof upload")
+    .optional(),
   amount: z.number().positive().optional(),
   note: z.string().trim().min(1).max(500).optional(),
 })
@@ -819,6 +852,13 @@ const enforceBankTransferGate: MedusaRequestHandler = async (req, res, next) => 
 
 export default defineMiddlewares({
   routes: [
+    {
+      // Custom operational routes under /admin are not covered by Medusa's
+      // built-in admin middleware files. Keep one explicit guard here so a
+      // future custom admin endpoint cannot accidentally ship unauthenticated.
+      matcher: "/admin/*",
+      middlewares: [authenticate("user", ["session", "bearer", "api-key"])],
+    },
     {
       // Credential auth endpoints (login, register, update, reset-password) are
       // throttled per identity/IP. Uses the dynamic provider path so MFA, session
@@ -1452,6 +1492,19 @@ export default defineMiddlewares({
           allowUnauthenticated: true,
         }),
       ],
+    },
+    {
+      matcher: "/sellers/uploads",
+      methods: ["POST"],
+      middlewares: [UPLOAD_RATE_LIMIT],
+    },
+    {
+      // Bank-proof uploads are intentionally guest-compatible because the
+      // order email is checked when the proof is attached, but the raw upload
+      // endpoint still needs an IP bucket to prevent disk/B2 exhaustion.
+      matcher: "/store/uploads",
+      methods: ["POST"],
+      middlewares: [UPLOAD_RATE_LIMIT],
     },
     {
       matcher: "/store/delivery-jobs/:id/chat",

@@ -9,6 +9,16 @@ const S3_HOSTNAME = process.env.MEDUSA_CLOUD_S3_HOSTNAME
 const S3_PATHNAME = process.env.MEDUSA_CLOUD_S3_PATHNAME
 
 /**
+ * Extra media hosts next/image may load from — comma-separated hostnames.
+ * Set MEDIA_IMAGE_HOSTNAMES in production to the Backblaze B2 public host
+ * (e.g. f004.backblazeb2.com) or the CDN domain in front of it.
+ */
+const mediaImageHostnames = (process.env.MEDIA_IMAGE_HOSTNAMES || "")
+  .split(",")
+  .map((h) => h.trim())
+  .filter(Boolean)
+
+/**
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
@@ -54,7 +64,27 @@ const nextConfig = {
             },
           ]
         : []),
+      ...mediaImageHostnames.map((hostname) => ({
+        protocol: "https",
+        hostname,
+      })),
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(self)",
+          },
+        ],
+      },
+    ]
   },
 }
 

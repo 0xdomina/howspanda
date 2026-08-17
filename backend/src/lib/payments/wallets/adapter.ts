@@ -24,6 +24,9 @@ export interface UserWallet {
 export interface WalletSpendResult {
   status: "signed" | "pending" | "confirmed" | "failed"
   tx_hash?: string
+  // Provider-side transaction identifier used for polling before a chain hash
+  // exists (notably Circle SCA transactions).
+  provider_id?: string
 }
 
 export interface UserWalletSigner {
@@ -51,6 +54,7 @@ export interface UserWalletSigner {
   checkSpend(input: {
     reference: string
     tx_hash?: string | null
+    provider_id?: string | null
   }): Promise<WalletSpendResult>
 }
 

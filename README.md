@@ -16,6 +16,37 @@ AI-powered multi-vendor marketplace — shop more, sell more.
 
 Environment files: copy `backend/.env.template` → `backend/.env`; create `frontend/.env.local` with your publishable API key (Admin → Settings → Publishable API Keys). Never commit `.env*` files with real secrets.
 
+## Production deployment
+
+Topology: **frontend → Vercel · backend → Pandastack · media → Backblaze B2**. The
+complete, annotated variable list lives in `.env.deploy.example` (copy to
+`.env.deploy`, never committed) — backend vars go on Pandastack, frontend vars
+in Vercel → Project → Settings → Environment Variables.
+
+- **Media (Backblaze B2).** B2 speaks the S3 API, so the backend registers the
+  official `@medusajs/file-s3` provider when `S3_BUCKET` + `S3_ACCESS_KEY_ID` +
+  `S3_SECRET_ACCESS_KEY` (with `S3_URL`/`S3_REGION`/`S3_ENDPOINT`) are set;
+  without them dev keeps writing to local `./uploads`. Make the bucket
+  public-read and point `S3_URL` at its public file host (or a CDN domain).
+  The storefront allows `next/image` loads from `MEDIA_IMAGE_HOSTNAMES`
+  (comma-separated hostnames) — set it to the B2 public host.
+- **Crypto (Circle programmable wallets).** All Circle credentials
+  (`CIRCLE_API_KEY`, `CIRCLE_ENTITY_SECRET`, `CIRCLE_WALLET_SET_ID`) live ONLY
+  in the backend. Per-user wallets on base/solana mint through
+  `CircleUserWalletSigner` (find-or-create by stable `user-*` refId, USDC
+  spends with `refId`-idempotent transactions); Arc stays the direct-L1
+  alternative. The storefront never holds Circle keys — every crypto-wallet
+  action goes through the backend store routes, which own the password gate,
+  the spend ledger and the reconcile sweeps.
+- **Runtime requirement.** The current Circle developer-controlled wallet SDK
+  requires Node.js 22 or newer. Keep the Pandastack backend on Node 22+ and
+  run the forward-only wallet-spend migration before enabling live payouts.
+- **Go-live checklist.** `JWT_SECRET`/`COOKIE_SECRET` must be non-default (the
+  config refuses to boot in production otherwise); set `PAYOUT_SCHEDULE_ENABLED=true`
+  when payout crons should run; point `STORE_CORS`/`AUTH_CORS` at the Vercel
+  domain(s); `CRYPTO_NETWORK_ENV=mainnet` flips every wallet to production
+  chains (a pure env switch).
+
 ## Marketplace API (Phase 2)
 
 Sellers are a custom `seller` actor type. Flow:

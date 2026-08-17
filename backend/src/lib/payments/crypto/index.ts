@@ -83,9 +83,24 @@ export function getCryptoSettlement(network?: string): CryptoSettlement {
     return new MockCryptoSettlement(chosen, env)
   }
 
+  const entitySecret = process.env.CIRCLE_ENTITY_SECRET
+  const walletSetId = process.env.CIRCLE_WALLET_SET_ID
+  if (!entitySecret || !walletSetId) {
+    throw new CryptoUnavailableError(
+      "Circle is enabled with a real API key but CIRCLE_ENTITY_SECRET or CIRCLE_WALLET_SET_ID is missing"
+    )
+  }
+  if (!/^[a-fA-F0-9]{64}$/.test(entitySecret)) {
+    throw new CryptoUnavailableError(
+      "CIRCLE_ENTITY_SECRET must be the registered 32-byte hexadecimal entity secret"
+    )
+  }
+
   return new CircleCryptoSettlement(chosen, env, {
     apiKey,
-    entitySecret: process.env.CIRCLE_ENTITY_SECRET,
-    walletSetId: process.env.CIRCLE_WALLET_SET_ID,
+    entitySecret,
+    walletSetId,
+    accountType: process.env.CIRCLE_ACCOUNT_TYPE === "EOA" ? "EOA" : "SCA",
+    baseUrl: process.env.CIRCLE_API_BASE_URL,
   })
 }

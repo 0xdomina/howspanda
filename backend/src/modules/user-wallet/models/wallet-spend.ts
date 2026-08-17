@@ -21,6 +21,9 @@ const WalletSpend = model.define("wallet_spend", {
   // "pending" | "signed" | "confirmed" | "failed"
   status: model.text().default("pending"),
   tx_hash: model.text().nullable(),
+  // Provider-side transaction id used for polling while tx_hash is not yet
+  // available. Circle SCA transfers can expose this before a chain hash.
+  provider_transaction_id: model.text().nullable(),
   wallet: model.belongsTo(() => UserWallet, {
     mappedBy: "spends",
   }),

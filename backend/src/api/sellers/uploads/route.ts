@@ -2,7 +2,7 @@ import {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
-import { MedusaError } from "@medusajs/framework/utils"
+import { MedusaError, Modules } from "@medusajs/framework/utils"
 import { randomUUID } from "crypto"
 import { mkdir, writeFile } from "fs/promises"
 import path from "path"
@@ -88,10 +88,53 @@ export const POST = async (
     )
   }
 
+  // `filename` is a generated UUID + sniffed extension and `kind` is
+  // whitelisted above, but keep the write provably bounded under the uploads
+  // root regardless of future edits (path traversal defense-in-depth).
   const filename = `${randomUUID()}.${sniffed.ext}`
-  const dir = path.join(process.cwd(), "uploads", kind)
+  const root = path.resolve(process.cwd(), "uploads")
+  const dir = path.join(root, kind)
+  const target = path.resolve(dir, filename)
+  if (target !== root && !target.startsWith(root + path.sep)) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Resolved upload path escapes the uploads root"
+    )
+  }
+
+  // S3-compatible storage (Backblaze B2 in production) when configured —
+  // deploy containers have ephemeral disks, so local writes only serve dev.
+  // The file service returns the public URL built from S3_URL; the media
+  // reference validator accepts absolute http(s) URLs as well as /uploads.
+  if (
+    process.env.S3_BUCKET &&
+    process.env.S3_ACCESS_KEY_ID &&
+    process.env.S3_SECRET_ACCESS_KEY
+  ) {
+    const fileService = req.scope.resolve(Modules.FILE) as unknown as {
+      upload(input: {
+        filename: string
+        mimeType: string
+        content: string
+        access: "public"
+      }): Promise<{ url: string; key: string }>
+    }
+    const uploaded = await fileService.upload({
+      filename,
+      mimeType: sniffed.mime,
+      content: file.buffer.toString("base64"),
+      access: "public",
+    })
+    return res.json({
+      url: uploaded.url,
+      kind,
+      mime: sniffed.mime,
+      size: file.size,
+    })
+  }
+
   await mkdir(dir, { recursive: true })
-  await writeFile(path.join(dir, filename), file.buffer)
+  await writeFile(target, file.buffer)
 
   res.json({
     url: `/uploads/${kind}/${filename}`,

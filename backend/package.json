@@ -27,8 +27,10 @@
     "@ai-sdk/deepseek": "^1.0.49",
     "@ai-sdk/groq": "^2.0.45",
     "@ai-sdk/openai-compatible": "^1.0.47",
+    "@circle-fin/developer-controlled-wallets": "^10.8.0",
     "@medusajs/admin-sdk": "2.18.0",
     "@medusajs/cli": "2.18.0",
+    "@medusajs/file-s3": "2.18.0",
     "@medusajs/framework": "2.18.0",
     "@medusajs/medusa": "2.18.0",
     "ai": "^5.0.222",
@@ -56,6 +58,6 @@
     "yalc": "^1.0.0-pre.53"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

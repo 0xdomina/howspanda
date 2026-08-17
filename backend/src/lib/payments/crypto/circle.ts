@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto"
 import {
   CIRCLE_BLOCKCHAIN,
   CryptoNetwork,
@@ -12,13 +13,23 @@ import {
 
 export type CircleOptions = {
   apiKey: string
-  entitySecret?: string
-  walletSetId?: string
+  entitySecret: string
+  walletSetId: string
+  accountType?: "EOA" | "SCA"
+  baseUrl?: string
 }
 
 // Platform TREASURY wallet per (network,env) — outbound-only (payouts).
 // Deposits get a fresh per-intent wallet instead (see createDepositIntent).
 const TREASURY_CACHE = new Map<string, { id: string; address: string }>()
+
+function deterministicUuid(value: string): string {
+  const bytes = createHash("sha256").update(value).digest().subarray(0, 16)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = bytes.toString("hex")
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 
 /**
  * Live settlement via Circle developer-controlled wallets (USDC-native, no
@@ -48,6 +59,11 @@ export class CircleCryptoSettlement implements CryptoSettlement {
   }
 
   private async client(): Promise<any> {
+    if (!this.options.entitySecret || !this.options.walletSetId) {
+      throw new CryptoUnavailableError(
+        "Circle requires CIRCLE_ENTITY_SECRET and CIRCLE_WALLET_SET_ID"
+      )
+    }
     if (!this.clientPromise) {
       // Indirect specifier: TypeScript can't statically resolve a non-literal
       // import, so it stays `any` and tsc is clean without the dependency.
@@ -57,6 +73,7 @@ export class CircleCryptoSettlement implements CryptoSettlement {
           mod.initiateDeveloperControlledWalletsClient({
             apiKey: this.options.apiKey,
             entitySecret: this.options.entitySecret,
+            ...(this.options.baseUrl ? { baseUrl: this.options.baseUrl } : {}),
           })
         )
         .catch((e: any) => {
@@ -74,13 +91,28 @@ export class CircleCryptoSettlement implements CryptoSettlement {
     address: string
   }> {
     const client = await this.client()
+    if (refId) {
+      const existing = await client.listWallets({
+        walletSetId: this.options.walletSetId,
+        blockchain: this.blockchain(),
+        refId,
+        pageSize: 1,
+      })
+      const found = existing?.data?.wallets?.find(
+        (wallet: any) => wallet?.refId === refId && wallet?.id && wallet?.address
+      )
+      if (found) return { id: found.id, address: found.address }
+    }
     try {
       const res = await client.createWallets({
         blockchains: [this.blockchain()],
         count: 1,
         walletSetId: this.options.walletSetId,
-        accountType: "SCA",
-        ...(refId ? { metadata: [{ refId }] } : {}),
+        accountType: this.options.accountType ?? "SCA",
+        // Circle requires `name` in wallet metadata; refId is the stable handle.
+        ...(refId ? { metadata: [{ name: refId, refId }] } : {}),
+        idempotencyKey: deterministicUuid(`wallet:${refId ?? randomUUID()}`),
+        xRequestId: randomUUID(),
       })
       const wallet = res?.data?.wallets?.[0]
       if (!wallet?.address || !wallet?.id) {
@@ -180,15 +212,21 @@ export class CircleCryptoSettlement implements CryptoSettlement {
       if (!usdc?.token?.id) {
         throw new Error("treasury wallet holds no USDC token")
       }
-      await client.createTransaction({
+      const response = await client.createTransaction({
         walletId: treasury.id,
         tokenId: usdc.token.id,
         destinationAddress: input.address,
         amount: [input.usdc_amount],
         refId: input.reference,
+        idempotencyKey: deterministicUuid(`withdrawal:${input.reference}`),
+        xRequestId: randomUUID(),
         fee: { type: "level", config: { feeLevel: "MEDIUM" } },
       })
-      return { reference: input.reference, status: "pending" }
+      return {
+        reference: input.reference,
+        status: "pending",
+        tx_hash: response?.data?.txHash,
+      }
     } catch (e: any) {
       throw new CryptoUnavailableError(
         `Circle withdrawal failed: ${e?.message ?? e}`

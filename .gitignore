@@ -15,3 +15,9 @@ out
 # Ops
 *.log
 .DS_Store
+
+# Mimosa scanner workspace artifacts
+.mimosa/
+
+# Local dev media uploads (production stores media on S3/Backblaze)
+backend/uploads

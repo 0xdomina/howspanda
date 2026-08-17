@@ -15,6 +15,9 @@ type WalletActor = {
   network?: string
 }
 
+const configuredWalletNetwork = () =>
+  process.env.CRYPTO_DEFAULT_NETWORK || "base"
+
 export type WalletInfo = {
   network: string
   env: string
@@ -30,6 +33,7 @@ type WalletSpendView = {
   reference: string
   status: string
   tx_hash: string | null
+  provider_transaction_id?: string | null
   created_at?: Date
   updated_at?: Date
 }
@@ -43,7 +47,7 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     wallet: UserWalletView
     balance_usdc: string
   }> {
-    const network = input.network || "arc"
+    const network = input.network || configuredWalletNetwork()
     const signer = getUserWalletSigner(network)
 
     let [wallet] = await this.listUserWallets({
@@ -103,7 +107,7 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     actor_id: string
     network?: string
   }): Promise<WalletInfo | null> {
-    const network = input.network || "arc"
+    const network = input.network || configuredWalletNetwork()
     const [wallet] = await this.listUserWallets({
       actor_type: input.actor_type,
       actor_id: input.actor_id,
@@ -160,7 +164,7 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     address: string
     to_address: string
   }> {
-    const network = input.network || "arc"
+    const network = input.network || configuredWalletNetwork()
     const [wallet] = await this.listUserWallets({
       actor_type: input.actor_type,
       actor_id: input.actor_id,
@@ -220,7 +224,7 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     idempotency_key: string
     network?: string
   }): Promise<WalletSpendView> {
-    const network = input.network || "arc"
+    const network = input.network || configuredWalletNetwork()
     const [wallet] = await this.listUserWallets({
       actor_type: input.actor_type,
       actor_id: input.actor_id,
@@ -299,8 +303,14 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
       id: spend.id,
       status: "signed",
       tx_hash: result.tx_hash ?? null,
+      provider_transaction_id: result.provider_id ?? null,
     })
-    return { ...spend, status: "signed", tx_hash: result.tx_hash ?? null }
+    return {
+      ...spend,
+      status: "signed",
+      tx_hash: result.tx_hash ?? null,
+      provider_transaction_id: result.provider_id ?? null,
+    }
   }
 
   async checkSpend(input: {
@@ -309,7 +319,7 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     idempotency_key: string
     network?: string
   }): Promise<WalletSpendView> {
-    const network = input.network || "arc"
+    const network = input.network || configuredWalletNetwork()
     const [wallet] = await this.listUserWallets({
       actor_type: input.actor_type,
       actor_id: input.actor_id,
@@ -339,14 +349,23 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
       const result = await signer.checkSpend({
         reference: spend.reference,
         tx_hash: spend.tx_hash,
+        provider_id: spend.provider_transaction_id,
       })
       if (result.status === "confirmed" || result.status === "failed") {
         await this.updateWalletSpends({
           id: spend.id,
           status: result.status,
           tx_hash: result.tx_hash ?? null,
+          provider_transaction_id:
+            result.provider_id ?? spend.provider_transaction_id ?? null,
         })
-        return { ...spend, status: result.status, tx_hash: result.tx_hash ?? null }
+        return {
+          ...spend,
+          status: result.status,
+          tx_hash: result.tx_hash ?? null,
+          provider_transaction_id:
+            result.provider_id ?? spend.provider_transaction_id ?? null,
+        }
       }
     }
     return spend
@@ -380,14 +399,23 @@ class UserWalletModuleService extends MedusaService({ UserWallet, WalletSpend })
     const result = await signer.checkSpend({
       reference: spend.reference,
       tx_hash: spend.tx_hash,
+      provider_id: spend.provider_transaction_id,
     })
     if (result.status === "confirmed" || result.status === "failed") {
       await this.updateWalletSpends({
         id: spend.id,
         status: result.status,
         tx_hash: result.tx_hash ?? null,
+        provider_transaction_id:
+          result.provider_id ?? spend.provider_transaction_id ?? null,
       })
-      return { ...spend, status: result.status, tx_hash: result.tx_hash ?? null }
+      return {
+        ...spend,
+        status: result.status,
+        tx_hash: result.tx_hash ?? null,
+        provider_transaction_id:
+          result.provider_id ?? spend.provider_transaction_id ?? null,
+      }
     }
     return spend
   }
