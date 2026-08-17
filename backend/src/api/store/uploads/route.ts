@@ -5,6 +5,10 @@ import { mkdir, writeFile } from "fs/promises"
 import path from "path"
 import multer from "multer"
 import { sniffMedia } from "../../../lib/upload/sniff"
+import {
+  hasPrivatePaymentProofStorage,
+  uploadPrivatePaymentProof,
+} from "../../../lib/bank-transfer/private-proof"
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
@@ -61,6 +65,28 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
 
   const filename = `${randomUUID()}.${sniffed.ext}`
+  if (hasPrivatePaymentProofStorage()) {
+    const reference = await uploadPrivatePaymentProof({
+      bytes: file.buffer,
+      contentType: sniffed.mime,
+      extension: sniffed.ext,
+    })
+    res.json({
+      url: reference,
+      kind: "image",
+      mime: sniffed.mime,
+      size: file.size,
+    })
+    return
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Payment-proof storage is not configured"
+    )
+  }
+
   if (
     process.env.S3_BUCKET &&
     process.env.S3_ACCESS_KEY_ID &&

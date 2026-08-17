@@ -392,6 +392,7 @@ export const PostBankProofSchema = z.object({
     .max(500)
     .refine((value) => {
       if (/^\/uploads\/proof\/[\w.-]+$/.test(value)) return true
+      if (/^private:\/\/[a-zA-Z0-9/_-]+\.(?:png|jpe?g|webp)$/i.test(value)) return true
       if (!process.env.S3_URL) return false
       try {
         const candidate = new URL(value)
@@ -561,6 +562,15 @@ export const PostMallCreateSchema = z.object({
   prizeDistribution: z.enum(["equal", "random"]).optional(),
   prizePoolNgn: z.number().positive(),
   productIds: z.array(z.string().min(1)).min(1),
+})
+const AI_CHAT_RATE_LIMIT = rateLimit({
+  name: "ai-chat",
+  limit: 30,
+  windowMs: 15 * 60 * 1000,
+  keyOf: (req) => {
+    const body = req.body as { client_key?: string } | undefined
+    return body?.client_key
+  },
 })
 
 export const PostMallJoinSchema = z.object({
@@ -958,6 +968,7 @@ export default defineMiddlewares({
         authenticate("customer", ["session", "bearer"], {
           allowUnauthenticated: true,
         }),
+        AI_CHAT_RATE_LIMIT,
         validateAndTransformBody(PostAiChatSchema),
       ],
     },

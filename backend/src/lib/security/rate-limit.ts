@@ -3,6 +3,7 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { Modules, ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import type { ICacheService } from "@medusajs/framework/types"
 import type { Logger } from "@medusajs/framework/types"
+import { createHash } from "crypto"
 
 export type RateLimitConfig = {
   // Maximum requests allowed within `windowMs`.
@@ -31,8 +32,9 @@ const CACHE_KEY_PREFIX = "rate-limit:"
  *
  * Counting is a small non-atomic read-modify-write over get/set, which is
  * acceptable for abuse throttling (a burst may share a few window "borrows").
- * Fail-open: if the cache is unavailable the request is allowed through and a
- * warning is logged, rather than taking a sensitive route down in an outage.
+ * Production fails closed when the distributed cache is unavailable. Allowing
+ * sensitive routes through during a cache outage turns an infrastructure
+ * incident into an abuse window.
  *
  * Runtime overrides (no rebuild needed):
  *  - RATE_LIMIT_ENABLED=false disables all limits (integration test env).
@@ -45,6 +47,12 @@ export function rateLimit(config: RateLimitConfig) {
     next: NextFunction
   ) => {
     const decision = await evaluate(req, config)
+    if (decision.unavailable) {
+      res.status(503).json({
+        message: "This action is temporarily unavailable. Please try again shortly.",
+      })
+      return
+    }
     if (decision.throttled) {
       res.status(429).json({
         message: "Too many requests, please try again shortly.",
@@ -59,7 +67,7 @@ export function rateLimit(config: RateLimitConfig) {
 async function evaluate(
   req: MedusaRequest,
   config: RateLimitConfig
-): Promise<{ throttled: boolean; windowMs: number }> {
+): Promise<{ throttled: boolean; windowMs: number; unavailable?: boolean }> {
   if (process.env.RATE_LIMIT_ENABLED === "false") {
     return { throttled: false, windowMs: config.windowMs }
   }
@@ -77,18 +85,24 @@ async function evaluate(
       .resolve<Logger>(ContainerRegistrationKeys.LOGGER, {
         allowUnregistered: true,
       })
-      ?.warn("rate-limit: no cache module registered; allowing request")
-    return { throttled: false, windowMs }
+      ?.error("rate-limit: no cache module registered")
+    return {
+      throttled: false,
+      unavailable: process.env.NODE_ENV === "production",
+      windowMs,
+    }
   }
 
-  const ip = (req.headers["x-forwarded-for"] as string | undefined)
-    ?.split(",")[0]
-    ?.trim()
-  const ipKey = ip || req.socket?.remoteAddress || "unknown"
+  // Express derives req.ip from the configured proxy trust chain. Never trust
+  // a user-supplied x-forwarded-for value directly; doing so lets an attacker
+  // mint a new bucket on every request.
+  const ipKey = (req as any).ip || req.socket?.remoteAddress || "unknown"
   const customKey = config.keyOf?.(req)
-  const bucketKey = `${CACHE_KEY_PREFIX}${config.name}:${customKey ?? ipKey}:${
-    Math.floor(Date.now() / windowMs)
-  }`
+  const identity = `${customKey ?? ""}|${ipKey}`
+  const digest = createHash("sha256").update(identity).digest("hex")
+  const bucketKey = `${CACHE_KEY_PREFIX}${config.name}:${digest}:${Math.floor(
+    Date.now() / windowMs
+  )}`
 
   const current = (await cache.get(bucketKey)) as number | undefined
   if (typeof current === "number" && current >= limit) {

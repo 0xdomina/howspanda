@@ -1,7 +1,3 @@
-import { createGroq } from "@ai-sdk/groq"
-import { createDeepSeek } from "@ai-sdk/deepseek"
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
-import type { LanguageModel } from "ai"
 import { AiUnavailableError, DEFAULT_AI_MODEL, getModel } from "../model"
 
 // Env-driven provider registry for the model router.
@@ -21,7 +17,7 @@ export type ModelProvider = {
   label: string
   modelId: string
   /** Resolve the concrete model for this provider RIGHT NOW. */
-  resolve: () => LanguageModel
+  resolve: () => Promise<unknown>
 }
 
 export type ExtraProviderConfig = {
@@ -101,7 +97,6 @@ function buildRegistry(): Record<string, ModelProvider> {
   const registry: Record<string, ModelProvider> = {}
 
   const groqApiKey = process.env.GROQ_API_KEY
-  const groqProvider = createGroq({ apiKey: groqApiKey ?? "" })
   const groqModel = process.env.AI_MODEL || DEFAULT_AI_MODEL
   registry.groq = {
     id: "groq",
@@ -113,13 +108,14 @@ function buildRegistry(): Record<string, ModelProvider> {
           "GROQ_API_KEY is not configured — AI features are disabled"
         )
       }
-      return groqProvider(groqModel as any)
+      return import("@ai-sdk/groq").then(({ createGroq }) =>
+        createGroq({ apiKey: groqApiKey ?? "" })(groqModel as any)
+      )
     },
   }
 
   const deepseekApiKey = process.env.DEEPSEEK_API_KEY
-  const deepseekProvider = createDeepSeek({ apiKey: deepseekApiKey ?? "" })
-  const deepseekModel = process.env.DEEPSEEK_MODEL || "deepseek-chat"
+  const deepseekModel = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash"
   registry.deepseek = {
     id: "deepseek",
     label: "DeepSeek",
@@ -130,7 +126,9 @@ function buildRegistry(): Record<string, ModelProvider> {
           "DEEPSEEK_API_KEY is not configured — AI features are disabled"
         )
       }
-      return deepseekProvider(deepseekModel as any)
+      return import("@ai-sdk/deepseek").then(({ createDeepSeek }) =>
+        createDeepSeek({ apiKey: deepseekApiKey ?? "" })(deepseekModel as any)
+      )
     },
   }
 
@@ -138,17 +136,21 @@ function buildRegistry(): Record<string, ModelProvider> {
     if (registry[extra.id]) {
       continue
     }
-    const provider = createOpenAICompatible({
-      name: extra.id,
-      baseURL: extra.baseURL,
-      apiKey: extra.apiKey,
-      headers: extra.headers,
-    })
     registry[extra.id] = {
       id: extra.id,
       label: extra.id,
       modelId: extra.model,
-      resolve: () => provider(extra.model),
+      resolve: async () => {
+        const { createOpenAICompatible } = await import(
+          "@ai-sdk/openai-compatible"
+        )
+        return createOpenAICompatible({
+          name: extra.id,
+          baseURL: extra.baseURL,
+          apiKey: extra.apiKey,
+          headers: extra.headers,
+        })(extra.model)
+      },
     }
   }
 

@@ -125,9 +125,10 @@ read-only quote and never mutates carts or sessions. Checkout itself stays
 USDC on Circle developer-controlled wallets: Circle custodies keys behind an API key +
 entity secret, so **users never handle a seed phrase**. Networks `base` and `solana`
 today (extensible to `bsc`, `somnia`, `arc`); testnet<->mainnet is a pure env switch.
-NGN->USDC uses a fixed configurable rate (`CRYPTO_NGN_PER_USDC`, a placeholder for a
-real oracle later). An unknown network throws instead of silently picking a wrong
-chain. Settlement seam: `src/lib/payments/crypto/` (mock + Circle adapters).
+NGN->USDC requires an operator-supplied current rate (`CRYPTO_NGN_PER_USDC`) when
+crypto is enabled in production; there is no hidden production fallback. An unknown
+network throws instead of silently picking a wrong chain. Settlement seam:
+`src/lib/payments/crypto/` (mock + Circle adapters).
 
 ### Configuration (`backend/.env`)
 
@@ -138,7 +139,7 @@ chain. Settlement seam: `src/lib/payments/crypto/` (mock + Circle adapters).
 | `CRYPTO_ENABLED` | `true` to offer the crypto rail |
 | `CRYPTO_DEFAULT_NETWORK` | `base` (default) or `solana` |
 | `CRYPTO_NETWORK_ENV` | `testnet` (default) or `mainnet` |
-| `CRYPTO_NGN_PER_USDC` | Fixed NGN-per-USDC quote rate (default 1600) |
+| `CRYPTO_NGN_PER_USDC` | Current NGN-per-USDC rate supplied by the approved pricing process |
 | `CIRCLE_API_KEY` | Circle key; `mock`/blank = mock settlement |
 | `CIRCLE_ENTITY_SECRET` / `CIRCLE_WALLET_SET_ID` | Circle developer-controlled-wallet config (live) |
 
@@ -155,9 +156,9 @@ DB_HOST=localhost DB_PORT=5432 DB_USERNAME=... DB_PASSWORD=... \
 ```
 
 > Known gaps (deferred to later phases): on-chain crypto refunds are not yet
-> executed (the amount is echoed for ledger consistency); the NGN->USDC rate is a
-> fixed placeholder, not a live oracle; `PAYMENT_DEFAULT_CURRENCY` in `.env.template`
-> is documentation-only. ~~Live crypto settlement matches any inbound transfer to a
+> executed (the amount is echoed for ledger consistency); the NGN->USDC rate must be
+> kept current by the approved operator process; `PAYMENT_DEFAULT_CURRENCY` in
+> `.env.template` is documentation-only. ~~Live crypto settlement matches any inbound transfer to a
 > shared receiving wallet~~ — fixed in Phase 5: every deposit intent gets its own
 > Circle wallet and settlement requires an inbound transfer to that wallet matching
 > the expected USDC amount.

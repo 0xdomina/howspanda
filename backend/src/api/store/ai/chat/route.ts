@@ -5,7 +5,6 @@ import {
 import { ILockingModule } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import type { CoreMessage } from "ai"
 import { AI_MODULE } from "../../../../modules/ai"
 import AiModuleService, {
   AiQuotaExceededError,
@@ -30,12 +29,20 @@ const CHAT_SYSTEM_ROLE = "system"
 const CHAT_USER_ROLE = "user"
 const CHAT_ASSISTANT_ROLE = "assistant"
 
-function buildHistory(rows: any[]): CoreMessage[] {
-  return rows
+function buildHistory(
+  rows: any[]
+): Array<{ role: "system" | "user" | "assistant"; content: string }> {
+  const messages = rows
     .filter((m) =>
       ["system", "user", "assistant"].includes(m.role)
     )
-    .map((m) => ({ role: m.role, content: m.content }))
+    .map((m) => ({
+      role: m.role as "system" | "user" | "assistant",
+      content: String(m.content ?? "").slice(0, 4_000),
+    }))
+  const system = messages.find((m) => m.role === "system")
+  const turns = messages.filter((m) => m.role !== "system").slice(-40)
+  return system ? [system, ...turns] : turns
 }
 
 // Map a classified buyer intent to its harness capability. General chat and
@@ -217,8 +224,6 @@ export const POST = async (
         ok: true,
         conversation_id: conversation.id,
         reply,
-        provider: result.provider,
-        model_id: result.modelId,
         capability: capability?.capability ?? null,
         result: capability?.result ?? null,
         proposal: capability?.proposal ?? null,
@@ -256,8 +261,6 @@ export const GET = async (
     messages: messages.map((m) => ({
       role: m.role,
       content: m.content,
-      provider: m.provider,
-      model_id: m.model_id,
       created_at: m.created_at,
     })),
   })

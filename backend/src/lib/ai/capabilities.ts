@@ -1,6 +1,6 @@
-import { generateObject, generateText } from "ai"
 import { z } from "zod"
 import { getModel } from "./model"
+import { generateObject, generateText } from "./sdk"
 
 export type AiUsageTokens = {
   inputTokens?: number
@@ -29,7 +29,7 @@ export async function generateListing(input: {
   category?: string
 }): Promise<CapabilityOutput<ListingResult>> {
   const { object, usage } = await generateObject({
-    model: getModel(),
+    model: await getModel(),
     schema: ListingResultSchema,
     system:
       "[capability:listing] You write compelling, honest e-commerce product " +
@@ -74,7 +74,7 @@ export async function suggestPricing(input: {
   market: MarketPriceStats
 }): Promise<CapabilityOutput<PricingResult>> {
   const { object, usage } = await generateObject({
-    model: getModel(),
+    model: await getModel(),
     schema: PricingResultSchema,
     system:
       "[capability:pricing] You are a pricing advisor for marketplace " +
@@ -104,7 +104,7 @@ export async function answerInsightsQuestion(input: {
   contextJson: string
 }): Promise<CapabilityOutput<string>> {
   const { text, usage } = await generateText({
-    model: getModel(),
+    model: await getModel(),
     system:
       "[capability:insights] You answer business questions for ONE " +
       "marketplace seller using ONLY the seller data provided in the " +
@@ -127,7 +127,7 @@ export async function writeAccountingDigest(input: {
   aggregatesJson: string
 }): Promise<CapabilityOutput<string>> {
   const { text, usage } = await generateText({
-    model: getModel(),
+    model: await getModel(),
     system:
       "[capability:accounting] You explain a marketplace seller's earnings " +
       "in plain language: gross revenue, platform commission deducted, and " +
@@ -158,7 +158,7 @@ export async function coachMarketing(input: {
   productsJson: string
 }): Promise<CapabilityOutput<MarketingResult>> {
   const { object, usage } = await generateObject({
-    model: getModel(),
+    model: await getModel(),
     schema: MarketingResultSchema,
     system:
       "[capability:marketing] You are a marketing coach for small " +
@@ -183,7 +183,7 @@ export async function writeSellerBrief(input: {
   opportunitiesJson: string
 }): Promise<CapabilityOutput<string>> {
   const { text, usage } = await generateText({
-    model: getModel(),
+    model: await getModel(),
     system:
       "[capability:brief] You write a short daily/weekly brief for ONE " +
       "marketplace seller using ONLY the deterministic numbers and " +
@@ -220,7 +220,7 @@ export async function explainRecommendations(input: {
   opportunitiesJson: string
 }): Promise<CapabilityOutput<RecommendationsResult>> {
   const { object, usage } = await generateObject({
-    model: getModel(),
+    model: await getModel(),
     schema: RecommendationsResultSchema,
     system:
       "[capability:recommendations] You explain a list of rule-ranked " +

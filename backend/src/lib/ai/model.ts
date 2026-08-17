@@ -1,7 +1,3 @@
-import { createGroq } from "@ai-sdk/groq"
-import type { LanguageModelV2 } from "@ai-sdk/provider"
-import { LanguageModel } from "ai"
-
 export class AiUnavailableError extends Error {
   constructor(message: string) {
     super(message)
@@ -78,7 +74,7 @@ function cannedFor(capability: string): string {
 // Hand-rolled LanguageModelV2 instead of `ai/test`'s MockLanguageModelV2:
 // that entrypoint requires msw/vitest, which cannot load in Medusa's
 // CommonJS runtime. Behavior is identical for doGenerate.
-function buildMockModel(fail: boolean): LanguageModelV2 {
+function buildMockModel(fail: boolean): unknown {
   return {
     specificationVersion: "v2",
     provider: "mock",
@@ -109,7 +105,7 @@ function buildMockModel(fail: boolean): LanguageModelV2 {
   }
 }
 
-export function getModel(): LanguageModel {
+export async function getModel(): Promise<unknown> {
   const provider = process.env.AI_PROVIDER || "groq"
 
   if (provider === "mock") {
@@ -129,6 +125,7 @@ export function getModel(): LanguageModel {
     )
   }
 
+  const { createGroq } = await import("@ai-sdk/groq")
   const groq = createGroq({ apiKey })
   return groq(process.env.AI_MODEL || DEFAULT_AI_MODEL)
 }

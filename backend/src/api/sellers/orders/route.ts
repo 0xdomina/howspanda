@@ -97,7 +97,9 @@ export const GET = async (
     { take: null }
   )
   const proofByOrder = new Map(
-    proofs.map((proof) => [proof.order_id, toBankTransferView(proof)])
+    await Promise.all(
+      proofs.map(async (proof) => [proof.order_id, await toBankTransferView(proof)] as const)
+    )
   )
 
   const orderRows = Array.isArray(orders) ? orders : orders.rows

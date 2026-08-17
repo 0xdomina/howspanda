@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # BASE: shared build/runtime prerequisites
 # ---------------------------------------------------------------------------
-FROM node:20-slim AS base
+FROM node:22.12-slim AS base
 ENV NODE_ENV=production \
     MEDUSA_BE_PATH=/medusa \
     YARN_ENABLE_IMMUTABLE_INSTALLS=false

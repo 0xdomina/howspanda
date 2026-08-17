@@ -18,8 +18,9 @@ remote testing was performed.
 - Kept byte-level media sniffing, generated filenames, size caps, and `nosniff`
   headers; restricted bank-proof URLs to local proof uploads or the configured
   HTTPS B2 origin.
-- Routed bank-proof uploads to the configured S3-compatible provider when B2 is
-  enabled, while preserving local development behavior.
+- Routed bank-proof uploads to a separate private S3-compatible bucket and
+  return five-minute signed read URLs; production fails fast if the private
+  bucket is not configured.
 - Installed Circle's developer-controlled wallet SDK, moved the integration to
   the current SDK transaction shape, added deterministic idempotency keys, and
   persisted a provider transaction ID for asynchronous status polling.
@@ -33,26 +34,25 @@ remote testing was performed.
 - Added `.mimosa/` to `.gitignore`; its session state is local audit metadata,
   not deployable application code or a safe artifact to commit.
 
-## Findings that remain before production
+## Operational requirements before production
 
-1. The backend dependency audit still reports inherited vulnerabilities from
-   the pinned Medusa 2.18 / AI dependency graph (16 high, 65 moderate, 5 low
-   in the current `npm audit --omit=dev` result). `npm audit fix --force` would
-   cross breaking Medusa and AI versions, so this needs a planned dependency
-   upgrade and full commerce/auth regression pass rather than an automatic
-   force-upgrade.
-2. Bank proofs use the same public B2 media provider when B2 is configured. Use
-   a separate private B2 bucket plus authenticated signed-download handling
-   before treating bank proof images as confidential financial records.
-3. Circle entity-secret generation/registration, recovery-file custody, wallet
+1. Circle entity-secret generation/registration, recovery-file custody, wallet
    set creation, testnet funding, webhook configuration, and live/mainnet
    approval remain operator actions. No real key is stored in this repository.
-4. `CRYPTO_NGN_PER_USDC` is still a fixed PoC quote. Live crypto checkout must
-   use a trusted, bounded rate source with stale-rate handling before launch.
-5. The repository has only `master`; no `dev`, `security-lab`, deploy workflow,
+2. `CRYPTO_NGN_PER_USDC` must be injected from an approved current rate process
+   before USDC checkout is enabled. Production now fails closed instead of using
+   a hidden fallback rate.
+3. The repository has only `master`; no `dev`, `security-lab`, deploy workflow,
    or `pb_hooks` directory exists. This pass is committed on the dedicated
    feature branch created from the existing baseline, and the missing lane
    bootstrap should be addressed before production promotion.
+
+## Dependency result
+
+The backend was upgraded to Medusa 2.19, current AI SDK/provider packages,
+BullMQ 6.1.2, and patched `lodash`, `ajv`, and `uuid` resolutions. Both
+`npm audit --omit=dev --audit-level=moderate` and the full
+`npm audit --audit-level=moderate` report zero vulnerabilities.
 
 ## `.mimosa` result
 
@@ -66,9 +66,12 @@ configuration file. The recent status record reports `outcome: clear`,
 - Frontend TypeScript: passed with `npx tsc --noEmit`.
 - Backend build: passed with `npm run build`.
 - Frontend build: passed with `npm run build`.
-- Frontend lint: 0 errors, 18 existing warnings.
+- Frontend lint: 0 errors, 18 warnings (image optimization and existing hook
+  dependency guidance; no lint errors).
 - Focused backend unit suite: 5 tests passed.
+- Backend unit suite: passed with the cross-platform test scripts.
 - Frontend dependency audit: passed with zero vulnerabilities.
-- Backend dependency audit: documented above; no force upgrade applied.
+- Backend dependency audit: passed with zero vulnerabilities at moderate level,
+  including production dependencies.
 - Authenticated live route checks remain dependent on a running Postgres/Redis
   environment and were not run against production.

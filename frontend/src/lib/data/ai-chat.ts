@@ -12,8 +12,6 @@ import { getAuthHeaders } from "./cookies"
 export type AiChatMessage = {
   role: "system" | "user" | "assistant"
   content: string
-  provider?: string | null
-  model_id?: string | null
   created_at?: string
 }
 
@@ -33,8 +31,6 @@ export type AiChatReply = {
   ok: boolean
   conversation_id: string
   reply: string
-  provider: string
-  model_id: string
   quota?: AiChatQuota
   message?: string
   code?: string

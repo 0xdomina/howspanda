@@ -62,5 +62,5 @@ export const POST = async (
     payload: { order_id: proof.order_id, reference: proof.reference },
   })
 
-  res.json({ order_id: req.params.id, transfer: toBankTransferView(proof) })
+  res.json({ order_id: req.params.id, transfer: await toBankTransferView(proof) })
 }

@@ -40,5 +40,5 @@ export const POST = async (
     },
   })
 
-  res.json({ order_id: req.params.id, transfer: toBankTransferView(proof) })
+  res.json({ order_id: req.params.id, transfer: await toBankTransferView(proof) })
 }

@@ -19,28 +19,30 @@
     "seed:collections": "medusa exec ./src/scripts/seed-collections.ts",
     "start": "medusa start",
     "dev": "medusa develop",
-    "test:integration:http": "TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
-    "test:integration:modules": "TEST_TYPE=integration:modules NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
-    "test:unit": "TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit"
+    "test:integration:http": "cross-env TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
+    "test:integration:modules": "cross-env TEST_TYPE=integration:modules NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
+    "test:unit": "cross-env TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit"
   },
   "dependencies": {
-    "@ai-sdk/deepseek": "^1.0.49",
-    "@ai-sdk/groq": "^2.0.45",
-    "@ai-sdk/openai-compatible": "^1.0.47",
+    "@ai-sdk/deepseek": "^3.0.28",
+    "@ai-sdk/groq": "^4.0.28",
+    "@ai-sdk/openai-compatible": "^3.0.30",
+    "@aws-sdk/client-s3": "^3.1111.0",
+    "@aws-sdk/s3-request-presigner": "^3.1111.0",
     "@circle-fin/developer-controlled-wallets": "^10.8.0",
-    "@medusajs/admin-sdk": "2.18.0",
-    "@medusajs/cli": "2.18.0",
-    "@medusajs/file-s3": "2.18.0",
-    "@medusajs/framework": "2.18.0",
-    "@medusajs/medusa": "2.18.0",
-    "ai": "^5.0.222",
+    "@medusajs/admin-sdk": "2.19.0",
+    "@medusajs/cli": "2.19.0",
+    "@medusajs/file-s3": "2.19.0",
+    "@medusajs/framework": "2.19.0",
+    "@medusajs/medusa": "2.19.0",
+    "ai": "^7.0.66",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.5",
     "viem": "^2.55.10",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@medusajs/test-utils": "2.18.0",
+    "@medusajs/test-utils": "2.19.0",
     "@swc/core": "^1.7.28",
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.13",
@@ -54,10 +56,17 @@
     "react-dom": "^18.3.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2",
-    "vite": "^5.4.14",
+    "vite": "^6.4.3",
+    "cross-env": "^10.0.0",
     "yalc": "^1.0.0-pre.53"
   },
+  "overrides": {
+    "lodash": "4.18.1",
+    "ajv": "8.20.0",
+    "uuid": "11.1.1",
+    "bullmq": "6.1.2"
+  },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   }
 }

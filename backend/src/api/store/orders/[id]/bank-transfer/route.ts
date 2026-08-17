@@ -45,9 +45,9 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
   res.json({
     order_id: req.params.id,
-    transfers: proofs.map((proof) => ({
-      ...toBankTransferView(proof),
+    transfers: await Promise.all(proofs.map(async (proof) => ({
+      ...(await toBankTransferView(proof)),
       seller: sellerById[proof.seller_id as string] ?? null,
-    })),
+    }))),
   })
 }

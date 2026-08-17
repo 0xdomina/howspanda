@@ -77,7 +77,7 @@ const SellerBankTransfer = ({
 
         {bt.proof_url && (
           <img
-            src={`${backendUrl}${bt.proof_url}`}
+            src={bt.proof_url.startsWith("http") ? bt.proof_url : `${backendUrl}${bt.proof_url}`}
             alt="Buyer's transfer proof"
             className="max-h-56 w-auto rounded-control border border-ink-hairline"
             data-testid="seller-bank-proof-image"

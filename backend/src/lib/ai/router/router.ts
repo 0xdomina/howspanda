@@ -1,5 +1,4 @@
-import { generateText } from "ai"
-import type { CoreMessage, LanguageModel } from "ai"
+import { generateText } from "../sdk"
 import { AiUnavailableError } from "../model"
 import {
   getEnabledProviders,
@@ -23,14 +22,25 @@ export type RouterStrategy = "round-robin" | "failover"
 
 const ROUND_ROBIN_CURSOR = new Map<string, number>()
 const LAST_SUCCESS = new Map<string, number>()
+const MAX_ROUTER_KEYS = 10_000
+
+function setRouterState(map: Map<string, number>, key: string, value: number) {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > MAX_ROUTER_KEYS) {
+    const oldest = map.keys().next().value
+    if (!oldest) break
+    map.delete(oldest)
+  }
+}
 
 export function getRouterStrategy(): RouterStrategy {
-  const raw = (process.env.AI_ROUTER_STRATEGY || "round-robin").toLowerCase()
+  const raw = (process.env.AI_ROUTER_STRATEGY || "failover").toLowerCase()
   return raw === "failover" ? "failover" : "round-robin"
 }
 
 export type RoutedModel = {
-  model: LanguageModel
+  model: Promise<unknown>
   provider: string
   modelId: string
 }
@@ -81,7 +91,7 @@ export function getRoutedModel(
 
   if (strategy !== "failover") {
     // round-robin: advance the cursor for the next message
-    ROUND_ROBIN_CURSOR.set(key, (ROUND_ROBIN_CURSOR.get(key) ?? 0) + 1)
+    setRouterState(ROUND_ROBIN_CURSOR, key, (ROUND_ROBIN_CURSOR.get(key) ?? 0) + 1)
   }
 
   return {
@@ -93,7 +103,10 @@ export function getRoutedModel(
 
 export type RoutedChatInput = {
   /** Full conversation history, including the system message. */
-  messages: CoreMessage[]
+  messages: Array<{
+    role: "system" | "user" | "assistant"
+    content: string
+  }>
   providerFilter?: string[]
   /** Conversation id — per-thread cursor/last-success state. */
   key?: string
@@ -135,19 +148,27 @@ export async function runRoutedChat(
   for (const provider of providers) {
     try {
       const { text, usage } = await generateText({
-        model: provider.resolve(),
+        model: await provider.resolve(),
         ...(system ? { system } : {}),
         messages,
+        maxOutputTokens: Number(process.env.AI_CHAT_MAX_OUTPUT_TOKENS || 600),
+        abortSignal: AbortSignal.timeout(
+          Number(process.env.AI_REQUEST_TIMEOUT_MS || 30_000)
+        ),
       })
 
       const pool = getEnabledProviders()
 
       if (strategy === "failover") {
-        LAST_SUCCESS.set(key, pool.findIndex((p) => p.id === provider.id))
+        setRouterState(LAST_SUCCESS, key, pool.findIndex((p) => p.id === provider.id))
       } else {
         // point the cursor AFTER the answering provider so the next message in
         // the thread starts at a different provider even after a failover
-        ROUND_ROBIN_CURSOR.set(key, (pool.findIndex((p) => p.id === provider.id) + 1) % pool.length)
+        setRouterState(
+          ROUND_ROBIN_CURSOR,
+          key,
+          (pool.findIndex((p) => p.id === provider.id) + 1) % pool.length
+        )
       }
 
       return {
@@ -170,12 +191,12 @@ export async function runRoutedChat(
     throw lastError
   }
   throw new AiUnavailableError(
-    `All router providers failed: ${failedProviders.join(", ")} — ${String(lastError)}`
+    `All configured AI providers failed after ${failedProviders.length} attempt(s)`
   )
 }
 
 /** Helper for callers that only need a single next model. */
-export function getProviderModel(id: string): RoutedModel {
+export async function getProviderModel(id: string): Promise<RoutedModel> {
   const provider = getProvider(id)
   return { model: provider.resolve(), provider: provider.id, modelId: provider.modelId }
 }

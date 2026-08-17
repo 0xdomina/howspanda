@@ -19,6 +19,33 @@ if (isProduction) {
       'COOKIE_SECRET must be set to a non-default value when NODE_ENV=production'
     )
   }
+  const required = ["DATABASE_URL", "STORE_CORS", "ADMIN_CORS", "AUTH_CORS"]
+  const missing = required.filter((name) => !process.env[name]?.trim())
+  if (missing.length) {
+    throw new Error(`Missing production configuration: ${missing.join(", ")}`)
+  }
+  const privateStorage = [
+    "PRIVATE_S3_BUCKET",
+    "PRIVATE_S3_ENDPOINT",
+    "PRIVATE_S3_ACCESS_KEY_ID",
+    "PRIVATE_S3_SECRET_ACCESS_KEY",
+  ]
+  const missingPrivateStorage = privateStorage.filter(
+    (name) => !process.env[name]?.trim()
+  )
+  if (missingPrivateStorage.length) {
+    throw new Error(
+      `Private payment-proof storage is required in production: ${missingPrivateStorage.join(", ")}`
+    )
+  }
+  if (
+    process.env.CRYPTO_ENABLED === "true" &&
+    !process.env.CRYPTO_NGN_PER_USDC?.trim()
+  ) {
+    throw new Error(
+      "CRYPTO_NGN_PER_USDC must be set from an approved current rate before enabling USDC checkout"
+    )
+  }
 }
 
 module.exports = defineConfig({

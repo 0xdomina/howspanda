@@ -24,13 +24,12 @@ const mediaImageHostnames = (process.env.MEDIA_IMAGE_HOSTNAMES || "")
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  poweredByHeader: false,
+  compress: true,
   logging: {
     fetches: {
-      fullUrl: true,
+      fullUrl: process.env.NODE_ENV !== "production",
     },
-  },
-  typescript: {
-    ignoreBuildErrors: true,
   },
   images: {
     qualities: [50, 75],

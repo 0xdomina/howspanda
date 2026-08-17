@@ -30,11 +30,15 @@ export function getNetworkEnv(): NetworkEnv {
   return process.env.CRYPTO_NETWORK_ENV === "mainnet" ? "mainnet" : "testnet"
 }
 
-// Fixed configurable NGN→USDC rate for the PoC — deterministic, documented as
-// a placeholder for a real price oracle in a later phase.
 export function ngnPerUsdc(): number {
   const v = Number(process.env.CRYPTO_NGN_PER_USDC)
-  return Number.isFinite(v) && v > 0 ? v : 1600
+  if (Number.isFinite(v) && v > 0) return v
+  if (process.env.NODE_ENV === "production" && isCryptoEnabled()) {
+    throw new CryptoUnavailableError(
+      "A current CRYPTO_NGN_PER_USDC rate is required before enabling USDC checkout"
+    )
+  }
+  return 1600
 }
 
 /**

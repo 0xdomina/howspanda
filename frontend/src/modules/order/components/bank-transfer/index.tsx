@@ -282,7 +282,7 @@ export default function BankTransferCard({
             <div>
               <p className={labelClass}>Your proof</p>
               <img
-                src={`${backendUrl}${transfer.proof_url}`}
+                src={transfer.proof_url.startsWith("http") ? transfer.proof_url : `${backendUrl}${transfer.proof_url}`}
                 alt="Your transfer proof"
                 className="mt-2 max-h-64 w-auto rounded-control border border-ink-hairline"
                 data-testid="bank-proof-image"
