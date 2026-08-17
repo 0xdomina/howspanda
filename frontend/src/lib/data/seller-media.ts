@@ -4,7 +4,7 @@ import { MEDUSA_BACKEND_URL } from "@lib/config"
 import { getSellerAuthHeaders } from "./seller-cookies"
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
-const VIDEO_MAX_BYTES = 60 * 1024 * 1024
+const VIDEO_MAX_BYTES = 40 * 1024 * 1024
 
 export type UploadMediaResult = {
   url?: string

@@ -8,16 +8,17 @@ import { mkdir, writeFile } from "fs/promises"
 import path from "path"
 import multer from "multer"
 import { sniffMedia, MediaKind } from "../../../lib/upload/sniff"
+import { validateMediaMetadata } from "../../../lib/upload/metadata"
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
-const VIDEO_MAX_BYTES = 60 * 1024 * 1024
+const VIDEO_MAX_BYTES = 40 * 1024 * 1024
 
 // multipart/form-data is never parsed by Medusa's body parsers (json/text/
 // urlencoded only), so the raw stream reaches multer untouched. Memory storage
 // keeps the cap honest; per-kind limits are enforced after sniffing.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: VIDEO_MAX_BYTES, files: 1 },
+  limits: { fileSize: VIDEO_MAX_BYTES, files: 1, fields: 2, fieldSize: 4096, parts: 3 },
 }).single("file")
 
 const parseMultipart = (req: unknown, res: unknown) =>
@@ -55,6 +56,12 @@ export const POST = async (
         `File too large — max ${VIDEO_MAX_BYTES / 1024 / 1024}MB`
       )
     }
+    if (typeof err?.code === "string" && err.code.startsWith("LIMIT_")) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Upload form is too large or contains too many parts"
+      )
+    }
     throw err
   }
 
@@ -87,6 +94,13 @@ export const POST = async (
       `File too large — max ${maxBytes / 1024 / 1024}MB for ${kind}s`
     )
   }
+  if (sniffed.ext === "gif") {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Animated images are not supported. Upload a photo instead."
+    )
+  }
+  const metadata = validateMediaMetadata(file.buffer, kind, sniffed.ext)
 
   // `filename` is a generated UUID + sniffed extension and `kind` is
   // whitelisted above, but keep the write provably bounded under the uploads
@@ -130,6 +144,9 @@ export const POST = async (
       kind,
       mime: sniffed.mime,
       size: file.size,
+      width: metadata.width,
+      height: metadata.height,
+      duration_seconds: metadata.durationSeconds,
     })
   }
 
@@ -141,5 +158,8 @@ export const POST = async (
     kind,
     mime: sniffed.mime,
     size: file.size,
+    width: metadata.width,
+    height: metadata.height,
+    duration_seconds: metadata.durationSeconds,
   })
 }

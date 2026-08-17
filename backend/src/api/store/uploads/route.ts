@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "fs/promises"
 import path from "path"
 import multer from "multer"
 import { sniffMedia } from "../../../lib/upload/sniff"
+import { validateMediaMetadata } from "../../../lib/upload/metadata"
 import {
   hasPrivatePaymentProofStorage,
   uploadPrivatePaymentProof,
@@ -18,7 +19,7 @@ const IMAGE_MAX_BYTES = 10 * 1024 * 1024
 // POST /store/orders/:id/bank-proof, which enforces email ownership.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: IMAGE_MAX_BYTES, files: 1 },
+  limits: { fileSize: IMAGE_MAX_BYTES, files: 1, fields: 2, fieldSize: 4096, parts: 3 },
 }).single("file")
 
 const parseMultipart = (req: unknown, res: unknown) =>
@@ -48,6 +49,12 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         `File too large — max ${IMAGE_MAX_BYTES / 1024 / 1024}MB`
       )
     }
+    if (typeof err?.code === "string" && err.code.startsWith("LIMIT_")) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Upload form is too large or contains too many parts"
+      )
+    }
     throw err
   }
 
@@ -63,6 +70,13 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       "Only image files are allowed"
     )
   }
+  if (sniffed.ext === "gif") {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Animated images are not supported. Upload a screenshot instead."
+    )
+  }
+  const metadata = validateMediaMetadata(file.buffer, "image", sniffed.ext)
 
   const filename = `${randomUUID()}.${sniffed.ext}`
   if (hasPrivatePaymentProofStorage()) {
@@ -76,6 +90,9 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       kind: "image",
       mime: sniffed.mime,
       size: file.size,
+      width: metadata.width,
+      height: metadata.height,
+      duration_seconds: null,
     })
     return
   }
@@ -113,6 +130,9 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       kind: "image",
       mime: sniffed.mime,
       size: file.size,
+      width: metadata.width,
+      height: metadata.height,
+      duration_seconds: null,
     })
     return
   }
@@ -126,5 +146,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     kind: "image",
     mime: sniffed.mime,
     size: file.size,
+    width: metadata.width,
+    height: metadata.height,
+    duration_seconds: null,
   })
 }

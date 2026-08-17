@@ -152,14 +152,14 @@ const SellerSettingsClient = ({
                   <label className="mb-1 block text-xs text-ink-muted">Profile image</label>
                   <label className="flex cursor-pointer items-center justify-center rounded-medium border border-dashed border-ink-hairline bg-white/50 px-3 py-3 text-center text-sm text-ink hover:bg-white">
                     {uploading === "logo" ? "Preparing image…" : logo ? "Change profile image" : "Upload profile image"}
-                    <input type="file" accept="image/*" className="sr-only" disabled={!isOwner || uploading !== null} onChange={(event) => uploadImage(event, "logo")} />
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={!isOwner || uploading !== null} onChange={(event) => uploadImage(event, "logo")} />
                   </label>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-ink-muted">Store cover image</label>
                   <label className="flex cursor-pointer items-center justify-center rounded-medium border border-dashed border-ink-hairline bg-white/50 px-3 py-3 text-center text-sm text-ink hover:bg-white">
                     {uploading === "cover" ? "Preparing image…" : coverImage ? "Change cover image" : "Upload cover image"}
-                    <input type="file" accept="image/*" className="sr-only" disabled={!isOwner || uploading !== null} onChange={(event) => uploadImage(event, "cover")} />
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={!isOwner || uploading !== null} onChange={(event) => uploadImage(event, "cover")} />
                   </label>
                 </div>
               </div>

@@ -14,7 +14,13 @@ declare module "multer" {
 
   interface MulterOptions {
     storage?: unknown
-    limits?: { fileSize?: number; files?: number }
+    limits?: {
+      fileSize?: number
+      files?: number
+      fields?: number
+      fieldSize?: number
+      parts?: number
+    }
   }
 
   interface MulterInstance {

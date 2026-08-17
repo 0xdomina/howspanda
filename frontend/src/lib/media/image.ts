@@ -1,10 +1,12 @@
 // Client-side image pipeline for product photos. The original file is decoded
-// via createImageBitmap, downscaled on a canvas (cap 2000px on the long edge),
+// via createImageBitmap, downscaled on a canvas (cap 1600px on the long edge),
 // and re-encoded lossily. The raw file never leaves the device — only the
 // re-encoded blob is uploaded, which keeps payloads small and strips any
 // embedded metadata.
-const MAX_DIM = 2000
-const QUALITY = 0.82
+const MAX_INPUT_BYTES = 30 * 1024 * 1024
+const MAX_PIXELS = 40_000_000
+const MAX_DIM = 1600
+const QUALITY = 0.8
 
 function canvasToBlob(
   canvas: HTMLCanvasElement,
@@ -29,15 +31,24 @@ function downscale(bitmap: ImageBitmap): [HTMLCanvasElement, CanvasRenderingCont
   return [canvas, ctx]
 }
 
-// AVIF is smaller than WebP at the same quality, but only Chromium's encoder
-// is trustworthy in the browser. Probe it: an unsupported type makes the
-// canvas fall back to PNG, so accept the blob only when it really is AVIF.
 export async function encodeProductImage(file: File): Promise<Blob> {
-  if (typeof createImageBitmap === "undefined") {
-    throw new Error("This browser can't process images here.")
+  if (!/^image\/(jpeg|png|webp|avif)$/i.test(file.type)) {
+    throw new Error("Choose a JPEG, PNG, WebP, or AVIF image.")
   }
-  const bitmap = await createImageBitmap(file)
+  if (file.size > MAX_INPUT_BYTES) {
+    throw new Error("Choose an image smaller than 30 MB.")
+  }
+  if (typeof createImageBitmap === "undefined") {
+    throw new Error("This device can't prepare that image. Try a smaller photo.")
+  }
+  const bitmap = await createImageBitmap(file, {
+    imageOrientation: "from-image",
+    premultiplyAlpha: "default",
+  })
   try {
+    if (bitmap.width * bitmap.height > MAX_PIXELS) {
+      throw new Error("That image is too large to process safely. Choose a smaller photo.")
+    }
     const [canvas] = downscale(bitmap)
 
     const webp = await canvasToBlob(canvas, "image/webp", QUALITY)
@@ -45,10 +56,6 @@ export async function encodeProductImage(file: File): Promise<Blob> {
       throw new Error("Could not encode the image.")
     }
 
-    const avif = await canvasToBlob(canvas, "image/avif", QUALITY)
-    if (avif && avif.type === "image/avif") {
-      return avif
-    }
     return webp
   } finally {
     bitmap.close()

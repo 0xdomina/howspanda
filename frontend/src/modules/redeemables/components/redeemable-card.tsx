@@ -116,7 +116,7 @@ export default function RedeemableCard({
     >
       {image && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-screen" />
+        <img src={image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-screen" />
       )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_8%,rgba(255,255,255,.38),transparent_32%),linear-gradient(120deg,rgba(255,255,255,.16),transparent_45%,rgba(0,0,0,.18))]" />
       <div className="relative p-5 small:p-6">
@@ -124,7 +124,7 @@ export default function RedeemableCard({
           <div className="flex min-w-0 items-center gap-2">
             {storeLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={storeLogo} alt="" className="h-7 w-7 rounded-full border border-white/50 object-cover" />
+              <img src={storeLogo} alt="" loading="lazy" decoding="async" className="h-7 w-7 rounded-full border border-white/50 object-cover" />
             ) : (
               <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 bg-white/15 text-xs font-semibold">
                 {(storeName ?? "H").slice(0, 1).toUpperCase()}

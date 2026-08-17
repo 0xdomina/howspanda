@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { encodeProductImage } from "@lib/media/image"
 import {
@@ -17,6 +17,7 @@ type ProductMediaProps = {
   videoUrl: string | null
   onVideoChange: (url: string | null) => void
   showVideo: boolean
+  onBusyChange?: (busy: boolean) => void
   hiddenPhotosName?: string
   hiddenBannerName?: string
   hiddenVideoName?: string
@@ -39,6 +40,7 @@ const ProductMedia = ({
   videoUrl,
   onVideoChange,
   showVideo,
+  onBusyChange,
   hiddenPhotosName,
   hiddenBannerName,
   hiddenVideoName,
@@ -52,10 +54,16 @@ const ProductMedia = ({
     progress: null,
     error: null,
   })
+  const [activeUploads, setActiveUploads] = useState(0)
 
-  const busy = state.status === "encoding" || state.status === "uploading"
+  const busy = activeUploads > 0 || state.status === "encoding" || state.status === "uploading"
+
+  useEffect(() => {
+    onBusyChange?.(busy)
+  }, [busy, onBusyChange])
 
   const uploadImage = async (file: File, kind: "image" | "banner") => {
+    setActiveUploads((count) => count + 1)
     setState({ kind, status: "encoding", progress: 0, error: null })
     try {
       const blob = await encodeProductImage(file)
@@ -73,6 +81,8 @@ const ProductMedia = ({
     } catch (err: any) {
       setState({ kind, status: "error", progress: null, error: err?.message ?? "Could not process that image." })
       return null
+    } finally {
+      setActiveUploads((count) => Math.max(0, count - 1))
     }
   }
 
@@ -88,14 +98,9 @@ const ProductMedia = ({
     }
 
     const selected = files.slice(0, Math.max(0, remaining))
-    let nextPhotos = [...photos]
-    for (const file of selected) {
-      const url = await uploadImage(file, "image")
-      if (url) {
-        nextPhotos = [...nextPhotos, url]
-        onPhotosChange(nextPhotos)
-      }
-    }
+    const uploaded = await Promise.all(selected.map((file) => uploadImage(file, "image")))
+    const nextPhotos = [...photos, ...uploaded.filter((url): url is string => !!url)]
+    if (nextPhotos.length !== photos.length) onPhotosChange(nextPhotos)
   }
 
   const uploadBanner = async (file: File) => {
@@ -164,7 +169,7 @@ const ProductMedia = ({
       <input
         ref={imageInput}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/avif"
         multiple
         className="hidden"
         data-testid="product-media-image-input"
@@ -177,7 +182,7 @@ const ProductMedia = ({
       <input
         ref={bannerInput}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/avif"
         className="hidden"
         data-testid="product-media-banner-input"
         onChange={(event) => {
@@ -217,7 +222,7 @@ const ProductMedia = ({
             {photos.map((url, index) => (
               <div key={`${url}-${index}`} className="group relative overflow-hidden rounded-medium border border-ink-hairline bg-paper-tinted">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`Product photo ${index + 1}`} className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
+                <img src={url} alt={`Product photo ${index + 1}`} loading="lazy" decoding="async" className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
                 <div className="absolute inset-x-1 bottom-1 flex items-center justify-between gap-1 rounded-full bg-ink/70 px-1.5 py-1 text-[10px] text-paper backdrop-blur-sm">
                   <span>{index === 0 ? "Cover" : `Photo ${index + 1}`}</span>
                   <span className="flex items-center gap-0.5">
@@ -253,7 +258,7 @@ const ProductMedia = ({
         {bannerUrl ? (
           <div className="mt-4 flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={bannerUrl} alt="Home banner preview" className="h-20 w-full rounded-medium border border-ink-hairline object-cover" />
+            <img src={bannerUrl} alt="Home banner preview" loading="lazy" decoding="async" className="h-20 w-full rounded-medium border border-ink-hairline object-cover" />
             <div className="flex shrink-0 flex-col gap-2">
               <button type="button" onClick={() => bannerInput.current?.click()} className="text-sm text-ink-muted underline underline-offset-4">Change</button>
               <button type="button" onClick={() => onBannerChange(null)} className="text-sm text-ink-muted underline underline-offset-4">Remove</button>
@@ -277,7 +282,7 @@ const ProductMedia = ({
           </div>
           {videoUrl ? (
             <div className="mt-4 flex items-center gap-3">
-              <video src={videoUrl} controls playsInline className="h-20 w-32 rounded-medium border border-ink-hairline object-cover" />
+              <video src={videoUrl} controls playsInline preload="metadata" className="h-20 w-32 rounded-medium border border-ink-hairline object-cover" />
               <div className="flex flex-col gap-2">
                 <button type="button" onClick={() => videoInput.current?.click()} className="text-sm text-ink-muted underline underline-offset-4">Change video</button>
                 <button type="button" onClick={() => onVideoChange(null)} className="text-sm text-ink-muted underline underline-offset-4">Remove video</button>

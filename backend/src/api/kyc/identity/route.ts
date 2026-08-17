@@ -19,7 +19,7 @@ type Body = z.infer<typeof PostKycIdentitySchema>
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: KYC_DOCUMENT_MAX_BYTES, files: 1 },
+  limits: { fileSize: KYC_DOCUMENT_MAX_BYTES, files: 1, fields: 5, fieldSize: 8192, parts: 6 },
 }).single("document")
 
 const parseMultipart = (req: unknown, res: unknown) =>
@@ -53,6 +53,12 @@ export const POST = async (
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         `ID document is too large — max ${KYC_DOCUMENT_MAX_BYTES / 1024 / 1024}MB`
+      )
+    }
+    if (typeof err?.code === "string" && err.code.startsWith("LIMIT_")) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Upload form is too large or contains too many parts"
       )
     }
     throw err

@@ -8,6 +8,7 @@ import {
   uploadBankProofImage,
   type BankTransferTransfer,
 } from "@lib/data/bank-transfer"
+import { encodeProductImage } from "@lib/media/image"
 import { convertToLocale } from "@lib/util/money"
 import Button from "@modules/common/components/button"
 import ErrorMessage from "@modules/checkout/components/error-message"
@@ -59,6 +60,7 @@ export default function BankTransferCard({
   const [amount, setAmount] = useState("")
   const [note, setNote] = useState("")
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadingProof, setUploadingProof] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
 
@@ -89,15 +91,30 @@ export default function BankTransferCard({
   const handleUpload = async (f: File) => {
     setUploadError(null)
     setOk(null)
-    const res = await uploadBankProofImage(f)
-    if (res.error) {
-      setUploadError(res.error)
-      setFile(null)
-      setProofUrl("")
-      return
+    setUploadingProof(true)
+    try {
+      let uploadFile = f
+      try {
+        const prepared = await encodeProductImage(f)
+        uploadFile = new File([prepared], `payment-proof-${Date.now()}.webp`, {
+          type: prepared.type,
+        })
+      } catch {
+        // Older browsers can still upload the original image; the server
+        // performs the same byte and dimension checks on that fallback.
+      }
+      const res = await uploadBankProofImage(uploadFile)
+      if (res.error) {
+        setUploadError(res.error)
+        setFile(null)
+        setProofUrl("")
+        return
+      }
+      setFile(f)
+      setProofUrl(res.url ?? "")
+    } finally {
+      setUploadingProof(false)
     }
-    setFile(f)
-    setProofUrl(res.url ?? "")
   }
 
   const handleSubmit = () => {
@@ -209,14 +226,16 @@ export default function BankTransferCard({
                 <label className={labelClass}>Transfer screenshot</label>
                 <input
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
                   onChange={(e) => {
                     const f = e.target.files?.[0]
                     if (f) handleUpload(f)
                   }}
+                  disabled={uploadingProof}
                   className="mt-1 block w-full text-sm text-ink-muted file:mr-3 file:rounded-control file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
                   data-testid="bank-proof-file-input"
                 />
+                {uploadingProof && <p className="mt-1 text-xs text-ink-muted" role="status">Preparing your screenshot…</p>}
                 {uploadError && (
                   <p className="mt-1 text-xs text-rose-600">{uploadError}</p>
                 )}

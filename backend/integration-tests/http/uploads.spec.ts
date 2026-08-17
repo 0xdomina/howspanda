@@ -7,23 +7,39 @@ jest.setTimeout(240 * 1000)
 process.env.KYC_VERIFICATION_ENABLED = "true"
 process.env.KYC_VERIFICATION_CHANNEL = "mock"
 
-// A valid PNG by magic bytes (the sniffer only reads the header; the rest of
-// the buffer can be padding for the size-cap test).
-const PNG_HEADER = Buffer.from([
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-])
+// A tiny 1x1 PNG. The server validates dimensions as well as magic bytes, so
+// the fixture stays structurally readable instead of relying on a header-only
+// shortcut.
+const tinyPng = () =>
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64"
+  )
 
-const tinyPng = () => Buffer.concat([PNG_HEADER, Buffer.from("TINY")])
-
-// A minimal ISO-BMFF container branded as MP4 (bytes 4-7 `ftyp`, brand
-// `isom` at 8-11) — enough for the video sniffer.
+// A minimal playable MP4 metadata tree: ftyp + moov/mvhd/trak/tkhd. The
+// upload validator uses the declared dimensions and duration to reject
+// malformed or oversized clips before they reach storage.
 const tinyMp4 = () => {
-  const b = Buffer.alloc(64)
-  b.writeUInt32BE(64, 0)
-  b.write("ftyp", 4, "latin1")
-  b.write("isom", 8, "latin1")
-  b.write("isomiso2avc1mp41", 16, "latin1")
-  return b
+  const box = (type: string, payload: Buffer) => {
+    const result = Buffer.alloc(8 + payload.length)
+    result.writeUInt32BE(result.length, 0)
+    result.write(type, 4, "latin1")
+    payload.copy(result, 8)
+    return result
+  }
+  const ftyp = Buffer.alloc(16)
+  ftyp.write("isom", 0, "latin1")
+  ftyp.write("isomiso2", 8, "latin1")
+  const mvhd = Buffer.alloc(100)
+  mvhd.writeUInt32BE(1000, 12)
+  mvhd.writeUInt32BE(10000, 16)
+  const tkhd = Buffer.alloc(84)
+  tkhd.writeUInt32BE(640 * 65536, 76)
+  tkhd.writeUInt32BE(360 * 65536, 80)
+  return Buffer.concat([
+    box("ftyp", ftyp),
+    box("moov", Buffer.concat([box("mvhd", mvhd), box("trak", box("tkhd", tkhd))])),
+  ])
 }
 
 const svg = () =>
@@ -131,7 +147,7 @@ medusaIntegrationTestRunner({
       })
 
       it("rejects an image over the size cap", async () => {
-        const big = Buffer.concat([PNG_HEADER, Buffer.alloc(11 * 1024 * 1024)])
+        const big = Buffer.concat([tinyPng(), Buffer.alloc(11 * 1024 * 1024)])
         await expect(upload(big, "image", "big.png")).rejects.toMatchObject({
           response: { status: 400 },
         })

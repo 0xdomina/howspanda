@@ -55,6 +55,17 @@ const IMAGE_SIGNATURES: {
 // The brand right after the box header decides which.
 const AVIF_BRANDS = new Set(["avif", "avis", "av01", "mif1", "msf1"])
 const HEIF_BRANDS = new Set(["heic", "heix", "hevc", "hevx", "heif", "heis", "heim"])
+const MP4_BRANDS = new Set([
+  "isom",
+  "iso2",
+  "iso5",
+  "iso6",
+  "mp41",
+  "mp42",
+  "avc1",
+  "dash",
+  "M4V ",
+])
 
 function sniffIsoBmff(b: Buffer): SniffedMedia | null {
   if (b.length < 12 || b.toString("latin1", 4, 8) !== "ftyp") return null
@@ -66,6 +77,12 @@ function sniffIsoBmff(b: Buffer): SniffedMedia | null {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       "HEIC images are not supported — convert to JPEG or PNG first"
+    )
+  }
+  if (!MP4_BRANDS.has(brand)) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Only MP4 videos are supported"
     )
   }
   return { kind: "video", ext: "mp4", mime: "video/mp4" }
@@ -101,6 +118,6 @@ export function sniffMedia(buf: Buffer): SniffedMedia {
 
   throw new MedusaError(
     MedusaError.Types.INVALID_DATA,
-    "Unrecognized file — upload a JPEG, PNG, WebP, GIF or AVIF image, or an MP4 video"
+    "Unrecognized file — upload a JPEG, PNG, WebP or AVIF image, or an MP4 video"
   )
 }

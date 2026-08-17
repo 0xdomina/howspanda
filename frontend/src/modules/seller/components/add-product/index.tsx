@@ -38,6 +38,7 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [flashSale, setFlashSale] = useState(false)
   const [homepageBanner, setHomepageBanner] = useState(false)
+  const [mediaBusy, setMediaBusy] = useState(false)
 
   // The backend accepts the full admin shape for products that carry
   // options/variants. We serialize it so the server action can forward it
@@ -140,6 +141,7 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
             videoUrl={videoUrl}
             onVideoChange={setVideoUrl}
             showVideo={showVideo}
+            onBusyChange={setMediaBusy}
             hiddenPhotosName="photos_json"
             hiddenBannerName="banner_url"
             hiddenVideoName="video_url"
@@ -337,7 +339,7 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
             error={(state as any)?.error}
             data-testid="add-product-error"
           />
-          <SubmitButton className="mt-2" data-testid="add-product-submit">
+          <SubmitButton disabled={mediaBusy} className="mt-2" data-testid="add-product-submit">
             Add product
           </SubmitButton>
         </form>

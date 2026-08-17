@@ -23,6 +23,7 @@ const AVC_CODECS = ["avc1.42001f", "avc1.640028", "avc1.4d0028"]
 const MAX_DIM = 1280
 const MAX_FPS = 30
 const MAX_SECONDS = 30
+const MAX_INPUT_BYTES = 40 * 1024 * 1024
 const KEYFRAME_EVERY = 2 // seconds
 const BITRATE_PER_PIXEL = 0.11
 
@@ -61,7 +62,9 @@ function pickCodec(width: number, height: number, bitrate: number): Promise<stri
   })()
 }
 
-function loadVideo(file: File): Promise<HTMLVideoElement> {
+type LoadedVideo = { video: HTMLVideoElement; url: string }
+
+function loadVideo(file: File): Promise<LoadedVideo> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
     const video = document.createElement("video")
@@ -76,7 +79,7 @@ function loadVideo(file: File): Promise<HTMLVideoElement> {
     video.onerror = fail
     video.onloadedmetadata = () => {
       if (!video.videoWidth || !video.videoHeight) return fail()
-      resolve(video)
+      resolve({ video, url })
     }
   })
 }
@@ -89,11 +92,20 @@ export async function encodeProductVideo(
   file: File,
   onProgress?: VideoEncodeProgress
 ): Promise<Blob> {
+  if (!/^video\/(mp4|quicktime|webm)$/i.test(file.type)) {
+    throw new Error("Choose an MP4 video.")
+  }
+  if (file.size > MAX_INPUT_BYTES) {
+    throw new Error("Choose a video smaller than 40 MB.")
+  }
   if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") {
     throw new VideoEncodeUnsupportedError()
   }
 
-  const video = await loadVideo(file)
+  const loaded = await loadVideo(file)
+  const video = loaded.video
+
+  try {
   const duration = Math.min(MAX_SECONDS, video.duration || MAX_SECONDS)
   const fps = Math.min(MAX_FPS, 30)
   const frameUs = Math.round(1_000_000 / fps)
@@ -214,4 +226,10 @@ export async function encodeProductVideo(
 
   const { buffer } = muxer.target
   return new Blob([buffer], { type: "video/mp4" })
+  } finally {
+    video.pause()
+    video.removeAttribute("src")
+    video.load()
+    URL.revokeObjectURL(loaded.url)
+  }
 }

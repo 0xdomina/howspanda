@@ -71,7 +71,7 @@ export default async function StorePage({
       {/* Store header */}
       <section className="glass-panel relative overflow-hidden rounded-control p-6 small:p-8" style={{ borderColor: `${seller.accent_color ?? "#ef4444"}33` }}>
         <div className="absolute inset-x-0 top-0 h-28 opacity-90" style={{ background: visualFor(seller.theme) }} />
-        {seller.cover_image && <img src={seller.cover_image} alt="" className="absolute inset-x-0 top-0 h-28 w-full object-cover opacity-70" />}
+        {seller.cover_image && <img src={seller.cover_image} alt="" loading="lazy" decoding="async" className="absolute inset-x-0 top-0 h-28 w-full object-cover opacity-70" />}
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-transparent to-white/90" />
         <div className="relative flex flex-col gap-6 pt-10 small:flex-row small:items-end small:justify-between">
         <div className="flex items-end gap-4">
@@ -80,6 +80,8 @@ export default async function StorePage({
             <img
               src={seller.logo}
               alt={seller.name}
+              loading="lazy"
+              decoding="async"
               className="h-20 w-20 rounded-full border-4 border-white object-cover shadow-sm"
             />
           ) : (
@@ -216,6 +218,8 @@ export default async function StorePage({
                     <img
                       src={p.thumbnail}
                       alt={p.title}
+                      loading="lazy"
+                      decoding="async"
                       className="aspect-square w-full rounded-control border border-ink-hairline object-cover"
                     />
                   ) : (
