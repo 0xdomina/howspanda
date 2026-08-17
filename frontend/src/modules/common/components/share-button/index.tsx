@@ -4,7 +4,13 @@ import { useCallback, useState } from "react"
 
 import ShareSheet from "@modules/common/components/share-sheet"
 import Share from "@modules/common/icons/share"
-import { SharePayload, ShareResult } from "@lib/share"
+import {
+  SharePayload,
+  ShareResult,
+  fireShareEvent,
+  isWebShareSupported,
+  shareViaNative,
+} from "@lib/share"
 
 type ShareButtonProps = {
   payload: SharePayload
@@ -26,7 +32,21 @@ const ShareButton = ({
   className,
 }: ShareButtonProps) => {
   const [isOpen, setIsOpen] = useState(false)
-  const open = useCallback(() => setIsOpen(true), [])
+  const open = useCallback(async () => {
+    if (isWebShareSupported()) {
+      const result = await shareViaNative(payload)
+      if (result.status === "native") {
+        fireShareEvent({ entity, entityId, channel: "native" })
+        return
+      }
+
+      // A cancelled native sheet should stay cancelled. The fallback is only
+      // needed when the browser cannot complete native sharing.
+      return
+    }
+
+    setIsOpen(true)
+  }, [payload, entity, entityId])
   const close = useCallback(() => setIsOpen(false), [])
 
   return (

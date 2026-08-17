@@ -2,6 +2,7 @@ import { Text } from "@medusajs/ui"
 import { getProductPrice } from "@lib/util/get-product-price"
 import { HttpTypes } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ProductShare from "@modules/products/components/product-share"
 import Thumbnail from "../thumbnail"
 import PreviewPrice from "./price"
 
@@ -44,6 +45,9 @@ export default async function ProductPreview({
             </div>
           </div>
         </LocalizedClientLink>
+        <div className="mt-3 flex justify-end">
+          <ProductShare product={product} />
+        </div>
       </div>
     </div>
   )

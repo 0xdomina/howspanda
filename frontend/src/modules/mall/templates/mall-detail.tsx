@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ShareButton from "@modules/common/components/share-button"
 import { useShareUrl } from "@lib/hooks/use-share-url"
+import { getBaseURL } from "@lib/util/env"
 import { joinMallAsBuyer, joinMallAsSeller } from "@lib/data/mall"
 import type { SellerAdmin, SellerProduct } from "@lib/data/seller"
 import { sellerHasPermission } from "@lib/seller-permissions"
@@ -203,6 +204,9 @@ const MallDetailClient = ({
                 url: shareUrl(`/malls/${mall.id}`),
                 text: `${mall.name} on How's u — a community sales event.`,
                 title: mall.name,
+                description:
+                  mall.description || "Join this How's u community shopping event.",
+                image: `${getBaseURL()}/opengraph-image.jpg`,
               }}
             />
           </div>

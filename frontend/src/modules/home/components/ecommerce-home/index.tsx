@@ -66,7 +66,7 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
     <div className="bg-white">
       {hasProducts ? (
         <>
-          <PromoBannerCarousel products={banners} />
+          <PromoBannerCarousel products={banners} countryCode={countryCode} />
           <section className="figma-container py-16 small:py-24">
             <div className="flex flex-col justify-between gap-8 small:flex-row small:items-end">
               <SectionTitle eyebrow="Today’s" title="Flash Sales" />

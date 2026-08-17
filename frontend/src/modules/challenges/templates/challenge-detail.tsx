@@ -175,6 +175,8 @@ const ChallengeDetailClient = ({
               url: shareUrl(`/challenges/${challenge.slug}`),
               text: `${challenge.name} on How's u — invite friends and earn credits.`,
               title: challenge.name,
+              description:
+                challenge.description || "Join the next How's u community challenge.",
             }}
           />
         </div>

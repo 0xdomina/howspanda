@@ -12,6 +12,26 @@ export const metadata: Metadata = {
   },
   description:
     "How's u is an AI-powered marketplace that helps people shop more and sell more.",
+  openGraph: {
+    title: "How's u — Shop more. Sell more.",
+    description:
+      "Discover products from independent sellers and share your next find.",
+    siteName: "How's u",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph-image.jpg",
+        alt: "How's u marketplace",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How's u — Shop more. Sell more.",
+    description:
+      "Discover products from independent sellers and share your next find.",
+    images: ["/opengraph-image.jpg"],
+  },
 }
 
 export default async function RootLayout(props: { children: React.ReactNode }) {

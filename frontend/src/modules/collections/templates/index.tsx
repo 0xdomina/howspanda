@@ -37,6 +37,8 @@ export default function CollectionTemplate({
               url: `${getBaseURL()}/${countryCode}/collections/${collection.handle}`,
               text: `${collection.title} on How's u`,
               title: collection.title,
+              description: `Shop the ${collection.title} collection on How's u.`,
+              image: collection.products?.[0]?.thumbnail ?? undefined,
             }}
           />
         </div>

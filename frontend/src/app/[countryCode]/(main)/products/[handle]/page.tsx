@@ -64,7 +64,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       title: `${product.title} | How's u`,
       description: product.description ?? product.title,
       url,
-      images: product.thumbnail ? [product.thumbnail] : [],
+      images: product.thumbnail
+        ? [{ url: product.thumbnail, alt: `${product.title} on How's u` }]
+        : undefined,
       videos: productVideo ? [productVideo] : undefined,
       type: "website",
       siteName: "How's u",
@@ -73,7 +75,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       card: "summary_large_image",
       title: product.title,
       description: product.description ?? product.title,
-      images: product.thumbnail ? [product.thumbnail] : undefined,
+      images: product.thumbnail ? [product.thumbnail] : ["/opengraph-image.jpg"],
     },
   }
 }

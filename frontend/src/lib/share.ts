@@ -27,12 +27,15 @@ type SharePayload = {
  * tags on the destination page.
  */
 const buildShareMessage = (payload: SharePayload) => {
-  const parts: string[] = []
-  if (payload.title) parts.push(payload.title)
-  if (payload.text && payload.text !== payload.title) parts.push(payload.text)
-  if (payload.description) parts.push(payload.description)
-  parts.push(payload.url)
-  return parts.join("\n")
+  const parts = [
+    payload.text || payload.title,
+    payload.description && payload.description !== payload.text
+      ? payload.description
+      : undefined,
+    payload.url,
+  ].filter((part): part is string => Boolean(part?.trim()))
+
+  return parts.join("\n\n")
 }
 
 const enc = (s: string) => encodeURIComponent(s)
@@ -112,7 +115,13 @@ const copyText = async (text: string): Promise<boolean> => {
 const shareViaNative = async (payload: SharePayload): Promise<ShareResult> => {
   if (!isWebShareSupported()) return { status: "cancelled" }
   try {
-    await navigator.share({ title: payload.title, text: payload.text, url: payload.url })
+    await navigator.share({
+      title: payload.title,
+      text: [payload.text, payload.description]
+        .filter((part): part is string => Boolean(part?.trim()))
+        .join("\n\n"),
+      url: payload.url,
+    })
     return { status: "native" }
   } catch (err) {
     if ((err as Error).name === "AbortError") return { status: "cancelled" }

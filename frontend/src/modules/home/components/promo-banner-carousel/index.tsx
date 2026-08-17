@@ -5,11 +5,15 @@ import { useEffect, useState } from "react"
 import type { HttpTypes } from "@medusajs/types"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import ShareButton from "@modules/common/components/share-button"
+import { getBaseURL } from "@lib/util/env"
 
 export default function PromoBannerCarousel({
   products,
+  countryCode,
 }: {
   products: HttpTypes.StoreProduct[]
+  countryCode: string
 }) {
   const [active, setActive] = useState(0)
   const slides = products.slice(0, 5)
@@ -48,7 +52,22 @@ export default function PromoBannerCarousel({
         <div className="relative flex min-h-[360px] flex-col justify-between p-7 small:min-h-[430px] small:p-12">
           <div className="flex items-center justify-between gap-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
             <span>Featured on How’s U</span>
-            <span>{String(active + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
+            <div className="flex items-center gap-3">
+              <ShareButton
+                entity="product"
+                entityId={product.id}
+                className="grid h-9 w-9 place-items-center rounded-full border border-white/30 bg-black/20 text-white backdrop-blur-sm transition-transform duration-200 hover:bg-black/30 active:scale-95"
+                payload={{
+                  url: `${getBaseURL()}/${countryCode}/products/${product.handle}`,
+                  text: `${product.title} on How's u`,
+                  title: product.title,
+                  description:
+                    product.description || "A fresh find from an independent seller on How's u.",
+                  image: bannerImage ?? undefined,
+                }}
+              />
+              <span>{String(active + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
+            </div>
           </div>
           <div key={product.id} className="media-enter max-w-xl">
             <p className="mb-3 text-sm font-medium text-white/75">{product.title}</p>

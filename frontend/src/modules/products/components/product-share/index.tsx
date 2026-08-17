@@ -1,11 +1,18 @@
 "use client"
 
-import { HttpTypes } from "@medusajs/types"
-
 import ShareButton from "@modules/common/components/share-button"
 import { useShareUrl } from "@lib/hooks/use-share-url"
 
-const ProductShare = ({ product }: { product: HttpTypes.StoreProduct }) => {
+type ShareableProduct = {
+  id: string
+  title: string
+  handle: string
+  thumbnail?: string | null
+  description?: string | null
+  collection?: { handle: string } | null
+}
+
+const ProductShare = ({ product }: { product: ShareableProduct }) => {
   const shareUrl = useShareUrl()
 
   return (
@@ -17,6 +24,7 @@ const ProductShare = ({ product }: { product: HttpTypes.StoreProduct }) => {
         url: shareUrl(`/products/${product.handle}`),
         text: `${product.title} on How's u`,
         title: product.title,
+        description: product.description || "Shop this find from an independent seller on How's u.",
         image: product.thumbnail ?? undefined,
         hashtags: product.collection?.handle ? [product.collection.handle] : [],
       }}

@@ -6,6 +6,7 @@ import { getStoreProfile } from "@lib/data/follows"
 import FollowButton from "@modules/store/components/follow-button"
 import { getBaseURL } from "@lib/util/env"
 import RedeemableCard from "@modules/redeemables/components/redeemable-card"
+import ProductShare from "@modules/products/components/product-share"
 
 const visualFor = (variant?: string) => {
   const defaults: Record<string, string> = {
@@ -28,7 +29,7 @@ export async function generateMetadata({
   const title = profile?.seller.name ?? handle
   const description =
     profile?.seller.description ?? `Shop ${title} on How's u`
-  const image = profile?.seller.logo ?? undefined
+  const image = profile?.seller.cover_image ?? profile?.seller.logo ?? undefined
   const url = `${getBaseURL()}/${countryCode}/store/${handle}`
   return {
     title,
@@ -38,7 +39,9 @@ export async function generateMetadata({
       title,
       description,
       url,
-      images: image ? [image] : [],
+      images: image
+        ? [{ url: image, alt: `${title} storefront on How's u` }]
+        : undefined,
       type: "website",
       siteName: "How's u",
     },
@@ -46,7 +49,7 @@ export async function generateMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: image ? [image] : undefined,
+      images: image ? [image] : ["/opengraph-image.jpg"],
     },
   }
 }
@@ -131,6 +134,8 @@ export default async function StorePage({
               url: `${getBaseURL()}/${countryCode}/store/${seller.handle}`,
               text: `${seller.name} on How's u`,
               title: seller.name,
+              description:
+                seller.description || "Explore this independent storefront on How's u.",
               image: seller.logo ?? undefined,
             }}
           />
@@ -229,6 +234,9 @@ export default async function StorePage({
                     {p.title}
                   </p>
                 </LocalizedClientLink>
+                <div className="mt-2 flex justify-end">
+                  <ProductShare product={p} />
+                </div>
               </li>
             ))}
           </ul>

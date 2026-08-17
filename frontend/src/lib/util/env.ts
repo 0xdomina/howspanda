@@ -1,3 +1,4 @@
 export const getBaseURL = () => {
-  return process.env.NEXT_PUBLIC_BASE_URL || "https://localhost:8000"
+  const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:8000"
+  return base.replace(/\/+$/, "")
 }
