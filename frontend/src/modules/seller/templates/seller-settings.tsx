@@ -28,11 +28,9 @@ const themes: { id: ThemeName; label: string; gradient: string; color: string }[
 ]
 
 const SellerSettingsClient = ({
-  admin,
   store,
   isOwner,
 }: {
-  admin: { first_name?: string; last_name?: string }
   store: StoreInfo
   isOwner: boolean
 }) => {
@@ -44,8 +42,6 @@ const SellerSettingsClient = ({
   const [accentColor, setAccentColor] = useState(store.accent_color ?? "#ef4444")
   const [theme, setTheme] = useState<ThemeName>(store.theme ?? "sunset")
   const [cryptoEnabled, setCryptoEnabled] = useState(store.crypto_payments_enabled ?? true)
-  const [firstName, setFirstName] = useState(admin.first_name ?? "")
-  const [lastName, setLastName] = useState(admin.last_name ?? "")
   const [uploading, setUploading] = useState<"logo" | "cover" | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -94,14 +90,6 @@ const SellerSettingsClient = ({
       setMessage(res.success
         ? { ok: true, text: "Your storefront is updated." }
         : { ok: false, text: res.error ?? "Could not save store settings." })
-    })
-  }
-
-  const submitProfile = () => {
-    setMessage(null)
-    startTransition(async () => {
-      const res = await updateSellerStore({ first_name: firstName.trim() || undefined, last_name: lastName.trim() || undefined })
-      setMessage(res.success ? { ok: true, text: "Profile saved." } : { ok: false, text: res.error ?? "Could not save profile." })
     })
   }
 
@@ -211,11 +199,6 @@ const SellerSettingsClient = ({
             {isOwner && <button type="button" disabled={isPending} onClick={submitPayments} className="mt-4 rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{isPending ? "Saving…" : "Save payment settings"}</button>}
           </div>
 
-          <div className="glass-panel rounded-large p-5 small:p-6">
-            <h3 className="font-display text-lg font-medium text-ink">Your profile</h3>
-            <div className="mt-3 grid grid-cols-1 gap-3 small:grid-cols-2"><input aria-label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className="w-full rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink outline-none focus:border-ink" /><input aria-label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className="w-full rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink outline-none focus:border-ink" /></div>
-            <button type="button" disabled={isPending} onClick={submitProfile} className="mt-4 rounded-medium bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{isPending ? "Saving…" : "Save profile"}</button>
-          </div>
         </div>
 
         <aside className="large:sticky large:top-6 large:self-start">

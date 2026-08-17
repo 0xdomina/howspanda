@@ -34,7 +34,7 @@ export default async function Nav() {
             <LocalizedClientLink href="/about" className="hover:text-brand">About</LocalizedClientLink>
             <LocalizedClientLink href="/contact" className="hover:text-brand">Contact</LocalizedClientLink>
             <LocalizedClientLink href={seller ? "/seller" : customer ? "/account" : "/account?mode=register"} className="hover:text-brand">
-              {seller ? "Dashboard" : customer ? "Account" : "Sign Up"}
+              {seller ? "Manage Business" : customer ? "Account" : "Sign Up"}
             </LocalizedClientLink>
           </div>
           <div className="flex items-center gap-4">

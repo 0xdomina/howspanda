@@ -16,7 +16,7 @@ const primaryLinks = [
   ["/seller/products/new", "Create", "products"],
   ["/seller/orders", "Orders", "orders"],
   ["/seller/broadcasts", "Inbox", "broadcasts"],
-  ["/seller/settings", "Profile", null],
+  ["/seller/settings", "Store", null],
 ] as const
 
 const manageLinks = [
@@ -59,7 +59,7 @@ export default function SellerNav({ seller }: { seller: SellerNavSeller }) {
         })}
       </div>
       <details open={manageOpen} className="mt-4 border-t border-black/10 pt-4">
-        <summary className="cursor-pointer list-none rounded-xl px-3 py-2 text-sm font-semibold text-ink hover:bg-white/60">Manage business</summary>
+        <summary className="cursor-pointer list-none rounded-xl px-3 py-2 text-sm font-semibold text-ink hover:bg-white/60">Business tools</summary>
         <div className="mt-2 grid gap-1 pl-1">
           {manageLinks.map(([href, label, permission]) => {
             const allowed =

@@ -17,7 +17,6 @@ export default async function SellerSettingsPage() {
 
   return (
     <SellerSettingsClient
-      admin={{ first_name: seller.first_name, last_name: seller.last_name }}
       store={{
         name: seller.seller?.name,
         handle: seller.seller?.handle,

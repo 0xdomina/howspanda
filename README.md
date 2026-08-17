@@ -11,10 +11,12 @@ AI-powered multi-vendor marketplace — shop more, sell more.
 ## Run locally
 
 1. Infrastructure: `cd backend; docker compose up -d`
-2. Backend: `cd backend; npm run dev` → API http://localhost:9000, admin http://localhost:9000/app
+2. Backend: `cd backend; npm run dev` → API http://localhost:9000, platform operations console http://localhost:9000/app
 3. Storefront: `cd frontend; npm run dev` → http://localhost:8000
 
-Environment files: copy `backend/.env.template` → `backend/.env`; create `frontend/.env.local` with your publishable API key (Admin → Settings → Publishable API Keys). Never commit `.env*` files with real secrets.
+Environment files: copy `backend/.env.template` → `backend/.env`; create `frontend/.env.local` with your publishable API key (Operations Console → Settings → Publishable API Keys). Never commit `.env*` files with real secrets.
+
+Seller workspace: sellers and permitted store staff use the storefront's **Manage Business** area at `/seller` for products, orders, store presentation, team access, payouts, malls, redeemables, delivery, reviews, and Seller AI. The Medusa `/app` console is reserved for platform operations and is not a second seller dashboard.
 
 ## Production deployment
 

@@ -51,8 +51,7 @@ const SellerMallsOverview = ({
     <div data-testid="seller-malls-page" className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Manage Business</p>
-          <h2 className="mt-2 font-display text-2xl font-medium tracking-[-0.02em] text-ink">Malls</h2>
+          <h2 className="font-display text-2xl font-medium tracking-[-0.02em] text-ink">Malls</h2>
         </div>
         <LocalizedClientLink href="/malls/create" className="rounded-control bg-ink px-4 py-2 text-sm font-medium text-white">Create a mall</LocalizedClientLink>
       </div>
