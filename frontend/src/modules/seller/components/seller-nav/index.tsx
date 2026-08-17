@@ -24,7 +24,6 @@ const manageLinks = [
   ["/seller/analytics", "Analytics", "analytics"],
   ["/seller/followers", "Followers", "followers"],
   ["/seller/money", "Money", "owner"],
-  ["/seller/malls", "Malls", "malls"],
   ["/seller/delivery", "Delivery", "delivery"],
   ["/seller/reviews", "Reviews", "reviews"],
   ["/seller/referrals", "Referrals", "referrals"],

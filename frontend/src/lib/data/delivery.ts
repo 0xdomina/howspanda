@@ -249,12 +249,14 @@ export const getCourierMe = async (): Promise<CourierMe | null> => {
 export const generateVerification = async (
   jobId: string,
   purpose: "pickup" | "delivery",
-  courierEmail: string
+  _courierEmail?: string
 ): Promise<{ success: boolean; code?: string; codeTail?: string; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Sign in to continue." }
     const result = await sdk.client.fetch<{ code?: string; code_tail?: string }>(
       `/store/delivery-jobs/${jobId}/verify/${purpose}`,
-      { method: "POST", body: { courierEmail } }
+      { method: "POST", headers, body: {} }
     )
     return {
       success: true,
@@ -269,14 +271,17 @@ export const generateVerification = async (
 
 export const submitVerification = async (
   jobId: string,
-  email: string,
+  _email: string,
   code: string,
   purpose: "pickup" | "delivery"
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Sign in to continue." }
     await sdk.client.fetch(`/store/delivery-jobs/${jobId}/verify`, {
       method: "POST",
-      body: { email, code, purpose },
+      headers,
+      body: { code, purpose },
     })
     return { success: true, error: null }
   } catch (error: any) {
@@ -286,13 +291,16 @@ export const submitVerification = async (
 
 export const confirmDelivery = async (
   jobId: string,
-  recipientEmail: string,
-  courierEmail?: string
+  _recipientEmail?: string,
+  _courierEmail?: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Sign in to continue." }
     await sdk.client.fetch(`/store/delivery-jobs/${jobId}/confirm`, {
       method: "POST",
-      body: { recipientEmail, courierEmail },
+      headers,
+      body: {},
     })
     return { success: true, error: null }
   } catch (error: any) {
@@ -302,13 +310,16 @@ export const confirmDelivery = async (
 
 export const cancelDeliveryJob = async (
   jobId: string,
-  email: string,
+  _email: string,
   reason: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!hasAuth(headers)) return { success: false, error: "Sign in to continue." }
     await sdk.client.fetch(`/store/delivery-jobs/${jobId}/cancel`, {
       method: "POST",
-      body: { email, reason },
+      headers,
+      body: { reason },
     })
     return { success: true, error: null }
   } catch (error: any) {

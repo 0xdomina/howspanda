@@ -109,7 +109,7 @@ const DeliverBoardClient = ({ jobs }: { jobs: any[] }) => {
         setLoc({ lat, lng })
         const rev = await reverseGeocode(lat, lng)
         setLocLabel(
-          rev ? `${rev.city ?? rev.displayName}` : `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+          rev ? `${rev.city ?? rev.displayName}` : "Location selected"
         )
         setLocBusy(false)
         refresh({ lat, lng, radiusKm, city: city.trim() || undefined })

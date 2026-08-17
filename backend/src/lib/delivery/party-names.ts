@@ -112,20 +112,46 @@ export async function enrichJobWithPartyNames(
       courierPhone = courier?.phone ?? null
     }
   }
+  const safeEmail = (value: unknown) =>
+    normalizedViewer && typeof value === "string" && norm(value) === normalizedViewer
+      ? value
+      : undefined
   return {
     ...job,
+    // A public job page can show the route and named participants, but never
+    // becomes an email/phone directory. Contact numbers are only available to
+    // an authenticated party after a courier is accepted.
+    destination_phone: isParty ? job.destination_phone ?? null : null,
     offers: offers.map((o: any) => ({
-      ...o,
+      id: o.id,
+      job_id: o.job_id,
+      offered_price: o.offered_price,
+      status: o.status,
+      created_at: o.created_at,
       courier_name: names[norm(o.courier_email)] ?? null,
+      is_mine: !!safeEmail(o.courier_email),
+      courier_email: safeEmail(o.courier_email),
     })),
     parties: parties.map((p: any) => ({
-      ...p,
+      id: p.id,
+      role: p.role,
+      seller_id: p.seller_id,
       name: names[norm(p.email)] ?? null,
+      is_me: !!safeEmail(p.email),
+      email: safeEmail(p.email),
     })),
-    messages: messages.map((m: any) => ({
-      ...m,
+    messages: (isParty ? messages : []).map((m: any) => ({
+      id: m.id,
+      body: m.body,
+      is_system: m.is_system,
+      created_at: m.created_at,
       sender_name: names[norm(m.sender_email)] ?? null,
+      sender_is_me: !!safeEmail(m.sender_email),
+      sender_email: safeEmail(m.sender_email),
     })),
+    // Verification rows contain hashes, expiry metadata, and generator
+    // identities. They are server workflow state, never a public job field.
+    verifications: [],
     courier_phone: courierPhone,
   }
 }

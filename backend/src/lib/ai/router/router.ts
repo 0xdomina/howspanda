@@ -1,4 +1,4 @@
-import { generateText } from "../sdk"
+import { generateObject, generateText } from "../sdk"
 import { AiUnavailableError } from "../model"
 import {
   getEnabledProviders,
@@ -199,4 +199,103 @@ export async function runRoutedChat(
 export async function getProviderModel(id: string): Promise<RoutedModel> {
   const provider = getProvider(id)
   return { model: provider.resolve(), provider: provider.id, modelId: provider.modelId }
+}
+
+export type RoutedGenerationResult<T> = {
+  result: T
+  provider: string
+  modelId: string
+  usage: { inputTokens?: number; outputTokens?: number }
+  failedProviders: string[]
+}
+
+function recordProviderSuccess(strategy: RouterStrategy, key: string, providerId: string) {
+  const pool = getEnabledProviders()
+  const index = pool.findIndex((provider) => provider.id === providerId)
+  if (strategy === "failover") {
+    setRouterState(LAST_SUCCESS, key, index)
+  } else if (pool.length) {
+    setRouterState(ROUND_ROBIN_CURSOR, key, (index + 1) % pool.length)
+  }
+}
+
+/** Structured seller capabilities use the same hidden provider pool as buyer
+ * chat. Providers see only the capability prompt; the client receives no
+ * provider/model identity. */
+export async function runRoutedObject<T>(input: {
+  capability: string
+  schema: unknown
+  system: string
+  prompt: string
+  key?: string
+  providerFilter?: string[]
+}): Promise<RoutedGenerationResult<T>> {
+  const strategy = getRouterStrategy()
+  const key = input.key ?? `capability:${input.capability}`
+  const providers = providersToTry(strategy, key, input.providerFilter)
+  const failedProviders: string[] = []
+  let lastError: unknown
+  for (const provider of providers) {
+    try {
+      const { object, usage } = await generateObject({
+        model: await provider.resolve(),
+        schema: input.schema,
+        system: input.system,
+        prompt: input.prompt,
+        maxOutputTokens: Number(process.env.AI_CHAT_MAX_OUTPUT_TOKENS || 600),
+        abortSignal: AbortSignal.timeout(Number(process.env.AI_REQUEST_TIMEOUT_MS || 30_000)),
+      })
+      recordProviderSuccess(strategy, key, provider.id)
+      return {
+        result: object as T,
+        provider: provider.id,
+        modelId: provider.modelId,
+        usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+        failedProviders,
+      }
+    } catch (error) {
+      lastError = error
+      failedProviders.push(provider.id)
+    }
+  }
+  if (lastError instanceof AiUnavailableError) throw lastError
+  throw new AiUnavailableError(`All configured AI providers failed for ${input.capability}`)
+}
+
+export async function runRoutedText(input: {
+  capability: string
+  system: string
+  prompt: string
+  key?: string
+  providerFilter?: string[]
+}): Promise<RoutedGenerationResult<string>> {
+  const strategy = getRouterStrategy()
+  const key = input.key ?? `capability:${input.capability}`
+  const providers = providersToTry(strategy, key, input.providerFilter)
+  const failedProviders: string[] = []
+  let lastError: unknown
+  for (const provider of providers) {
+    try {
+      const { text, usage } = await generateText({
+        model: await provider.resolve(),
+        system: input.system,
+        prompt: input.prompt,
+        maxOutputTokens: Number(process.env.AI_CHAT_MAX_OUTPUT_TOKENS || 600),
+        abortSignal: AbortSignal.timeout(Number(process.env.AI_REQUEST_TIMEOUT_MS || 30_000)),
+      })
+      recordProviderSuccess(strategy, key, provider.id)
+      return {
+        result: text,
+        provider: provider.id,
+        modelId: provider.modelId,
+        usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+        failedProviders,
+      }
+    } catch (error) {
+      lastError = error
+      failedProviders.push(provider.id)
+    }
+  }
+  if (lastError instanceof AiUnavailableError) throw lastError
+  throw new AiUnavailableError(`All configured AI providers failed for ${input.capability}`)
 }

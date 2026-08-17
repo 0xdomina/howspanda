@@ -65,7 +65,7 @@ class DeliveryModuleService extends MedusaService({
         "packageDescription, pickupAddress, and destinationAddress are required"
       )
     }
-    if (!(Number.isFinite(input.postedPrice) && input.postedPrice > 0)) {
+    if (!(Number.isFinite(input.postedPrice) && input.postedPrice > 0 && input.postedPrice <= 1_000_000)) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "postedPrice must be a positive number"
@@ -340,7 +340,7 @@ class DeliveryModuleService extends MedusaService({
         "Job is not accepting offers"
       )
     }
-    if (!(Number.isFinite(input.offeredPrice) && input.offeredPrice > 0)) {
+    if (!(Number.isFinite(input.offeredPrice) && input.offeredPrice > 0 && input.offeredPrice <= 1_000_000)) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "offeredPrice must be a positive number"
@@ -648,15 +648,13 @@ class DeliveryModuleService extends MedusaService({
 
   /** Only the accepted courier can generate verification codes. */
   private async assertCourier(jobId: string, email: string) {
-    const couriers = await this.listDeliveryParties({
-      job_id: jobId,
-      role: "courier",
-      email: email.trim().toLowerCase(),
-    })
-    if (!couriers.length) {
+    const job = await this.getJob(jobId)
+    const [acceptedOffer] = await this.listDeliveryOffers({ id: job.accepted_offer_id })
+    const acceptedCourier = acceptedOffer?.courier_email?.trim().toLowerCase()
+    if (!acceptedCourier || acceptedCourier !== email.trim().toLowerCase()) {
       throw new MedusaError(
         MedusaError.Types.UNAUTHORIZED,
-        "Only the courier can generate verification codes"
+        "Only the accepted courier can generate verification codes"
       )
     }
   }
@@ -768,19 +766,41 @@ class DeliveryModuleService extends MedusaService({
       await this.updateDeliveryVerifications({ id: candidate.id, status: "expired" })
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Verification code expired")
     }
-    await this.updateDeliveryVerifications({
-      id: candidate.id,
-      status: "used",
-      used_at: now,
-    })
-    // Presenting a valid code is proof of involvement — register the verifier
-    // as the matching party (sender confirms pickup, recipient confirms delivery).
+    // The code proves proximity, while the signed-in party role controls what
+    // the code is allowed to do. Pickup belongs to the registered sender;
+    // delivery belongs to the recipient (created once on first valid handoff).
     const parties = await this.listDeliveryParties({ job_id: jobId })
-    if (!parties.some((p) => p.email === byEmailNorm)) {
+    const ownParty = parties.find((p) => p.email === byEmailNorm)
+    if (purpose === "pickup" && ownParty?.role !== "sender") {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Only the sender can verify pickup"
+      )
+    }
+    if (purpose === "delivery" && ownParty && ownParty.role !== "recipient") {
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Only the recipient can verify delivery"
+      )
+    }
+    if (!ownParty) {
       await this.ensureParty(
         jobId,
         purpose === "pickup" ? "sender" : "recipient",
         byEmailNorm
+      )
+    }
+    // Consume atomically so two requests cannot reuse the same code during the
+    // read-then-write window. This happens after role validation so a caller
+    // with a leaked code cannot burn it from the wrong account.
+    const consumed = await this.updateDeliveryVerifications({
+      selector: { id: candidate.id, status: "active" },
+      data: { status: "used", used_at: now },
+    })
+    if (!consumed.length) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "This verification code has already been used"
       )
     }
     if (purpose === "pickup") {

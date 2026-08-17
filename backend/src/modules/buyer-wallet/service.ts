@@ -87,17 +87,51 @@ class BuyerWalletModuleService extends MedusaService({
     }
     const wallet = await this.getOrCreate(input.buyerEmail, input.currencyCode)
     const amount = round2(input.amount)
-    const [ledger] = await this.createWalletLedgers([
-      {
+    const reference = input.reference?.trim() || null
+    if (reference) {
+      const [existing] = await this.listWalletLedgers({
         wallet: wallet.id,
-        amount,
         source: input.source,
-        reference: input.reference ?? null,
-      },
-    ])
-    const [updated] = await this.updateWallets([
-      { id: wallet.id, balance: round2(Number(wallet.balance) + amount) },
-    ])
+        reference,
+      })
+      if (existing) return { wallet, ledger: existing }
+    }
+
+    let ledger
+    try {
+      ;[ledger] = await this.createWalletLedgers([
+        {
+          wallet: wallet.id,
+          amount,
+          source: input.source,
+          reference,
+        },
+      ])
+    } catch {
+      // A retry raced the same idempotency reference. Return the already
+      // recorded credit instead of incrementing the wallet twice.
+      if (reference) {
+        const [existing] = await this.listWalletLedgers({
+          wallet: wallet.id,
+          source: input.source,
+          reference,
+        })
+        if (existing) return { wallet, ledger: existing }
+      }
+      throw new MedusaError(MedusaError.Types.UNEXPECTED_STATE, "Wallet credit could not be recorded")
+    }
+
+    const manager = (this as any).baseRepository_.getActiveManager() as {
+      execute: (sql: string, params?: Array<string | number>) => Promise<Array<Record<string, unknown>>>
+    }
+    const updatedRows = await manager.execute(
+      `UPDATE buyer_wallet SET balance = balance + ?, updated_at = now() WHERE id = ? RETURNING id`,
+      [amount, wallet.id]
+    )
+    if (!updatedRows.length) {
+      throw new MedusaError(MedusaError.Types.UNEXPECTED_STATE, "Buyer wallet could not be updated")
+    }
+    const [updated] = await this.listWallets({ id: wallet.id })
     return { wallet: updated, ledger }
   }
 

@@ -12,6 +12,9 @@ const MallPrize = model.define("mkt_mall_prize", {
     mappedBy: "prizes",
   }),
   winner_buyer_email: model.text(),
+  // Stable winner slot prevents concurrent purchases from allocating more
+  // winners than the mall configured.
+  winner_slot: model.number().nullable(),
   amount_ngn: model.bigNumber(),
   is_random: model.boolean().default(true),
   // Optional redeemable gift awarded alongside cash (from a seller's contribution)

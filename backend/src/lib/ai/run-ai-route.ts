@@ -22,6 +22,7 @@ type HandlerContext = {
 type HandlerOutput<T> = {
   result: T
   usage: AiUsageTokens
+  modelId?: string
   // deterministic numbers computed in code, returned alongside the AI text
   extra?: Record<string, unknown>
 }
@@ -83,14 +84,14 @@ export async function runAiRoute<T>(
         return
       }
 
-      const { result, usage, extra } = output
+      const { result, usage, extra, modelId } = output
 
       let quota: QuotaStatus | null = null
       try {
         await aiService.recordUsage({
           seller_id: seller.seller_id,
           capability,
-          model_id: getModelId(),
+            model_id: modelId ?? getModelId(),
           prompt_tokens: usage.inputTokens ?? null,
           completion_tokens: usage.outputTokens ?? null,
         })

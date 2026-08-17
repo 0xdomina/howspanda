@@ -33,6 +33,21 @@ const statusLabel: Record<string, string> = {
   cancelled: "Cancelled",
 }
 
+const deliverySteps = [
+  { key: "posted", label: "Request posted" },
+  { key: "accepted", label: "Courier accepted" },
+  { key: "in_transit", label: "Package in transit" },
+  { key: "delivered", label: "Delivered" },
+] as const
+
+const statusRank: Record<string, number> = {
+  open: 0,
+  negotiating: 0,
+  accepted: 1,
+  in_transit: 2,
+  delivered: 3,
+}
+
 const Section = ({
   title,
   children,
@@ -84,7 +99,7 @@ const DeliverJobDetailClient = ({
 
   const parties = job.parties ?? []
   const offers = job.offers ?? []
-  const myParty = parties.find((p: any) => p.email === email)
+  const myParty = parties.find((p: any) => p.is_me)
   const acceptedOffer = offers.find((o: any) => o.status === "accepted")
   const isCourier = myParty?.role === "courier"
   const isSender = myParty?.role === "sender"
@@ -93,19 +108,16 @@ const DeliverJobDetailClient = ({
   // People are identified by their proper name — never by any part of their
   // email. Without a name we fall back to the party's role, and own messages
   // are always labelled "You".
-  const partyLabel = (partyEmail: string) => {
-    const e = partyEmail.trim().toLowerCase()
-    if (e === email) return "You"
-    const party = parties.find(
-      (p: any) => (p.email ?? "").trim().toLowerCase() === e
-    )
-    if (party?.name) return party.name
+  const partyLabel = (party: any) => {
+    if (party?.sender_is_me) return "You"
+    const partyMatch = parties.find((p: any) => p.name === party?.sender_name)
+    if (party?.sender_name) return party.sender_name
     const roleLabel: Record<string, string> = {
       courier: "Courier",
       sender: "Sender",
       recipient: "Recipient",
     }
-    return roleLabel[party?.role] ?? "Participant"
+    return roleLabel[partyMatch?.role] ?? "Participant"
   }
 
   const setMsg = (s: string | null) => setMessage(s)
@@ -288,7 +300,7 @@ const DeliverJobDetailClient = ({
                 </p>
               )}
             </div>
-            {job.pickup_lat != null &&
+              {job.pickup_lat != null &&
               job.pickup_lng != null &&
               job.destination_lat != null &&
               job.destination_lng != null && (
@@ -318,6 +330,44 @@ const DeliverJobDetailClient = ({
                   )}
                 </div>
               )}
+            <div className="mt-5 rounded-medium border border-ink-hairline bg-paper-surface p-4">
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-ink-muted">
+                Delivery progress
+              </p>
+              <ol className="mt-3 grid gap-3 small:grid-cols-4">
+                {deliverySteps.map((step, index) => {
+                  const complete = statusRank[job.status] >= index
+                  const timestamp =
+                    index === 0
+                      ? job.created_at
+                      : index === 2
+                      ? job.picked_up_at
+                      : index === 3
+                      ? job.delivered_at
+                      : job.accepted_at
+                  return (
+                    <li key={step.key} className="flex items-start gap-2 text-sm">
+                      <span
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] ${
+                          complete ? "bg-emerald-600 text-white" : "bg-ink/10 text-ink-muted"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {complete ? "✓" : index + 1}
+                      </span>
+                      <span>
+                        <span className={complete ? "text-ink" : "text-ink-muted"}>{step.label}</span>
+                        {timestamp && (
+                          <span className="mt-0.5 block text-[11px] text-ink-muted">
+                            {new Date(timestamp).toLocaleString()}
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+            </div>
           </div>
 
           {offers.length > 0 && (
@@ -327,9 +377,7 @@ const DeliverJobDetailClient = ({
                   <li key={o.id} className="flex items-center justify-between py-2 text-sm">
                     <span className="truncate text-ink-muted">
                       {o.courier_name ??
-                        (o.courier_email?.trim().toLowerCase() === email
-                          ? "You"
-                          : "Courier")}
+                        (o.is_mine ? "You" : "Courier")}
                     </span>
                     <span className="ml-2 flex items-center gap-2">
                       <span className="font-mono tabular-nums text-ink">
@@ -364,7 +412,7 @@ const DeliverJobDetailClient = ({
                             ? "System"
                             : m.sender_name
                             ? m.sender_name
-                            : partyLabel(m.sender_email)}
+                            : partyLabel(m)}
                           :
                         </span>{" "}
                         {m.body}

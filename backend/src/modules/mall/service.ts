@@ -1,4 +1,5 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
+import { randomInt } from "node:crypto"
 import Mall from "./models/mall"
 import MallSeller from "./models/mall-seller"
 import MallBuyer from "./models/mall-buyer"
@@ -62,6 +63,12 @@ class MallModuleService extends MedusaService({
   MallPurchase,
 }) {
   async createMall(input: CreateMallInput) {
+    if (!Number.isInteger(input.prizeWinnerCount) || input.prizeWinnerCount < 1 || input.prizeWinnerCount > FIXED_TARGET_BUYERS) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `Choose between 1 and ${FIXED_TARGET_BUYERS} winners`
+      )
+    }
     if (input.prizePoolNgn <= 0) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
@@ -115,16 +122,48 @@ class MallModuleService extends MedusaService({
     )
   }
 
-  private decorateMall(mall: any) {
+  private decorateMall(mall: any, viewerEmail?: string | null) {
     const sellers = Array.isArray(mall.sellers) ? mall.sellers : []
     const buyers = Array.isArray(mall.buyers) ? mall.buyers : []
     const prizes = Array.isArray(mall.prizes) ? mall.prizes : []
+    const viewer = viewerEmail?.trim().toLowerCase() ?? null
+    const publicBuyers = buyers.map((buyer: any) => ({
+      id: buyer.id,
+      mall_id: buyer.mall_id,
+      joined_at: buyer.joined_at,
+      purchase_count: buyer.purchase_count,
+      has_won: buyer.has_won,
+      won_prize_ngn: buyer.won_prize_ngn,
+      won_at: buyer.won_at,
+      is_me: !!viewer && buyer.buyer_email?.trim().toLowerCase() === viewer,
+      // Only the signed-in buyer may receive their own email back.
+      buyer_email:
+        viewer && buyer.buyer_email?.trim().toLowerCase() === viewer
+          ? buyer.buyer_email
+          : undefined,
+    }))
+    const publicPrizes = prizes.map((prize: any) => ({
+      id: prize.id,
+      mall_id: prize.mall_id,
+      amount_ngn: prize.amount_ngn,
+      claimed: prize.claimed,
+      claimed_at: prize.claimed_at,
+      created_at: prize.created_at,
+      winner_slot: prize.winner_slot,
+      // The ticker can celebrate a winner without becoming a contact list.
+      winner_buyer_email: maskEmail(prize.winner_buyer_email),
+      is_mine: !!viewer && prize.winner_buyer_email?.trim().toLowerCase() === viewer,
+    }))
     const paidOut = prizes
       .filter((prize: any) => prize.claimed || prize.wallet_ledger_id)
       .reduce((sum: number, prize: any) => sum + Number(prize.amount_ngn ?? 0), 0)
 
     return {
       ...mall,
+      buyers: publicBuyers,
+      prizes: publicPrizes,
+      viewer_joined: publicBuyers.some((buyer: any) => buyer.is_me),
+      viewer_prize: publicPrizes.find((prize: any) => prize.is_mine) ?? null,
       seller_count: sellers.length,
       buyer_count: buyers.length,
       winner_count: prizes.length,
@@ -153,7 +192,7 @@ class MallModuleService extends MedusaService({
     return await this.listPublic()
   }
 
-  async getDetails(mallId: string) {
+  async getDetails(mallId: string, viewerEmail?: string | null) {
     const mall = await this.listMalls(
       { id: mallId },
       {
@@ -167,7 +206,7 @@ class MallModuleService extends MedusaService({
         "Mall not found"
       )
     }
-    return this.decorateMall(mall[0])
+    return this.decorateMall(mall[0], viewerEmail)
   }
 
   async joinAsSeller(input: JoinAsSellerInput) {
@@ -238,6 +277,7 @@ class MallModuleService extends MedusaService({
   }
 
   async joinAsBuyer(input: JoinAsBuyerInput) {
+    const buyerEmail = input.buyerEmail.trim().toLowerCase()
     const mall = await this.listMalls(
       { id: input.mallId },
       { take: 1 }
@@ -256,7 +296,7 @@ class MallModuleService extends MedusaService({
     }
     const existing = await this.listMallBuyers({
       mall_id: input.mallId,
-      buyer_email: input.buyerEmail,
+      buyer_email: buyerEmail,
     })
     if (existing.length > 0) {
       return existing[0]
@@ -321,6 +361,7 @@ class MallModuleService extends MedusaService({
   }
 
   async recordPurchase(input: RecordPurchaseInput) {
+    const buyerEmail = input.buyerEmail.trim().toLowerCase()
     const mall = await this.listMalls(
       { id: input.mallId },
       { take: 1 }
@@ -348,7 +389,7 @@ class MallModuleService extends MedusaService({
       await this.createMallPurchases({
         mall_id: input.mallId,
         order_id: input.orderId,
-        buyer_email: input.buyerEmail,
+        buyer_email: buyerEmail,
       })
     } catch {
       // Concurrent replay hit the (mall_id, order_id) unique index — the other
@@ -357,21 +398,18 @@ class MallModuleService extends MedusaService({
     }
     let buyer = await this.listMallBuyers({
       mall_id: input.mallId,
-      buyer_email: input.buyerEmail,
+      buyer_email: buyerEmail,
     }).then((b) => b[0])
     if (!buyer) {
-      buyer = await this.createMallBuyers({
-        mall_id: input.mallId,
-        buyer_email: input.buyerEmail,
-        joined_at: new Date(),
-        purchase_count: 1,
-      })
-    } else {
-      await this.updateMallBuyers({
-        id: buyer.id,
-        purchase_count: buyer.purchase_count + 1,
-      })
+      throw new MedusaError(
+        MedusaError.Types.UNAUTHORIZED,
+        "Join this mall before shopping here"
+      )
     }
+    await this.updateMallBuyers({
+      id: buyer.id,
+      purchase_count: buyer.purchase_count + 1,
+    })
     if (buyer.has_won) {
       return null
     }
@@ -383,7 +421,7 @@ class MallModuleService extends MedusaService({
     }
     const remaining = mall[0].prize_winner_count - prizesDrawn
     const winChance = remaining / mall[0].target_buyers
-    const randomValue = Math.random()
+    const randomValue = randomInt(0, 1_000_001) / 1_000_000
     const won = randomValue < winChance
     if (!won) {
       return null
@@ -397,22 +435,31 @@ class MallModuleService extends MedusaService({
         Math.floor(remainingPool / remaining),
         50000
       )
-      prizeAmount = Math.floor(Math.random() * maxPrize) + 1000
+      if (maxPrize < 1000) return null
+      prizeAmount = randomInt(1000, maxPrize + 1)
     }
     if (prizeAmount <= 0) {
       return null
     }
 
     // Create prize record (wallet credit will be handled by the route layer)
-    const prize = await this.createMallPrizes({
-      mall_id: input.mallId,
-      winner_buyer_email: input.buyerEmail,
-      amount_ngn: prizeAmount,
-      is_random: true,
-      random_seed: randomValue.toString(),
-      wallet_ledger_id: null, // Will be set after wallet credit
-      claimed: false,
-    })
+    let prize
+    try {
+      prize = await this.createMallPrizes({
+        mall_id: input.mallId,
+        winner_buyer_email: buyerEmail,
+        winner_slot: prizesDrawn,
+        amount_ngn: prizeAmount,
+        is_random: true,
+        random_seed: randomValue.toString(),
+        wallet_ledger_id: null, // Will be set after wallet credit
+        claimed: false,
+      })
+    } catch {
+      // A concurrent purchase may have claimed the same winner slot. The
+      // unique partial index makes this purchase a normal non-winning draw.
+      return null
+    }
     await this.updateMallBuyers({
       id: buyer.id,
       has_won: true,

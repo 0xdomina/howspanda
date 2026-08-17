@@ -68,21 +68,9 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   // down on larger values). A ₦15k tip is a small value → 5%; withheld here at
   // the ledger line so it holds whether the order was paid by card or USDC.
   const { rate, commission, net } = computeCommission(amount)
-  const line = await marketplace.createCommissionLines([
-    {
-      order_id: `tip:${orderId}:${Date.now()}`,
-      parent_order_id: orderId,
-      currency_code: currency,
-      order_total: amount,
-      rate,
-      commission_amount: commission,
-      net_amount: net,
-      status: "available",
-      available_at: new Date(),
-      seller_id: sellerId,
-    },
-  ])
-
+  // Record the social action first. The database uniqueness guard makes this
+  // idempotent under concurrent clicks; the ledger line is linked only after
+  // the tip record exists, so a rejected duplicate cannot mint balance.
   const tip = await tipping.createTip({
     direction: "to_seller",
     orderId,
@@ -91,8 +79,29 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     currencyCode: currency,
     amount,
     note,
-    commissionLineId: line[0]?.id ?? null,
+    commissionLineId: null,
   })
+
+  try {
+    const line = await marketplace.createCommissionLines([
+      {
+        order_id: `tip:${orderId}:${tip.id}`,
+        parent_order_id: orderId,
+        currency_code: currency,
+        order_total: amount,
+        rate,
+        commission_amount: commission,
+        net_amount: net,
+        status: "available",
+        available_at: new Date(),
+        seller_id: sellerId,
+      },
+    ])
+    await tipping.updateTips({ id: tip.id, commission_line_id: line[0]?.id ?? null })
+  } catch (error) {
+    await tipping.updateTips({ id: tip.id, status: "reversed" })
+    throw error
+  }
 
   res.json({ tip })
 }

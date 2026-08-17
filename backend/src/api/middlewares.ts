@@ -94,11 +94,18 @@ const DELIVERY_RATE_LIMIT = rateLimit({
   limit: 20,
   windowMs: 10 * 60 * 1000,
   keyOf: (req) => {
+    const authed = req as AuthenticatedMedusaRequest
+    if (authed.auth_context?.actor_id) return authed.auth_context.actor_id as string
     const b = req.body as
       | { email?: string; courierEmail?: string; recipientEmail?: string }
       | undefined
     return b?.email || b?.courierEmail || b?.recipientEmail
   },
+})
+const GEO_RATE_LIMIT = rateLimit({
+  name: "geo",
+  limit: 30,
+  windowMs: 15 * 60 * 1000,
 })
 // Escrow-status polls are per-order ownership reads (email-gated); throttle by
 // the queried email so an attacker cannot scrape order states wholesale.
@@ -593,12 +600,9 @@ export const PostMallJoinSchema = z.object({
   redeemableId: z.string().min(1).optional(),
 })
 
-export const PostMallJoinBuyerSchema = z.object({
-  buyerEmail: z.string().email(),
-})
+export const PostMallJoinBuyerSchema = z.object({})
 
 export const PostMallPurchaseSchema = z.object({
-  buyerEmail: z.string().email(),
   orderId: z.string().min(1),
 })
 
@@ -610,12 +614,12 @@ export const PostDeliveryJobSchema = z.object({
   pickupAddress: z.string().min(3),
   destinationAddress: z.string().min(3),
   destinationPhone: z.string().optional(),
-  postedPrice: z.number().positive(),
+  postedPrice: z.number().positive().max(1000000),
 })
 
 export const PostDeliveryOfferSchema = z.object({
   courierEmail: z.string().email().optional(),
-  offeredPrice: z.number().positive(),
+  offeredPrice: z.number().positive().max(1000000),
 })
 
 export const PostDeliveryPickupSchema = z.object({
@@ -623,27 +627,19 @@ export const PostDeliveryPickupSchema = z.object({
 })
 
 export const PostDeliveryCancelSchema = z.object({
-  email: z.string().email(),
-  reason: z.string().min(3),
+  reason: z.string().trim().min(3).max(500),
 })
 
-export const PostDeliveryConfirmSchema = z.object({
-  // Only the recipient confirms delivery (courier self-confirm would release
-  // the payout without the buyer's sign-off).
-  recipientEmail: z.string().email(),
-})
+export const PostDeliveryConfirmSchema = z.object({})
 
 // Chat + POD verification (Phase 12)
 export const PostDeliveryChatSchema = z.object({
   body: z.string().min(1).max(2000),
 })
 
-export const PostDeliveryVerifyGenerateSchema = z.object({
-  courierEmail: z.string().email(),
-})
+export const PostDeliveryVerifyGenerateSchema = z.object({})
 
 export const PostDeliveryVerifySchema = z.object({
-  email: z.string().email(),
   code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
   purpose: z.enum(["pickup", "delivery"]),
 })
@@ -1377,6 +1373,17 @@ export default defineMiddlewares({
       ],
     },
     {
+      // Public mall browsing can optionally annotate the signed-in buyer's
+      // participation without exposing anyone else's email.
+      matcher: "/store/malls/:id",
+      methods: ["GET"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnauthenticated: true,
+        }),
+      ],
+    },
+    {
       matcher: "/store/malls/:id/join",
       methods: ["POST"],
       middlewares: [
@@ -1405,9 +1412,7 @@ export default defineMiddlewares({
       matcher: "/store/malls/:id/join-buyer",
       methods: ["POST"],
       middlewares: [
-        authenticate("customer", ["session", "bearer"], {
-          allowUnauthenticated: true,
-        }),
+        authenticate("customer", ["session", "bearer"]),
         MALL_RATE_LIMIT,
         validateAndTransformBody(PostMallJoinBuyerSchema),
       ],
@@ -1416,9 +1421,7 @@ export default defineMiddlewares({
       matcher: "/store/malls/:id/purchase",
       methods: ["POST"],
       middlewares: [
-        authenticate("customer", ["session", "bearer"], {
-          allowUnauthenticated: true,
-        }),
+        authenticate("customer", ["session", "bearer"]),
         MALL_RATE_LIMIT,
         validateAndTransformBody(PostMallPurchaseSchema),
       ],
@@ -1431,6 +1434,13 @@ export default defineMiddlewares({
         authenticate(["customer", "seller"], ["session", "bearer"]),
         validateAndTransformBody(PostDeliveryJobSchema),
       ],
+    },
+    {
+      // Geocoding is an anonymous upstream call; keep it bounded so a public
+      // client cannot proxy unlimited address lookups to Nominatim.
+      matcher: "/store/geo/:route",
+      methods: ["GET"],
+      middlewares: [GEO_RATE_LIMIT],
     },
     {
       matcher: "/store/delivery-jobs/mine",
@@ -1500,12 +1510,20 @@ export default defineMiddlewares({
     {
       matcher: "/store/delivery-jobs/:id/cancel",
       methods: ["POST"],
-      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryCancelSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostDeliveryCancelSchema),
+      ],
     },
     {
       matcher: "/store/delivery-jobs/:id/confirm",
       methods: ["POST"],
-      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryConfirmSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostDeliveryConfirmSchema),
+      ],
     },
     {
       // Public job details remain browseable, but an optional session allows
@@ -1551,17 +1569,29 @@ export default defineMiddlewares({
     {
       matcher: "/store/delivery-jobs/:id/verify/pickup",
       methods: ["POST"],
-      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostDeliveryVerifyGenerateSchema),
+      ],
     },
     {
       matcher: "/store/delivery-jobs/:id/verify/delivery",
       methods: ["POST"],
-      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryVerifyGenerateSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostDeliveryVerifyGenerateSchema),
+      ],
     },
     {
       matcher: "/store/delivery-jobs/:id/verify",
       methods: ["POST"],
-      middlewares: [DELIVERY_RATE_LIMIT, validateAndTransformBody(PostDeliveryVerifySchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        DELIVERY_RATE_LIMIT,
+        validateAndTransformBody(PostDeliveryVerifySchema),
+      ],
     },
     {
       matcher: "/kyc/status",
@@ -1571,12 +1601,20 @@ export default defineMiddlewares({
     {
       matcher: "/kyc/request",
       methods: ["POST"],
-      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycRequestSchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        OTP_RATE_LIMIT,
+        validateAndTransformBody(PostKycRequestSchema),
+      ],
     },
     {
       matcher: "/kyc/verify",
       methods: ["POST"],
-      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostKycVerifySchema)],
+      middlewares: [
+        authenticate(["customer", "seller"], ["session", "bearer"]),
+        OTP_RATE_LIMIT,
+        validateAndTransformBody(PostKycVerifySchema),
+      ],
     },
     {
       matcher: "/kyc/identity",

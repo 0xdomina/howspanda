@@ -3,6 +3,7 @@
 import { sdk } from "@lib/config"
 import { revalidateTag } from "next/cache"
 import { getSellerAuthHeaders, getSellerCacheTag } from "./seller-cookies"
+import { getAuthHeaders } from "./cookies"
 
 export type Mall = {
   id: string
@@ -25,6 +26,8 @@ export type Mall = {
   sellers?: MallSeller[]
   buyers?: MallBuyer[]
   prizes?: MallPrize[]
+  viewer_joined?: boolean
+  viewer_prize?: MallPrize | null
   starts_at?: string | null
   ends_at?: string | null
   expires_at: string | null
@@ -34,7 +37,8 @@ export type Mall = {
 export type MallBuyer = {
   id: string
   mall_id: string
-  buyer_email: string
+  buyer_email?: string
+  is_me?: boolean
   joined_at: string
   purchase_count: number
   has_won: boolean
@@ -100,9 +104,11 @@ export const listRecentMallWins = async (): Promise<MallWin[]> => {
 
 export const retrieveMall = async (id: string): Promise<Mall | null> => {
   try {
+    const headers = await getAuthHeaders()
     return await sdk.client
       .fetch<{ mall: Mall }>(`/store/malls/${id}`, {
         method: "GET",
+        headers,
         cache: "no-store",
       })
       .then(({ mall }) => mall)
@@ -128,12 +134,15 @@ export const listMallGoods = async (id: string): Promise<any[]> => {
 
 export const joinMallAsBuyer = async (
   mallId: string,
-  buyerEmail: string
+  _buyerEmail?: string
 ): Promise<{ success: boolean; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!("authorization" in headers)) return { success: false, error: "Sign in to join this mall." }
     await sdk.client.fetch(`/store/malls/${mallId}/join-buyer`, {
       method: "POST",
-      body: { buyerEmail },
+      headers,
+      body: {},
     })
     return { success: true, error: null }
   } catch (error: any) {
@@ -143,7 +152,7 @@ export const joinMallAsBuyer = async (
 
 export const recordMallPurchase = async (
   mallId: string,
-  buyerEmail: string,
+  _buyerEmail: string,
   orderId: string
 ): Promise<{
   success: boolean
@@ -152,9 +161,11 @@ export const recordMallPurchase = async (
   error: string | null
 }> => {
   try {
+    const headers = await getAuthHeaders()
+    if (!("authorization" in headers)) return { success: false, error: "Sign in to complete a mall purchase." }
     const result = await sdk.client.fetch<{ result: any }>(
       `/store/malls/${mallId}/purchase`,
-      { method: "POST", body: { buyerEmail, orderId } }
+      { method: "POST", headers, body: { orderId } }
     )
     return {
       success: true,

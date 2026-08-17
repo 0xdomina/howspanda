@@ -1,4 +1,5 @@
 import { sdk } from "@lib/config"
+import { getAuthHeaders } from "./cookies"
 
 export type KycLevel =
   | "unverified"
@@ -103,10 +104,12 @@ export const requestKycOtp = async (input: {
   destination: string
 }): Promise<{ ok: boolean; code: string | null; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
     const res = await sdk.client.fetch<{ ok: boolean; code: string | null }>(
       "/kyc/request",
       {
         method: "POST",
+        headers,
         body: input,
       }
     )
@@ -123,10 +126,12 @@ export const verifyKycOtp = async (input: {
   code: string
 }): Promise<{ ok: boolean; profile: KycProfileView | null; error: string | null }> => {
   try {
+    const headers = await getAuthHeaders()
     const res = await sdk.client.fetch<{ ok: boolean; profile: KycProfileView }>(
       "/kyc/verify",
       {
         method: "POST",
+        headers,
         body: input,
       }
     )

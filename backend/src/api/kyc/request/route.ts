@@ -1,8 +1,9 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import KycModuleService from "../../../modules/kyc/service"
 import { KYC_MODULE } from "../../../modules/kyc"
 import { z } from "@medusajs/framework/zod"
 import { PostKycRequestSchema } from "../../middlewares"
+import { resolveActorEmail } from "../../../lib/accounts/resolve-actor-email"
 
 type Body = z.infer<typeof PostKycRequestSchema>
 
@@ -12,16 +13,17 @@ type Body = z.infer<typeof PostKycRequestSchema>
 // The profile is keyed by the signup identifier (email OR phone); the code
 // is sent to `destination` (the complementary identifier being verified).
 export const POST = async (
-  req: MedusaRequest<Body>,
+  req: AuthenticatedMedusaRequest<Body>,
   res: MedusaResponse
 ) => {
   const body = req.validatedBody
+  const email = await resolveActorEmail(req)
   const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
 
   const { code } = await kyc.requestOtp({
-    email: body.email,
+    email,
     channel: body.channel,
-    destination: body.destination,
+    destination: email,
   })
 
   res.status(201).json({ ok: true, code })

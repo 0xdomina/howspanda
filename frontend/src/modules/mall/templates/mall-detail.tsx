@@ -22,8 +22,6 @@ const statusLabel: Record<string, string> = {
   closed: "Closed",
 }
 
-const maskedEmail = (email: string) => email.replace(/^(.).+(@.*)$/, "$1•••$2")
-
 const MallCountdown = ({ expiresAt, status }: { expiresAt?: string | null; status: string }) => {
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
 
@@ -168,7 +166,7 @@ const MallDetailClient = ({
   const sellerCount = Number(mall.seller_count ?? sellers.length)
   const buyerCount = Number(mall.buyer_count ?? buyers.length)
   const paidOut = Number(mall.paid_out_ngn ?? prizes.filter((p: any) => p.claimed || p.wallet_ledger_id).reduce((sum: number, p: any) => sum + Number(p.amount_ngn ?? 0), 0))
-  const alreadyJoined = customerEmail ? buyers.some((buyer: any) => buyer.buyer_email === customerEmail) : false
+  const alreadyJoined = !!mall.viewer_joined
   const [joinMessage, setJoinMessage] = useState<string | null>(null)
   const [isJoining, startJoining] = useTransition()
   const shareUrl = useShareUrl()
@@ -249,7 +247,7 @@ const MallDetailClient = ({
             </section>
           )}
 
-          <section className="rounded-large border border-ink-hairline bg-paper-surface p-5"><h2 className="font-display text-lg font-medium text-ink">Prize winners</h2>{prizes.length ? <ul className="mt-3 divide-y divide-ink-hairline">{prizes.map((prize: any) => <li key={prize.id} className="flex items-center justify-between gap-2 py-2 text-sm"><span className="truncate text-ink-muted">{maskedEmail(prize.winner_buyer_email)}</span><span className="font-mono tabular-nums text-ink">{ngn(prize.amount_ngn)}</span><span className="text-xs text-emerald-700">{prize.claimed ? "Paid" : "Pending"}</span></li>)}</ul> : <p className="mt-2 text-sm text-ink-muted">Winners will appear here as prizes are drawn.</p>}</section>
+          <section className="rounded-large border border-ink-hairline bg-paper-surface p-5"><h2 className="font-display text-lg font-medium text-ink">Prize winners</h2>{mall.viewer_prize && <p className="mt-2 rounded-medium bg-emerald-50 p-3 text-sm text-emerald-800">You won {ngn(mall.viewer_prize.amount_ngn)}. It&apos;s been added to your wallet.</p>}{prizes.length ? <ul className="mt-3 divide-y divide-ink-hairline">{prizes.map((prize: any) => <li key={prize.id} className="flex items-center justify-between gap-2 py-2 text-sm"><span className="truncate text-ink-muted">{prize.winner_buyer_email}</span><span className="font-mono tabular-nums text-ink">{ngn(prize.amount_ngn)}</span><span className="text-xs text-emerald-700">{prize.claimed ? "Paid" : "Pending"}</span></li>)}</ul> : <p className="mt-2 text-sm text-ink-muted">Winners will appear here as prizes are drawn.</p>}</section>
         </aside>
       </div>
     </div>

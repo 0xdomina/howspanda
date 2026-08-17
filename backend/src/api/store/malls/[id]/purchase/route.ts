@@ -14,18 +14,12 @@ import { resolveActorEmail } from "../../../../../lib/accounts/resolve-actor-ema
 
 export const POST = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) => {
   const { id } = req.params as { id: string }
-  const body = req.validatedBody as { buyerEmail?: string; orderId: string }
-
-  // Signed-in buyers act as themselves (actor-derived email); guests use the
-  // order-matching email ownership flow.
-  let buyerEmail = body?.buyerEmail?.trim()
-  if (req.auth_context?.actor_id) {
-    buyerEmail = await resolveActorEmail(req)
-  }
+  const body = req.validatedBody as { orderId: string }
+  const buyerEmail = await resolveActorEmail(req)
   if (!buyerEmail || !body?.orderId) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "buyerEmail and orderId are required"
+      "orderId is required"
     )
   }
 
@@ -55,26 +49,28 @@ export const POST = async (req: AuthenticatedMedusaRequest, res: MedusaResponse)
     orderId: body.orderId,
   })
 
-  // If buyer won, credit their wallet and link the prize record to the ledger
-  if (result?.won) {
+  // If buyer won (or a previous request created the prize before a transient
+  // wallet failure), finish the reward exactly once. The wallet ledger uses
+  // the prize id as its idempotency reference.
+  const prizeRows = await mallService.listMallPrizes({
+    mall_id: id,
+    winner_buyer_email: buyerEmail,
+  })
+  const pendingPrize = prizeRows.find((prize: any) => !prize.wallet_ledger_id)
+  if (pendingPrize && (result?.won || prizeRows.length > 0)) {
     const buyerWalletService = req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
     const { ledger } = await buyerWalletService.credit({
       buyerEmail,
-      amount: result.prizeAmount,
+      amount: Number(pendingPrize.amount_ngn),
       source: "mall_prize",
-      reference: body.orderId,
+      reference: pendingPrize.id,
     })
-    const prizes = await mallService.listMallPrizes({
-      mall_id: id,
-      winner_buyer_email: buyerEmail,
+    await mallService.updateMallPrizes({
+      id: pendingPrize.id,
+      wallet_ledger_id: ledger.id,
+      claimed: true,
+      claimed_at: new Date(),
     })
-    if (prizes.length) {
-      await mallService.updateMallPrizes({
-        id: prizes[prizes.length - 1].id,
-        wallet_ledger_id: ledger.id,
-        claimed: true,
-      })
-    }
   }
 
   res.json({ result })

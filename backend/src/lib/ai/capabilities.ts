@@ -1,6 +1,5 @@
 import { z } from "zod"
-import { getModel } from "./model"
-import { generateObject, generateText } from "./sdk"
+import { runRoutedObject, runRoutedText } from "./router/router"
 
 export type AiUsageTokens = {
   inputTokens?: number
@@ -10,6 +9,7 @@ export type AiUsageTokens = {
 export type CapabilityOutput<T> = {
   result: T
   usage: AiUsageTokens
+  modelId?: string
 }
 
 // ---------- listing writer ----------
@@ -28,8 +28,8 @@ export async function generateListing(input: {
   notes: string
   category?: string
 }): Promise<CapabilityOutput<ListingResult>> {
-  const { object, usage } = await generateObject({
-    model: await getModel(),
+  const { result: object, usage, modelId } = await runRoutedObject<ListingResult>({
+    capability: "listing",
     schema: ListingResultSchema,
     system:
       "[capability:listing] You write compelling, honest e-commerce product " +
@@ -44,6 +44,7 @@ export async function generateListing(input: {
   return {
     result: object,
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    modelId,
   }
 }
 
@@ -73,8 +74,8 @@ export async function suggestPricing(input: {
   currency_code: string
   market: MarketPriceStats
 }): Promise<CapabilityOutput<PricingResult>> {
-  const { object, usage } = await generateObject({
-    model: await getModel(),
+  const { result: object, usage, modelId } = await runRoutedObject<PricingResult>({
+    capability: "pricing",
     schema: PricingResultSchema,
     system:
       "[capability:pricing] You are a pricing advisor for marketplace " +
@@ -94,6 +95,7 @@ export async function suggestPricing(input: {
   return {
     result: object,
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    modelId,
   }
 }
 
@@ -103,8 +105,8 @@ export async function answerInsightsQuestion(input: {
   question: string
   contextJson: string
 }): Promise<CapabilityOutput<string>> {
-  const { text, usage } = await generateText({
-    model: await getModel(),
+  const { result: text, usage, modelId } = await runRoutedText({
+    capability: "insights",
     system:
       "[capability:insights] You answer business questions for ONE " +
       "marketplace seller using ONLY the seller data provided in the " +
@@ -118,6 +120,7 @@ export async function answerInsightsQuestion(input: {
   return {
     result: text,
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    modelId,
   }
 }
 
@@ -126,8 +129,8 @@ export async function answerInsightsQuestion(input: {
 export async function writeAccountingDigest(input: {
   aggregatesJson: string
 }): Promise<CapabilityOutput<string>> {
-  const { text, usage } = await generateText({
-    model: await getModel(),
+  const { result: text, usage, modelId } = await runRoutedText({
+    capability: "accounting",
     system:
       "[capability:accounting] You explain a marketplace seller's earnings " +
       "in plain language: gross revenue, platform commission deducted, and " +
@@ -139,6 +142,7 @@ export async function writeAccountingDigest(input: {
   return {
     result: text,
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    modelId,
   }
 }
 
@@ -157,8 +161,8 @@ export async function coachMarketing(input: {
   tone?: string
   productsJson: string
 }): Promise<CapabilityOutput<MarketingResult>> {
-  const { object, usage } = await generateObject({
-    model: await getModel(),
+  const { result: object, usage, modelId } = await runRoutedObject<MarketingResult>({
+    capability: "marketing",
     schema: MarketingResultSchema,
     system:
       "[capability:marketing] You are a marketing coach for small " +
@@ -173,6 +177,7 @@ export async function coachMarketing(input: {
   return {
     result: object,
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    modelId,
   }
 }
 
@@ -182,8 +187,8 @@ export async function writeSellerBrief(input: {
   numbersJson: string
   opportunitiesJson: string
 }): Promise<CapabilityOutput<string>> {
-  const { text, usage } = await generateText({
-    model: await getModel(),
+  const { result: text, usage, modelId } = await runRoutedText({
+    capability: "brief",
     system:
       "[capability:brief] You write a short daily/weekly brief for ONE " +
       "marketplace seller using ONLY the deterministic numbers and " +
@@ -199,6 +204,7 @@ export async function writeSellerBrief(input: {
   return {
     result: text,
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    modelId,
   }
 }
 
@@ -219,8 +225,8 @@ export type RecommendationsResult = z.infer<typeof RecommendationsResultSchema>
 export async function explainRecommendations(input: {
   opportunitiesJson: string
 }): Promise<CapabilityOutput<RecommendationsResult>> {
-  const { object, usage } = await generateObject({
-    model: await getModel(),
+  const { result: object, usage, modelId } = await runRoutedObject<RecommendationsResult>({
+    capability: "recommendations",
     schema: RecommendationsResultSchema,
     system:
       "[capability:recommendations] You explain a list of rule-ranked " +
@@ -234,5 +240,6 @@ export async function explainRecommendations(input: {
   return {
     result: object,
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    modelId,
   }
 }

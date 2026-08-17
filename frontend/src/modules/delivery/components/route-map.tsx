@@ -69,20 +69,28 @@ const RouteMap = ({ points, height = 260 }: RouteMapProps) => {
           iconAnchor: [7, 7],
         })
 
+        const popup = (label: string) => {
+          const node = document.createElement("strong")
+          // Labels originate from user-entered addresses. Passing a DOM node
+          // keeps Leaflet from interpreting them as HTML.
+          node.textContent = label
+          return node
+        }
+
         leaflet
           .marker([pickup.lat, pickup.lng], {
             icon: pickupIcon,
             title: pickup.label ?? "Pickup",
           })
           .addTo(map)
-          .bindPopup(`<b>${pickup.label ?? "Pickup"}</b>`)
+          .bindPopup(popup(pickup.label ?? "Pickup"))
         leaflet
           .marker([destination.lat, destination.lng], {
             icon: destIcon,
             title: destination.label ?? "Destination",
           })
           .addTo(map)
-          .bindPopup(`<b>${destination.label ?? "Destination"}</b>`)
+          .bindPopup(popup(destination.label ?? "Destination"))
 
         if (valid.length === 2) {
           leaflet

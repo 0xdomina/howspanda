@@ -10,10 +10,10 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
   if (route === "geocode") {
     const address = String(req.query?.address ?? "")
-    if (!address.trim()) {
+    if (!address.trim() || address.trim().length > 200) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "address query param is required"
+        "Enter an address under 200 characters"
       )
     }
     const result = await geocodeAddress(address)
@@ -29,7 +29,14 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   if (route === "reverse") {
     const lat = Number(req.query?.lat)
     const lng = Number(req.query?.lng)
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180
+    ) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "lat and lng query params are required"

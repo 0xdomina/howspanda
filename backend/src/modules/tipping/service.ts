@@ -1,4 +1,5 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
+import { randomBytes } from "node:crypto"
 import Tip from "./models/tip"
 
 const round2 = (n: number) => Math.round(n * 100) / 100
@@ -128,7 +129,7 @@ class TippingModuleService extends MedusaService({ Tip }) {
   }
 
   private genCreditCode(): string {
-    return `CR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+    return `CR-${randomBytes(5).toString("hex").toUpperCase()}`
   }
 }
 

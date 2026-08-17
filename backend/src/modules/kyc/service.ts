@@ -524,11 +524,16 @@ class KycModuleService extends MedusaService({ KycProfile, KycOtp }) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Incorrect code")
     }
 
-    await this.updateKycOtps({
-      id: otp.id,
-      status: "used",
-      used_at: new Date(),
+    const consumed = await this.updateKycOtps({
+      selector: { id: otp.id, status: "active" },
+      data: { status: "used", used_at: new Date() },
     })
+    if (!consumed.length) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "This verification code has already been used"
+      )
+    }
 
     await this.updateKycProfiles({
       id: profile.id,

@@ -104,11 +104,18 @@ class AuthOtpModuleService extends MedusaService({ AuthOtp }) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Incorrect code")
     }
 
-    await this.updateAuthOtps({
-      id: otp.id,
-      status: "used",
-      used_at: new Date(),
+    // Consume with a conditional update. Two concurrent requests presenting
+    // the same code must not both be able to pass the read-then-write window.
+    const consumed = await this.updateAuthOtps({
+      selector: { id: otp.id, status: "active" },
+      data: { status: "used", used_at: new Date() },
     })
+    if (!consumed.length) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "This verification code has already been used"
+      )
+    }
 
     return { ok: true }
   }
