@@ -10,6 +10,7 @@ import {
 } from "@lib/data/seller"
 import { encodeProductImage } from "@lib/media/image"
 import { uploadSellerMedia } from "@lib/data/seller-media"
+import RedeemableCard from "@modules/redeemables/components/redeemable-card"
 
 const money = (amount: number | string | null | undefined) => {
   const value = Number(amount ?? 0)
@@ -34,34 +35,6 @@ const designGradients: Record<string, string> = {
   candy: "linear-gradient(135deg,#db2777,#c084fc)",
   cobalt: "linear-gradient(135deg,#2563eb,#22d3ee)",
 }
-
-const RedeemablePreview = ({
-  type,
-  title,
-  message,
-  design,
-  image,
-  accentColor,
-  value,
-}: {
-  type: string
-  title: string
-  message: string
-  design: string
-  image: string
-  accentColor: string
-  value: string
-}) => (
-  <div className="relative min-h-[210px] overflow-hidden rounded-large p-5 text-white shadow-sm" style={{ background: designGradients[design] ?? designGradients.sunset }}>
-    {image && <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
-    <div className="absolute inset-0 bg-black/10" />
-    <div className="relative flex min-h-[170px] flex-col justify-between">
-      <div className="flex items-center justify-between"><span className="text-xs font-medium uppercase tracking-[0.16em] text-white/80">{typeLabel(type)}</span><span className="text-2xl">✦</span></div>
-      <div><h4 className="font-display text-2xl font-medium">{title || "Your title"}</h4><p className="mt-2 max-w-[250px] text-sm text-white/80">{message || "Add a message people will want to keep."}</p></div>
-      <div className="flex items-end justify-between"><span className="text-lg font-semibold">{value || "₦0"}</span><span className="rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: accentColor }}>Ready to share</span></div>
-    </div>
-  </div>
-)
 
 const RedeemInStore = () => {
   const [code, setCode] = useState("")
@@ -138,6 +111,11 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
   const [backgroundImage, setBackgroundImage] = useState("")
   const [accentColor, setAccentColor] = useState("#ef4444")
   const [message, setMessage] = useState("")
+  const [eventName, setEventName] = useState("")
+  const [venueName, setVenueName] = useState("")
+  const [venueAddress, setVenueAddress] = useState("")
+  const [eventStartsAt, setEventStartsAt] = useState("")
+  const [eventEndsAt, setEventEndsAt] = useState("")
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -188,6 +166,11 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
       }
     }
 
+    if (type === "ticket" && eventStartsAt && eventEndsAt && new Date(eventEndsAt) <= new Date(eventStartsAt)) {
+      setError("The ticket end time must be after its start time.")
+      return
+    }
+
     startTransition(async () => {
       const res = await createSellerRedeemable({
         type,
@@ -197,6 +180,11 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
         background_image: backgroundImage || undefined,
         accent_color: accentColor,
         message: message.trim() || undefined,
+        event_name: type === "ticket" ? eventName.trim() || undefined : undefined,
+        venue_name: type === "ticket" ? venueName.trim() || undefined : undefined,
+        venue_address: type === "ticket" ? venueAddress.trim() || undefined : undefined,
+        event_starts_at: type === "ticket" ? eventStartsAt || undefined : undefined,
+        event_ends_at: type === "ticket" ? eventEndsAt || undefined : undefined,
         face_value: type === "voucher" ? undefined : Number(faceValue),
         discount_type: type === "voucher" ? discountType : undefined,
         discount_value: type === "voucher" ? Number(discountValue) : undefined,
@@ -213,6 +201,11 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
         setExpires("")
         setQuantity("1")
         setMessage("")
+        setEventName("")
+        setVenueName("")
+        setVenueAddress("")
+        setEventStartsAt("")
+        setEventEndsAt("")
         setBackgroundImage("")
         onCreated(res.code ?? "")
       } else {
@@ -301,6 +294,23 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
           />
         </div>
       )}
+      {type === "ticket" && (
+        <div className="space-y-3 rounded-medium border border-ink-hairline bg-white/40 p-3">
+          <div>
+            <p className="text-sm font-medium text-ink">Make the pass useful at the door</p>
+            <p className="mt-1 text-xs leading-5 text-ink-muted">Add the event, place, and time so the recipient can arrive with confidence.</p>
+          </div>
+          <input value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="Event or experience name" className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink" />
+          <div className="grid gap-3 small:grid-cols-2">
+            <input value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="Venue or place" className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink" />
+            <input value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)} placeholder="Address (optional)" className="w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink" />
+          </div>
+          <div className="grid gap-3 small:grid-cols-2">
+            <label className="text-xs text-ink-muted">Starts<input type="datetime-local" value={eventStartsAt} onChange={(e) => setEventStartsAt(e.target.value)} className="mt-1 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink" /></label>
+            <label className="text-xs text-ink-muted">Ends (optional)<input type="datetime-local" value={eventEndsAt} onChange={(e) => setEventEndsAt(e.target.value)} className="mt-1 w-full rounded-medium border border-ink-hairline px-3 py-2 text-sm text-ink outline-none focus:border-ink" /></label>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs text-ink-muted">Issue to email (optional)</label>
@@ -343,7 +353,7 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
         {isPending ? "Creating…" : `Create ${typeLabel(type).toLowerCase()}${quantity !== "1" ? "s" : ""}`}
       </button>
       </div>
-      <div className="large:sticky large:top-6 large:self-start"><p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-ink-muted">Live preview</p><RedeemablePreview type={type} title={title} message={message} design={design} image={backgroundImage} accentColor={accentColor} value={type === "voucher" ? (discountValue ? `${discountType === "percent" ? `${discountValue}% off` : `₦${discountValue} off`}` : "") : faceValue ? `₦${faceValue}` : ""} /></div>
+      <div className="large:sticky large:top-6 large:self-start"><p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-ink-muted">What buyers receive</p><RedeemableCard type={type} title={title} message={message} design={design} image={backgroundImage} accentColor={accentColor} faceValue={type === "voucher" ? undefined : faceValue} discountType={discountType} discountValue={type === "voucher" ? discountValue : undefined} eventName={eventName} venueName={venueName} venueAddress={venueAddress} eventStartsAt={eventStartsAt} eventEndsAt={eventEndsAt} mode="preview" /></div>
     </div>
   )
 }

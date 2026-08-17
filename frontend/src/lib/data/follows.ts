@@ -46,6 +46,11 @@ export type StoreProfile = {
     background_image?: string | null
     accent_color?: string | null
     message?: string | null
+    event_name?: string | null
+    venue_name?: string | null
+    venue_address?: string | null
+    event_starts_at?: string | null
+    event_ends_at?: string | null
     price?: number | string | null
     face_value?: number | string | null
     balance?: number | string | null

@@ -534,6 +534,11 @@ export type SellerRedeemable = {
   background_image?: string | null
   accent_color?: string | null
   message?: string | null
+  event_name?: string | null
+  venue_name?: string | null
+  venue_address?: string | null
+  event_starts_at?: string | null
+  event_ends_at?: string | null
   face_value?: number | string | null
   balance?: number | string | null
   discount_type?: string | null
@@ -577,6 +582,11 @@ export const createSellerRedeemable = async (
     background_image?: string | null
     accent_color?: string | null
     message?: string | null
+    event_name?: string | null
+    venue_name?: string | null
+    venue_address?: string | null
+    event_starts_at?: string
+    event_ends_at?: string
     face_value?: number
     discount_type?: "fixed" | "percent"
     discount_value?: number
@@ -602,6 +612,11 @@ export const createSellerRedeemable = async (
           background_image: body.background_image,
           accent_color: body.accent_color,
           message: body.message,
+          event_name: body.event_name,
+          venue_name: body.venue_name,
+          venue_address: body.venue_address,
+          event_starts_at: body.event_starts_at || undefined,
+          event_ends_at: body.event_ends_at || undefined,
           price: body.price,
           face_value: body.face_value,
           discount_type: body.discount_type,

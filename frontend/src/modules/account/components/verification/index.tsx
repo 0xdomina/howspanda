@@ -5,12 +5,10 @@ import { useMemo, useState, useTransition } from "react"
 import { NIGERIAN_BANKS, bankNameToCode } from "@lib/data/banks"
 import { reverseGeocode } from "@lib/data/delivery"
 import {
-  requestKycOtp,
-  verifyKycOtp,
-  submitKycIdentity,
   type KycFeatures,
   type KycProfileView,
 } from "@lib/data/kyc"
+import { requestKycOtp, verifyKycOtp, submitKycIdentity } from "@lib/data/kyc-actions"
 import { saveMyKycProfile } from "@lib/data/kyc-profile"
 import { addWithdrawalAccount } from "@lib/data/wallet"
 import {

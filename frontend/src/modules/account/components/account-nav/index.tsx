@@ -51,6 +51,19 @@ const AccountNav = ({
               <ul>
                 <li>
                   <LocalizedClientLink
+                    href="/account/redeemables"
+                    className="flex items-center justify-between py-4 border-b border-ink-hairline px-8"
+                    data-testid="redeemables-link"
+                  >
+                    <div className="flex items-center gap-x-2">
+                      <span aria-hidden="true">✦</span>
+                      <span>Gift cards & passes</span>
+                    </div>
+                    <ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                <li>
+                  <LocalizedClientLink
                     href="/account/profile"
                     className="flex items-center justify-between py-4 border-b border-ink-hairline px-8"
                     data-testid="profile-link"
@@ -175,6 +188,15 @@ const AccountNav = ({
                   data-testid="overview-link"
                 >
                   Overview
+                </AccountNavLink>
+              </li>
+              <li>
+                <AccountNavLink
+                  href="/account/redeemables"
+                  route={route!}
+                  data-testid="redeemables-link"
+                >
+                  Gift cards & passes
                 </AccountNavLink>
               </li>
               <li>

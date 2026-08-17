@@ -456,6 +456,11 @@ export const PostSellerRedeemableSchema = z.object({
   background_image: z.string().url().nullable().optional(),
   accent_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   message: z.string().max(180).nullable().optional(),
+  event_name: z.string().trim().max(160).nullable().optional(),
+  venue_name: z.string().trim().max(160).nullable().optional(),
+  venue_address: z.string().trim().max(300).nullable().optional(),
+  event_starts_at: z.coerce.date().nullable().optional(),
+  event_ends_at: z.coerce.date().nullable().optional(),
   face_value: z.number().positive().optional(),
   discount_type: z.enum(["fixed", "percent"]).optional(),
   discount_value: z.number().positive().optional(),
@@ -1182,6 +1187,11 @@ export default defineMiddlewares({
       matcher: "/sellers/redeemables/redeem",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostRedeemInStoreSchema)],
+    },
+    {
+      matcher: "/store/redeemables/mine",
+      methods: ["GET"],
+      middlewares: [authenticate("customer", ["session", "bearer"])],
     },
     {
       matcher: "/store/carts/:id/apply-redeemable",

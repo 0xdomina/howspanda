@@ -5,15 +5,9 @@ import ShareButton from "@modules/common/components/share-button"
 import { getStoreProfile } from "@lib/data/follows"
 import FollowButton from "@modules/store/components/follow-button"
 import { getBaseURL } from "@lib/util/env"
+import RedeemableCard from "@modules/redeemables/components/redeemable-card"
 
-const money = (value: number | string | null | undefined) =>
-  new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0,
-  }).format(Number(value ?? 0))
-
-const visualFor = (type: string, variant?: string) => {
+const visualFor = (variant?: string) => {
   const defaults: Record<string, string> = {
     sunset: "linear-gradient(135deg,#ef4444,#f59e0b)",
     midnight: "linear-gradient(135deg,#111827,#4338ca)",
@@ -21,7 +15,7 @@ const visualFor = (type: string, variant?: string) => {
     candy: "linear-gradient(135deg,#db2777,#c084fc)",
     cobalt: "linear-gradient(135deg,#2563eb,#22d3ee)",
   }
-  return defaults[variant ?? ""] ?? (type === "ticket" ? defaults.cobalt : type === "voucher" ? defaults.mint : defaults.sunset)
+  return defaults[variant ?? ""] ?? defaults.sunset
 }
 
 export async function generateMetadata({
@@ -76,7 +70,7 @@ export default async function StorePage({
     <div className="figma-container flex flex-col gap-12 py-10 small:py-16">
       {/* Store header */}
       <section className="glass-panel relative overflow-hidden rounded-control p-6 small:p-8" style={{ borderColor: `${seller.accent_color ?? "#ef4444"}33` }}>
-        <div className="absolute inset-x-0 top-0 h-28 opacity-90" style={{ background: visualFor("store", seller.theme) }} />
+        <div className="absolute inset-x-0 top-0 h-28 opacity-90" style={{ background: visualFor(seller.theme) }} />
         {seller.cover_image && <img src={seller.cover_image} alt="" className="absolute inset-x-0 top-0 h-28 w-full object-cover opacity-70" />}
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-transparent to-white/90" />
         <div className="relative flex flex-col gap-6 pt-10 small:flex-row small:items-end small:justify-between">
@@ -175,15 +169,29 @@ export default async function StorePage({
           </div>
           <div className="grid gap-4 small:grid-cols-2 large:grid-cols-3">
             {profile.redeemables.map((item) => (
-              <div key={item.id} className="group relative overflow-hidden rounded-control p-5 text-white shadow-sm transition-transform hover:-translate-y-1" style={{ background: visualFor(item.type, item.design_variant), borderColor: item.accent_color ?? undefined }}>
-                {item.background_image && <img src={item.background_image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
-                <div className="absolute inset-0 bg-black/10" />
-                <div className="relative">
-                  <div className="flex items-center justify-between"><span className="text-xs font-medium uppercase tracking-[0.16em] text-white/80">{item.type === "gift_card" ? "Gift card" : item.type === "voucher" ? "Voucher" : "Ticket"}</span><span className="text-xl">✦</span></div>
-                  <h3 className="mt-8 font-display text-xl font-medium">{item.title}</h3>
-                  {item.message && <p className="mt-2 line-clamp-2 text-sm text-white/80">{item.message}</p>}
-                  <div className="mt-7 flex items-end justify-between gap-3"><div><p className="text-xs text-white/70">{item.type === "voucher" ? `${item.discount_type === "percent" ? `${item.discount_value}% off` : `${money(item.discount_value)} off`}` : `${money(item.face_value)} value`}</p><p className="mt-1 text-lg font-semibold">{money(item.price)}</p></div>{item.product_handle && <LocalizedClientLink href={`/products/${item.product_handle}`} className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-ink">Shop now</LocalizedClientLink>}</div>
-                </div>
+              <div key={item.id}>
+                <RedeemableCard
+                  type={item.type}
+                  title={item.title}
+                  message={item.message}
+                  design={item.design_variant}
+                  image={item.background_image}
+                  accentColor={item.accent_color}
+                  faceValue={item.face_value}
+                  discountType={item.discount_type}
+                  discountValue={item.discount_value}
+                  price={item.price}
+                  eventName={item.event_name}
+                  venueName={item.venue_name}
+                  venueAddress={item.venue_address}
+                  eventStartsAt={item.event_starts_at}
+                  eventEndsAt={item.event_ends_at}
+                  expiresAt={item.expires_at}
+                  storeName={seller.name}
+                  storeLogo={seller.logo}
+                  mode="listing"
+                />
+                {item.product_handle && <LocalizedClientLink href={`/products/${item.product_handle}`} className="mt-2 block text-center text-sm font-semibold text-ink hover:underline">Get this {item.type === "ticket" ? "pass" : item.type.replace("_", " ")}</LocalizedClientLink>}
               </div>
             ))}
           </div>

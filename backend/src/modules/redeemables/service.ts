@@ -13,6 +13,11 @@ export type MintInput = {
   background_image?: string | null
   accent_color?: string | null
   message?: string | null
+  event_name?: string | null
+  venue_name?: string | null
+  venue_address?: string | null
+  event_starts_at?: Date | null
+  event_ends_at?: Date | null
   currency_code?: string
   face_value?: number
   discount_type?: "fixed" | "percent"
@@ -83,6 +88,18 @@ class RedeemablesModuleService extends MedusaService({
       )
     }
 
+    if (
+      input.type === "ticket" &&
+      input.event_starts_at &&
+      input.event_ends_at &&
+      input.event_ends_at <= input.event_starts_at
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "A ticket end time must be after its start time"
+      )
+    }
+
     const rows = Array.from({ length: quantity }, () => ({
       seller_id: input.seller_id,
       type: input.type,
@@ -93,6 +110,11 @@ class RedeemablesModuleService extends MedusaService({
       background_image: input.background_image ?? null,
       accent_color: input.accent_color ?? null,
       message: input.message ?? null,
+      event_name: input.event_name ?? null,
+      venue_name: input.venue_name ?? null,
+      venue_address: input.venue_address ?? null,
+      event_starts_at: input.event_starts_at ?? null,
+      event_ends_at: input.event_ends_at ?? null,
       face_value: input.face_value ?? null,
       balance: input.type === "gift_card" ? input.face_value : null,
       discount_type: input.discount_type ?? null,
@@ -100,7 +122,7 @@ class RedeemablesModuleService extends MedusaService({
       price: input.price ?? null,
       product_id: input.product_id ?? null,
       expires_at: input.expires_at ?? null,
-      issued_to_email: input.issued_to_email ?? null,
+      issued_to_email: input.issued_to_email?.trim().toLowerCase() ?? null,
       source_order_id: input.source_order_id ?? null,
     }))
     return await this.createRedeemables(rows)
@@ -121,6 +143,11 @@ class RedeemablesModuleService extends MedusaService({
         background_image: template.background_image,
         accent_color: template.accent_color,
         message: template.message,
+        event_name: template.event_name,
+        venue_name: template.venue_name,
+        venue_address: template.venue_address,
+        event_starts_at: template.event_starts_at,
+        event_ends_at: template.event_ends_at,
         currency_code: template.currency_code,
         face_value: template.face_value
           ? Number(template.face_value)
