@@ -391,8 +391,19 @@ export const PostBankProofSchema = z.object({
     .trim()
     .max(500)
     .refine((value) => {
-      if (/^\/uploads\/proof\/[\w.-]+$/.test(value)) return true
-      if (/^private:\/\/[a-zA-Z0-9/_-]+\.(?:png|jpe?g|webp)$/i.test(value)) return true
+      // Production proofs must come from the private proof bucket. Local disk
+      // paths are development-only, and public product-media URLs must never
+      // be accepted for a payment proof.
+      if (
+        process.env.NODE_ENV !== "production" &&
+        /^\/uploads\/proof\/[\w.-]+$/.test(value)
+      ) return true
+      if (
+        /^private:\/\/[a-zA-Z0-9/_-]+\.(?:png|jpe?g|webp|gif|avif)$/i.test(
+          value
+        )
+      ) return true
+      if (process.env.NODE_ENV === "production") return false
       if (!process.env.S3_URL) return false
       try {
         const candidate = new URL(value)
@@ -408,7 +419,10 @@ export const PostBankProofSchema = z.object({
       }
     }, "Invalid proof upload")
     .optional(),
-  amount: z.number().positive().optional(),
+  // This is a buyer claim for the seller to compare with the bank ledger; it
+  // is never used to mark an order paid. Keep it bounded so malformed values
+  // cannot pollute payment records or seller dashboards.
+  amount: z.number().positive().max(1_000_000_000_000).optional(),
   note: z.string().trim().min(1).max(500).optional(),
 })
 

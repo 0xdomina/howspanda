@@ -20,10 +20,13 @@ Seller workspace: sellers and permitted store staff use the storefront's **Manag
 
 ## Production deployment
 
-Topology: **frontend → Vercel · backend → Pandastack · media → Backblaze B2**. The
-complete, annotated variable list lives in `.env.deploy.example` (copy to
-`.env.deploy`, never committed) — backend vars go on Pandastack, frontend vars
-in Vercel → Project → Settings → Environment Variables.
+Topology: **storefront + Manage Business → Vercel · API/worker → Out Plane ·
+Postgres → Neon · Valkey/Redis → Aiven · media → Backblaze B2**. The optional
+Medusa Operations Console is built as a second Vercel project from `backend/`.
+The complete, annotated variable list and free-tier release lane live in
+[`docs/DEPLOYMENT_FREE_TIER_LANE.md`](docs/DEPLOYMENT_FREE_TIER_LANE.md).
+Copy `.env.deploy.example` to `.env.deploy` locally, never commit it, and put
+backend secrets only on Out Plane.
 
 - **Media (Backblaze B2).** B2 speaks the S3 API, so the backend registers the
   official `@medusajs/file-s3` provider when `S3_BUCKET` + `S3_ACCESS_KEY_ID` +
@@ -41,13 +44,18 @@ in Vercel → Project → Settings → Environment Variables.
   action goes through the backend store routes, which own the password gate,
   the spend ledger and the reconcile sweeps.
 - **Runtime requirement.** The current Circle developer-controlled wallet SDK
-  requires Node.js 22 or newer. Keep the Pandastack backend on Node 22+ and
+  requires Node.js 22 or newer. Keep the Out Plane backend on Node 22+ and
   run the forward-only wallet-spend migration before enabling live payouts.
 - **Go-live checklist.** `JWT_SECRET`/`COOKIE_SECRET` must be non-default (the
   config refuses to boot in production otherwise); set `PAYOUT_SCHEDULE_ENABLED=true`
   when payout crons should run; point `STORE_CORS`/`AUTH_CORS` at the Vercel
   domain(s); `CRYPTO_NETWORK_ENV=mainnet` flips every wallet to production
   chains (a pure env switch).
+
+- **AI routing and user journey.** How's U uses a commerce-specific, backend-
+  owned router rather than exposing coding agents or provider names to users.
+  The capability boundaries, model classes, quotas, and buyer/seller/courier
+  onboarding are documented in [`docs/AI_COMMERCE_HARNESS.md`](docs/AI_COMMERCE_HARNESS.md).
 
 ## Marketplace API (Phase 2)
 

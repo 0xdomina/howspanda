@@ -49,6 +49,16 @@ if (isProduction) {
 }
 
 module.exports = defineConfig({
+  // The operations console can remain mounted at /app on the API service, or
+  // be built as a static, separate Vercel project with MEDUSA_ADMIN_PATH=/.
+  // Keep the backend URL explicit when the console has its own origin so its
+  // browser requests still target the Out Plane API.
+  admin: {
+    path: (process.env.MEDUSA_ADMIN_PATH || "/app") as `/${string}`,
+    ...(process.env.MEDUSA_ADMIN_BACKEND_URL
+      ? { backendUrl: process.env.MEDUSA_ADMIN_BACKEND_URL }
+      : {}),
+  },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     redisUrl: process.env.REDIS_URL,

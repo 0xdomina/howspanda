@@ -69,11 +69,16 @@ const SellerBankTransfer = ({
           </p>
         </div>
 
-        {bt.note && (
+        {bt.buyer_note && (
           <p className="text-xs text-ink-muted">
-            Buyer&apos;s note: “{bt.note}”
+            Buyer&apos;s note: “{bt.buyer_note}”
           </p>
         )}
+
+        <p className="rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+          Confirm only after the money appears in the store&apos;s bank account.
+          A screenshot or buyer-entered amount is not proof of funds.
+        </p>
 
         {bt.proof_url && (
           <img
@@ -102,9 +107,15 @@ const SellerBankTransfer = ({
             <button
               type="button"
               disabled={isPending}
-              onClick={() =>
-                run(() => confirmBankTransfer(order.id), "Transfer confirmed.")
-              }
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Have you checked the store bank account and seen this transfer arrive? Only confirm money that is actually received."
+                  )
+                ) {
+                  run(() => confirmBankTransfer(order.id), "Transfer confirmed.")
+                }
+              }}
               className="rounded-medium bg-ink px-4 py-1.5 text-sm font-medium text-white hover:opacity-80 disabled:opacity-50"
               data-testid="confirm-bank-proof"
             >
@@ -152,6 +163,9 @@ const SellerBankTransfer = ({
                   type="button"
                   disabled={isPending}
                   onClick={() =>
+                    window.confirm(
+                      "Have you checked the store bank account and seen this transfer arrive? Only confirm money that is actually received."
+                    ) &&
                     run(
                       () => confirmBankTransfer(order.id),
                       "Transfer confirmed."

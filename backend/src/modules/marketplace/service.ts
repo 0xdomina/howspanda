@@ -456,15 +456,28 @@ class MarketplaceModuleService extends MedusaService({
     if (existing) {
       return existing
     }
-    return this.createPaymentProofs({
-      order_id: input.orderId,
-      seller_id: input.sellerId,
-      buyer_email: input.buyerEmail,
-      reference: input.reference,
-      currency_code: input.currencyCode ?? "ngn",
-      bank: input.bank,
-      status: "awaiting_proof" as const,
-    })
+    try {
+      return await this.createPaymentProofs({
+        order_id: input.orderId,
+        seller_id: input.sellerId,
+        buyer_email: input.buyerEmail,
+        reference: input.reference,
+        currency_code: input.currencyCode ?? "ngn",
+        bank: input.bank,
+        status: "awaiting_proof" as const,
+      })
+    } catch (error) {
+      // A repeated completion request can race the initial existence check.
+      // The database uniqueness guard is authoritative; re-read its winner so
+      // the client gets the same proof instead of a duplicate or a false
+      // checkout failure.
+      const concurrent = await this.bankTransferForOrder(
+        input.orderId,
+        input.sellerId
+      )
+      if (concurrent) return concurrent
+      throw error
+    }
   }
 
   /** Buyer uploads proof. Re-submission is allowed from `rejected` (recheck

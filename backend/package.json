@@ -14,6 +14,7 @@
   ],
   "scripts": {
     "build": "medusa build",
+    "build:admin": "medusa build --admin-only",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "seed:accounts": "medusa exec ./src/scripts/seed-test-accounts.ts",
     "seed:collections": "medusa exec ./src/scripts/seed-collections.ts",

@@ -200,8 +200,16 @@ export async function upgradeCustomerToSeller(
 
     revalidateTag(await getSellerCacheTag("seller"), "max")
     revalidateTag(await getCacheTag("customers"), "max")
-    return null
+    // Seller access is additive to the current customer session. Land the
+    // user directly in the workspace instead of making them sign in again or
+    // search for the new Manage Business entry point.
+    redirect("/seller")
   } catch (error: any) {
+    // Next's redirect is implemented as a control-flow exception. Do not turn
+    // the successful post-setup navigation into a form error.
+    if (typeof error?.digest === "string" && error.digest.startsWith("NEXT_REDIRECT")) {
+      throw error
+    }
     return error?.message ?? error?.toString?.() ?? String(error)
   }
 }

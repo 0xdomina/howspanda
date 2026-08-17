@@ -159,7 +159,7 @@ const CourierDashboard = ({
           <p className="mt-1 text-sm font-medium text-ink">{kycLevel}</p>
           <p className="mt-1 text-xs text-ink-muted">
             {active
-              ? "Courierhood is active."
+              ? "Courier access is active."
               : "Verify your ID to activate courier features."}
           </p>
         </div>
@@ -245,7 +245,7 @@ const CourierDashboard = ({
         </div>
       ) : (
         <div className="rounded-large border border-amber-300 bg-amber-50 p-4">
-          <h2 className="font-display text-lg font-medium text-amber-900">Verify your ID to activate courierhood</h2>
+          <h2 className="font-display text-lg font-medium text-amber-900">Verify your ID to unlock courier access</h2>
           <p className="mt-1 text-sm text-amber-800">
             Upload a clear ID card photo from your Profile. A verified identity
             unlocks courier applications and offers.
