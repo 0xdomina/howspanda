@@ -56,3 +56,6 @@ dump.rdb
 /blob-report/
 /playwright/.cache/
 /playwright/.auth
+
+.vercel
+.env*.local

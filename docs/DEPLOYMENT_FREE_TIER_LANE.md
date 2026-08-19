@@ -11,7 +11,7 @@ Buyer / seller browser
         |
         +--> Vercel project 1: Next.js storefront + Manage Business
         |        |
-        |        +--> Out Plane: Medusa API + worker jobs
+        |        +--> PandaStack: Medusa API + worker jobs
         |                     |
         |                     +--> Neon: PostgreSQL
         |                     +--> Aiven: Valkey/Redis
@@ -19,7 +19,7 @@ Buyer / seller browser
         |                     +--> Backblaze B2: private payment proofs
         |
         +--> optional Vercel project 2: Medusa Operations Console
-                 (static admin build, calls the same Out Plane API)
+                 (static admin build, calls the same PandaStack API)
 ```
 
 The seller-facing “Manage Business” area is part of the storefront. It is the
@@ -56,7 +56,7 @@ The repository includes `backend/vercel.json` and the `build:admin` script for
 this project. The normal backend still serves `/app` unless the separate build
 overrides the path.
 
-### Out Plane — API and worker
+### PandaStack — API and worker
 
 - Root directory: `backend`
 - Node.js: 22.12 or newer
@@ -64,7 +64,9 @@ overrides the path.
 - Listen on `0.0.0.0` and the port supplied by the platform.
 - Keep the Medusa API and scheduled worker jobs on the same service for the
   beta, or use a second small process once scheduled work grows.
-- Put all backend variables from `.env.deploy.example` here.
+- Put all backend variables from `.env.deploy.example` in PandaStack's encrypted
+  environment settings. The PandaStack control-plane token is deployment-only
+  and must never be passed to the Medusa runtime or the browser.
 - Connect the deploy to the `dev` branch first; promote to `main` only after
   the smoke suite below passes.
 
@@ -98,7 +100,7 @@ untrusted media and are sniffed server-side; SVG/HTML are not accepted.
 
 This lane is cost-conscious, not a guarantee of unlimited capacity. Medusa's
 general deployment guidance calls for at least 2 GB RAM for a comfortable
-server/worker process. Out Plane's free starting operation is much smaller, so
+server/worker process. PandaStack's free container is scale-to-zero, so
 the beta must be protected by bounded uploads, request rate limits, short cache
 TTLs, paginated seller lists, and no unbounded synchronous AI work.
 
@@ -119,7 +121,7 @@ remain on Vercel while those limits are increased independently.
 ## Release and rollback lane
 
 1. Work on a feature branch.
-2. Merge to `dev`; Vercel creates a preview and Out Plane deploys the beta
+2. Merge to `dev`; Vercel creates a preview and PandaStack deploys the beta
    environment.
 3. Run the frontend build, backend build, migration dry-run/preflight, and the
    smoke flow: sign in, browse, add to cart, checkout, submit bank proof, seller
@@ -159,8 +161,8 @@ the payment state.
 
 ## Reference limits
 
-- [Out Plane pricing](https://outplane.com/pricing)
-- [Out Plane deployment quick start](https://docs.outplane.com/docs/console/quick-start)
+- [PandaStack API reference](https://docs.pandastack.io/api)
+- [PandaStack deployment quick start](https://docs.pandastack.io/start/quickstart)
 - [Neon pricing](https://neon.com/pricing)
 - [Aiven Valkey free tier](https://aiven.io/docs/products/valkey/concepts/valkey-free-tier)
 - [Backblaze B2 pricing](https://www.backblaze.com/cloud-storage/pricing)
