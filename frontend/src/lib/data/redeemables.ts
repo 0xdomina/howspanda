@@ -6,7 +6,8 @@ import { getAuthHeaders } from "@lib/data/cookies"
 export type OwnedRedeemable = {
   id: string
   seller_id: string
-  type: "gift_card" | "voucher" | "ticket"
+  type: "gift_card" | "voucher" | "ticket" | "product_gift"
+  product_id?: string | null
   code: string
   status: string
   title: string

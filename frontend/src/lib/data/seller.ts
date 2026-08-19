@@ -525,7 +525,7 @@ export const createSellerReferral = async (
 
 export type SellerRedeemable = {
   id: string
-  type: "gift_card" | "voucher" | "ticket"
+  type: "gift_card" | "voucher" | "ticket" | "product_gift"
   code: string
   status?: string
   currency_code?: string
@@ -576,7 +576,7 @@ export const listSellerRedeemables = async (
 
 export const createSellerRedeemable = async (
   body: {
-    type: "gift_card" | "voucher" | "ticket"
+    type: "gift_card" | "voucher" | "ticket" | "product_gift"
     title: string
     design_variant?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
     background_image?: string | null

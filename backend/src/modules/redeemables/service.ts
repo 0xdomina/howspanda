@@ -3,7 +3,7 @@ import { MedusaError, MedusaService } from "@medusajs/framework/utils"
 import Redeemable from "./models/redeemable"
 import Redemption from "./models/redemption"
 
-export type RedeemableType = "gift_card" | "voucher" | "ticket"
+export type RedeemableType = "gift_card" | "voucher" | "ticket" | "product_gift"
 
 export type MintInput = {
   seller_id: string
@@ -35,6 +35,7 @@ const CODE_PREFIX: Record<RedeemableType, string> = {
   gift_card: "GC",
   voucher: "VC",
   ticket: "TK",
+  product_gift: "PG",
 }
 
 function generateCode(type: RedeemableType): string {
@@ -84,7 +85,14 @@ class RedeemablesModuleService extends MedusaService({
     } else if (!input.face_value || input.face_value <= 0) {
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
-        `${input.type === "gift_card" ? "Gift cards" : "Tickets"} need a positive face_value`
+        `${input.type === "gift_card" ? "Gift cards" : input.type === "product_gift" ? "Product gifts" : "Tickets"} need a positive face_value`
+      )
+    }
+
+    if (input.type === "product_gift" && !input.product_id) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "A product gift needs a product"
       )
     }
 
@@ -204,10 +212,10 @@ class RedeemablesModuleService extends MedusaService({
     redeemable: { type: string; balance?: unknown; discount_type?: string | null; discount_value?: number | null },
     total: number
   ): number {
-    if (redeemable.type === "ticket") {
+    if (redeemable.type === "ticket" || redeemable.type === "product_gift") {
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
-        "Tickets are redeemed at the venue — show the code or QR at the door"
+        "This pass is redeemed in-store — show the code to the store team"
       )
     }
     if (redeemable.type === "gift_card") {
@@ -287,7 +295,7 @@ class RedeemablesModuleService extends MedusaService({
         )
       }
       amount = opts.amount
-    } else if (redeemable.type === "ticket") {
+    } else if (redeemable.type === "ticket" || redeemable.type === "product_gift") {
       amount = Number(redeemable.face_value)
     } else {
       amount =

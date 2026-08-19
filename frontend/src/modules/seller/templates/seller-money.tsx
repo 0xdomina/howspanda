@@ -7,6 +7,8 @@ import {
   createPayoutAccount,
   requestSellerPayout,
   giveSellerTip,
+  type SellerProduct,
+  type SellerRedeemable,
   type SellerTip,
 } from "@lib/data/seller"
 
@@ -403,23 +405,37 @@ const CommissionsCard = ({ commissions }: { commissions: any }) => {
   )
 }
 
-const TipsCard = ({ tips, summary }: { tips: SellerTip[]; summary: any }) => {
+const TipsCard = ({ tips, summary, products, redeemables }: { tips: SellerTip[]; summary: any; products: SellerProduct[]; redeemables: SellerRedeemable[] }) => {
+  const [giftType, setGiftType] = useState<"cash" | "redeemable" | "product">("cash")
   const [buyerEmail, setBuyerEmail] = useState("")
   const [amount, setAmount] = useState("")
   const [code, setCode] = useState("")
+  const [productId, setProductId] = useState("")
   const [note, setNote] = useState("")
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const send = () => startTransition(async () => {
     setMessage(null)
-    const result = await giveSellerTip({ buyer_email: buyerEmail, amount: amount ? Number(amount) : undefined, redeemable_code: code || undefined, note: note || undefined })
-    if (result.success) { setBuyerEmail(""); setAmount(""); setCode(""); setNote(""); setMessage("Thank-you sent.") } else setMessage(result.error)
+    const product = products.find((item) => item.id === productId)
+    const result = await giveSellerTip({
+      buyer_email: buyerEmail,
+      amount: giftType === "cash" && amount ? Number(amount) : undefined,
+      redeemable_code: giftType === "redeemable" ? code || undefined : undefined,
+      product_id: giftType === "product" ? productId || undefined : undefined,
+      product_title: giftType === "product" ? product?.title : undefined,
+      note: note || undefined,
+    })
+    if (result.success) { setBuyerEmail(""); setAmount(""); setCode(""); setProductId(""); setNote(""); setMessage("Thank-you sent.") } else setMessage(result.error)
   })
 
   return <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-display text-lg font-medium text-ink">Thank a buyer</h3><p className="mt-1 text-sm text-ink-muted">Send cash from your available balance or a store redeemable.</p></div><div className="text-right text-xs text-ink-muted"><p>Received {money(Number(summary?.in_amount ?? 0) * 100, "ngn")}</p><p>Given {money(Number(summary?.out_amount ?? 0) * 100, "ngn")}</p></div></div>
-    <div className="mt-4 grid gap-2 small:grid-cols-2"><input value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} type="email" placeholder="Buyer email" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /><input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="100" placeholder="Cash amount (NGN)" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /><input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Or redeemable code" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Short note (optional)" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /></div>
-    <div className="mt-3 flex items-center justify-between gap-3"><p className="text-xs text-ink-muted">Cash gifts use your available seller balance.</p><button type="button" disabled={isPending || !buyerEmail || (!amount && !code)} onClick={send} className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Sending…" : "Send thank-you"}</button></div>{message && <p className="mt-2 text-sm text-ink-muted">{message}</p>}
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-display text-lg font-medium text-ink">Thank a buyer</h3><p className="mt-1 text-sm text-ink-muted">Send money, a store pass, or an extra product.</p></div><div className="text-right text-xs text-ink-muted"><p>Received {money(Number(summary?.in_amount ?? 0) * 100, "ngn")}</p><p>Given {money(Number(summary?.out_amount ?? 0) * 100, "ngn")}</p></div></div>
+    <div className="mt-4 grid gap-2 small:grid-cols-2"><input value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} type="email" placeholder="Buyer email" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /><select value={giftType} onChange={(e) => setGiftType(e.target.value as typeof giftType)} className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink"><option value="cash">Cash tip</option><option value="redeemable">Gift card, voucher or ticket</option><option value="product">Extra product</option></select>
+      {giftType === "cash" && <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="100" placeholder="Cash amount (NGN)" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" />}
+      {giftType === "redeemable" && <select value={code} onChange={(e) => setCode(e.target.value)} className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink"><option value="">Choose a store pass</option>{redeemables.filter((item) => item.status === "active" && !item.issued_to_email).map((item) => <option key={item.id} value={item.code}>{item.title ?? item.type} · {item.code}</option>)}</select>}
+      {giftType === "product" && <select value={productId} onChange={(e) => setProductId(e.target.value)} className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink"><option value="">Choose a product</option>{products.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>}
+      <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Short note (optional)" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /></div>
+    <div className="mt-3 flex items-center justify-between gap-3"><p className="text-xs text-ink-muted">{giftType === "product" ? "The buyer receives a private collection pass." : giftType === "redeemable" ? "Only unused store passes can be gifted." : "Cash gifts use your available seller balance."}</p><button type="button" disabled={isPending || !buyerEmail || (giftType === "cash" ? !amount : giftType === "redeemable" ? !code : !productId)} onClick={send} className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Sending…" : "Send thank-you"}</button></div>{message && <p className="mt-2 text-sm text-ink-muted">{message}</p>}
     <div className="mt-5 border-t border-ink-hairline pt-4"><p className="text-sm font-medium text-ink">Recent tips</p>{tips.length === 0 ? <p className="mt-2 text-sm text-ink-muted">No tips yet.</p> : <ul className="mt-2 divide-y divide-ink-hairline">{tips.slice(0, 8).map((tip) => <li key={tip.id} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="text-ink-muted">{tip.direction === "to_seller" ? "Received" : "Given"} · {tip.buyer_email ?? "buyer"}</span><span className="font-mono text-ink">{tip.amount ? money(Number(tip.amount) * 100, "ngn") : tip.redeemable_code ?? tip.product_title ?? "Gift"}</span></li>)}</ul>}</div>
   </div>
 }
@@ -432,6 +448,8 @@ const SellerMoneyClient = ({
   enabledRails,
   tips,
   tipSummary,
+  products,
+  redeemables,
 }: {
   balance: any
   commissions: any
@@ -440,6 +458,8 @@ const SellerMoneyClient = ({
   enabledRails: string[]
   tips: SellerTip[]
   tipSummary: any
+  products: SellerProduct[]
+  redeemables: SellerRedeemable[]
 }) => {
   const ngn = balance?.balances?.ngn ?? {}
   const buckets: { label: string; value: number }[] = [
@@ -470,7 +490,7 @@ const SellerMoneyClient = ({
       </div>
 
       <CommissionsCard commissions={commissions} />
-      <TipsCard tips={tips} summary={tipSummary} />
+      <TipsCard tips={tips} summary={tipSummary} products={products} redeemables={redeemables} />
 
       <div className="grid grid-cols-1 gap-6 small:grid-cols-2">
         <RequestPayout

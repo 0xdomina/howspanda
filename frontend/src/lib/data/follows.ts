@@ -40,7 +40,7 @@ export type StoreProfile = {
   products: { id: string; title: string; handle: string; thumbnail: string | null }[]
   redeemables: {
     id: string
-    type: "gift_card" | "voucher" | "ticket"
+    type: "gift_card" | "voucher" | "ticket" | "product_gift"
     title: string
     design_variant?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
     background_image?: string | null

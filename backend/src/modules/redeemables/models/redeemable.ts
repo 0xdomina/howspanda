@@ -10,7 +10,7 @@ import Redemption from "./redemption"
 const Redeemable = model.define("redeemable", {
   id: model.id().primaryKey(),
   seller_id: model.text(),
-  type: model.enum(["gift_card", "voucher", "ticket"]),
+  type: model.enum(["gift_card", "voucher", "ticket", "product_gift"]),
   code: model.text().unique(),
   status: model
     .enum(["active", "redeemed", "cancelled", "expired"])

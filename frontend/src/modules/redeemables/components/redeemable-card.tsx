@@ -11,7 +11,7 @@ const gradients: Record<string, string> = {
 }
 
 const typeLabel = (type: string) =>
-  type === "gift_card" ? "Gift card" : type === "voucher" ? "Voucher" : "Ticket"
+  type === "gift_card" ? "Gift card" : type === "voucher" ? "Voucher" : type === "product_gift" ? "Product gift" : "Ticket"
 
 const money = (amount: number | string | null | undefined) =>
   new Intl.NumberFormat("en-NG", {
@@ -79,7 +79,7 @@ export default function RedeemableCard({
   mode = "preview",
 }: RedeemableCardProps) {
   const [copied, setCopied] = useState(false)
-  const isTicket = type === "ticket"
+  const isTicket = type === "ticket" || type === "product_gift"
   const value =
     type === "voucher"
       ? discountValue
@@ -141,7 +141,7 @@ export default function RedeemableCard({
 
         <div className="mt-9 min-h-[96px]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/65">
-            {isTicket ? "Your entry pass" : "Made to keep"}
+            {isTicket ? (type === "product_gift" ? "Your collection pass" : "Your entry pass") : "Made to keep"}
           </p>
           <h3 className="mt-2 line-clamp-2 font-display text-2xl font-medium leading-tight">
             {title || (isTicket ? eventName : undefined) || "A little something for you"}

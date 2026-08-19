@@ -70,6 +70,7 @@ export const POST = async (
   const wallet = req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
   const follows = req.scope.resolve<FollowsModuleService>(FOLLOWS_MODULE)
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const redeemables = req.scope.resolve<RedeemablesModuleService>(REDEEMABLES_MODULE)
   const { data: [recipient] } = await query.graph({
     entity: "customer",
     fields: ["id", "email"],
@@ -80,7 +81,7 @@ export const POST = async (
   }
 
   const isCash = Number.isFinite(body.amount) && (body.amount as number) > 0
-  const isProduct = !isCash && (!!body.product_id || !!body.product_title)
+  const isProduct = !isCash && !!body.product_id
   const isInstrument = !isCash && !isProduct && !!body.redeemable_code
   if (!isCash && !isProduct && !isInstrument) {
     throw new MedusaError(
@@ -123,17 +124,49 @@ export const POST = async (
   // or spent codes are invisible (404), matching the redeemables convention.
   let redeemableId: string | null = null
   let redeemableCode: string | null = null
-  if (isInstrument) {
-    const redeemables = req.scope.resolve<RedeemablesModuleService>(
-      REDEEMABLES_MODULE
+  let productTitle = body.product_title ?? null
+  if (isProduct) {
+    const { data: [sellerAdmin] } = await query.graph({
+      entity: "seller_admin",
+      fields: ["seller.products.id", "seller.products.title", "seller.products.variants.prices.amount", "seller.products.variants.prices.currency_code"],
+      filters: { id: req.auth_context.actor_id },
+    })
+    const product = (sellerAdmin?.seller?.products ?? []).find(
+      (item: any) => item?.id === body.product_id
     )
+    if (!product) {
+      throw new MedusaError(MedusaError.Types.NOT_FOUND, "Product not found in your store")
+    }
+    productTitle = product.title
+    const priceMinor = Number(
+      product.variants?.flatMap((variant: any) => variant.prices ?? [])
+        .find((price: any) => price.currency_code === "ngn")?.amount ?? 0
+    )
+    if (!(priceMinor > 0)) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "This product needs a price before it can be gifted")
+    }
+    const [gift] = await redeemables.mintRedeemables({
+      seller_id: sellerId,
+      type: "product_gift",
+      title: `${productTitle} gift`,
+      message: body.note ?? "A product gift from the store",
+      face_value: Math.max(1, Math.round(priceMinor / 100)),
+      product_id: product.id,
+      issued_to_email: body.buyer_email,
+      expires_at: new Date(Date.now() + 30 * 86400000),
+    })
+    redeemableId = gift.id
+    redeemableCode = gift.code
+  }
+  if (isInstrument) {
     const [redeem] = await redeemables.listRedeemables({
       code: (body.redeemable_code as string).toUpperCase(),
     })
     if (
       !redeem ||
       redeem.seller_id !== sellerId ||
-      redeem.status !== "active"
+      redeem.status !== "active" ||
+      Boolean(redeem.issued_to_email)
     ) {
       throw new MedusaError(
         MedusaError.Types.NOT_FOUND,
@@ -156,7 +189,7 @@ export const POST = async (
       sellerId,
       amount: isCash ? Number(body.amount) : null,
       productId: body.product_id,
-      productTitle: body.product_title,
+      productTitle,
       redeemableId,
       redeemableCode,
       note: body.note,
@@ -179,6 +212,9 @@ export const POST = async (
     if (tip?.id) {
       await tipping.updateTips({ id: tip.id, status: "reversed" })
     }
+    if (isProduct && redeemableId) {
+      await redeemables.updateRedeemables([{ id: redeemableId, status: "cancelled" }])
+    }
     throw error
   }
 
@@ -197,6 +233,8 @@ export const POST = async (
       title: isCash ? "You received a thank-you" : "You received a store gift",
       body: isCash
         ? `${seller?.name ?? "A store"} sent you a ${Number(body.amount).toLocaleString("en-NG")} NGN wallet credit.`
+        : isProduct
+          ? `Your ${productTitle ?? "product"} gift is ready in Gift cards & passes.`
         : redeemableCode
           ? `${seller?.name ?? "A store"} sent you a redeemable code.`
           : `${seller?.name ?? "A store"} sent you ${body.product_title ?? "a product gift"}.`,

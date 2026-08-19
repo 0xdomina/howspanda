@@ -8,6 +8,8 @@ import {
   listPayoutAccounts,
   listSellerPayouts,
   listSellerTips,
+  listSellerProducts,
+  listSellerRedeemables,
 } from "@lib/data/seller"
 import { getPaymentRails } from "@lib/data/payment-rails"
 import { getEnabledRailKeys } from "@lib/data/payment-rails-utils"
@@ -25,6 +27,8 @@ export default async function SellerMoneyPage() {
   const payoutAccounts = await listPayoutAccounts().catch(() => [])
   const payouts = await listSellerPayouts().catch(() => [])
   const tips = await listSellerTips().catch(() => null)
+  const products = await listSellerProducts().catch(() => [])
+  const redeemables = await listSellerRedeemables({ status: "active" }).catch(() => [])
   const rails = await getPaymentRails().catch(() => [])
 
   if (!seller || seller.role === "staff") {
@@ -44,6 +48,8 @@ export default async function SellerMoneyPage() {
       enabledRails={enabledRails}
       tips={tips?.tips ?? []}
       tipSummary={tips?.summary ?? {}}
+      products={products}
+      redeemables={redeemables}
     />
   )
 }
