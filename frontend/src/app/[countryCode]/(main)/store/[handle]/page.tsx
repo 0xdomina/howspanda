@@ -7,6 +7,7 @@ import FollowButton from "@modules/store/components/follow-button"
 import { getBaseURL } from "@lib/util/env"
 import RedeemableCard from "@modules/redeemables/components/redeemable-card"
 import ProductShare from "@modules/products/components/product-share"
+import RequestProduct from "@modules/store/components/request-product"
 
 const visualFor = (variant?: string) => {
   const defaults: Record<string, string> = {
@@ -141,6 +142,7 @@ export default async function StorePage({
           />
         </div>
         </div>
+        <RequestProduct handle={handle} />
       </section>
 
       {/* Recent broadcasts */}

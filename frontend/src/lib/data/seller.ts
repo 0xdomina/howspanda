@@ -1073,6 +1073,9 @@ export const giveSellerTip = async (body: {
   order_id?: string
   buyer_email?: string
   amount?: number
+  product_id?: string
+  product_title?: string
+  redeemable_code?: string
   note?: string
 }): Promise<{ success: boolean; error: string | null }> => {
   try {

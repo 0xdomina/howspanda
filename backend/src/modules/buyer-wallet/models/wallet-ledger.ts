@@ -13,6 +13,7 @@ const WalletLedger = model.define("buyer_wallet_ledger", {
   source: model.enum([
     "campaign",
     "tip_credit",
+    "tip_sent",
     "referral",
     "withdrawal",
     "adjustment",

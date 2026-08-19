@@ -75,6 +75,7 @@ export const SELLER_PERMISSION_KEYS = [
   "referrals",
   "ai",
   "redeemables",
+  "requests",
 ] as const
 
 export type SellerPermission = (typeof SELLER_PERMISSION_KEYS)[number]

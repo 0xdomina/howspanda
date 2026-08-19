@@ -158,6 +158,11 @@ const AccountNav = ({
                   </LocalizedClientLink>
                 </li>
                 <li>
+                  <LocalizedClientLink href="/account/requests" className="flex items-center justify-between py-4 border-b border-ink-hairline px-8" data-testid="requests-link">
+                    <span>Product requests</span><ChevronDown className="transform -rotate-90" />
+                  </LocalizedClientLink>
+                </li>
+                <li>
                   <button
                     type="button"
                     className="flex items-center justify-between py-4 border-b border-ink-hairline px-8 w-full"
@@ -262,6 +267,7 @@ const AccountNav = ({
                   Notifications
                 </AccountNavLink>
               </li>
+              <li><AccountNavLink href="/account/requests" route={route!}>Product requests</AccountNavLink></li>
               <li className="text-ink-muted">
                 <button
                   type="button"

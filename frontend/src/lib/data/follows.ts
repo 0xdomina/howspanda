@@ -122,7 +122,7 @@ export const unfollowStore = async (
 
 export type AppNotification = {
   id: string
-  kind: "store_broadcast" | "giveaway_claimed"
+  kind: "store_broadcast" | "giveaway_claimed" | "tip_received" | "product_request_update"
   broadcast_id: string | null
   seller_id: string | null
   actor_label: string | null
@@ -135,6 +135,12 @@ export type AppNotification = {
     voucher_code?: string | null
     discount_type?: string | null
     discount_value?: number | null
+    tip_id?: string
+    amount?: number | null
+    redeemable_code?: string | null
+    product_title?: string | null
+    request_id?: string
+    status?: string
   } | null
   read_at: string | null
   created_at: string

@@ -15,7 +15,7 @@ const primaryLinks = [
   ["/seller", "Home", null],
   ["/seller/products/new", "Create", "products"],
   ["/seller/orders", "Orders", "orders"],
-  ["/seller/broadcasts", "Inbox", "broadcasts"],
+  ["/seller/requests", "Inbox", "requests"],
   ["/seller/settings", "Store", null],
 ] as const
 
@@ -30,6 +30,7 @@ const manageLinks = [
   ["/seller/redeemables", "Redeemables", "redeemables"],
   ["/seller/team", "Team", "owner"],
   ["/seller/ai", "Seller AI", "ai"],
+  ["/seller/broadcasts", "Updates", "broadcasts"],
 ] as const
 
 export default function SellerNav({ seller }: { seller: SellerNavSeller }) {

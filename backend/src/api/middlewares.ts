@@ -548,7 +548,16 @@ export const PostSellerTipSchema = z.object({
   redeemable_code: z.string().min(6).optional(),
   order_id: z.string().min(1).optional(),
   note: z.string().max(500).optional(),
-})
+}).refine((body) => {
+  const choices = [
+    Number.isFinite(body.amount) && Number(body.amount) > 0,
+    !!body.product_id || !!body.product_title,
+    !!body.redeemable_code,
+  ].filter(Boolean)
+  return choices.length === 1
+}, "Choose one tip: cash, product, or redeemable code").refine((body) => (
+  body.amount == null || (body.amount >= 100 && body.amount <= 50000)
+), "Cash tips must be between ₦100 and ₦50,000")
 
 // Growth (Phase 9): referrals
 export const PostReferralCreateSchema = z.object({
@@ -606,6 +615,17 @@ export const PostMallCreateSchema = z.object({
   prizePoolNgn: z.number().positive(),
   productIds: z.array(z.string().min(1)).min(1),
 })
+
+export const PostProductRequestSchema = z.object({
+  request: z.string().trim().min(1).max(100),
+})
+
+export const PatchProductRequestSchema = z.object({
+  status: z.enum(["reviewing", "available", "not_available", "closed"]),
+  seller_note: z.string().trim().max(500).optional(),
+  product_id: z.string().min(1).optional(),
+})
+
 const AI_CHAT_RATE_LIMIT = rateLimit({
   name: "ai-chat",
   limit: 30,
@@ -1184,6 +1204,20 @@ export default defineMiddlewares({
       ],
     },
     {
+      matcher: "/store/sellers/:handle/requests",
+      methods: ["POST"],
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+        TIP_RATE_LIMIT,
+        validateAndTransformBody(PostProductRequestSchema),
+      ],
+    },
+    {
+      matcher: "/store/requests",
+      methods: ["GET"],
+      middlewares: [authenticate("customer", ["session", "bearer"])],
+    },
+    {
       matcher: "/admin/escrow/hold",
       methods: ["POST"],
       middlewares: [
@@ -1346,6 +1380,11 @@ export default defineMiddlewares({
       matcher: "/sellers/tips",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostSellerTipSchema)],
+    },
+    {
+      matcher: "/sellers/requests/:id",
+      methods: ["PATCH"],
+      middlewares: [validateAndTransformBody(PatchProductRequestSchema)],
     },
     {
       matcher: "/sellers/referrals",

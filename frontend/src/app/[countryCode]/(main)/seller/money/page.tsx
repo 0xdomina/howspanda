@@ -7,6 +7,7 @@ import {
   retrieveSellerCommissions,
   listPayoutAccounts,
   listSellerPayouts,
+  listSellerTips,
 } from "@lib/data/seller"
 import { getPaymentRails } from "@lib/data/payment-rails"
 import { getEnabledRailKeys } from "@lib/data/payment-rails-utils"
@@ -23,6 +24,7 @@ export default async function SellerMoneyPage() {
   const commissions = await retrieveSellerCommissions().catch(() => null)
   const payoutAccounts = await listPayoutAccounts().catch(() => [])
   const payouts = await listSellerPayouts().catch(() => [])
+  const tips = await listSellerTips().catch(() => null)
   const rails = await getPaymentRails().catch(() => [])
 
   if (!seller || seller.role === "staff") {
@@ -40,6 +42,8 @@ export default async function SellerMoneyPage() {
       payoutAccounts={payoutAccounts}
       payouts={payouts}
       enabledRails={enabledRails}
+      tips={tips?.tips ?? []}
+      tipSummary={tips?.summary ?? {}}
     />
   )
 }

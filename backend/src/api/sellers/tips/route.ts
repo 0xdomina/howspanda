@@ -15,6 +15,11 @@ import { REDEEMABLES_MODULE } from "../../../modules/redeemables"
 import type RedeemablesModuleService from "../../../modules/redeemables/service"
 import { PostSellerTipSchema } from "../../middlewares"
 import { requireSellerOwner } from "../../../lib/sellers/resolve-seller"
+import { BUYER_WALLET_MODULE } from "../../../modules/buyer-wallet"
+import BuyerWalletModuleService from "../../../modules/buyer-wallet/service"
+import { FOLLOWS_MODULE } from "../../../modules/follows"
+import FollowsModuleService from "../../../modules/follows/service"
+import { randomUUID } from "node:crypto"
 
 type PostBody = z.infer<typeof PostSellerTipSchema>
 
@@ -62,6 +67,17 @@ export const POST = async (
   const tipping: TippingModuleService = req.scope.resolve(TIPPING_MODULE)
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
+  const wallet = req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
+  const follows = req.scope.resolve<FollowsModuleService>(FOLLOWS_MODULE)
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: [recipient] } = await query.graph({
+    entity: "customer",
+    fields: ["id", "email"],
+    filters: { email: body.buyer_email.trim().toLowerCase() },
+  })
+  if (!recipient?.id) {
+    throw new MedusaError(MedusaError.Types.NOT_FOUND, "Buyer account not found")
+  }
 
   const isCash = Number.isFinite(body.amount) && (body.amount as number) > 0
   const isProduct = !isCash && (!!body.product_id || !!body.product_title)
@@ -75,10 +91,11 @@ export const POST = async (
 
   let commissionLineId: string | null = null
   if (isCash) {
+    const settlementAmount = Math.round(Number(body.amount) * 100)
     // a seller can only gift what they actually have available
     const balances = await marketplace.getSellerBalance(sellerId)
     const available = balances.ngn?.available ?? 0
-    if ((body.amount as number) > available + 0.001) {
+    if (settlementAmount > available + 0.001) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "Seller available balance is insufficient for this tip"
@@ -87,12 +104,12 @@ export const POST = async (
     // negative ledger line: the cash flows OUT of the seller's balance
     const line = await marketplace.createCommissionLines([
       {
-        order_id: `tip:${sellerId}:gift:${Date.now()}`,
+        order_id: `tip:${sellerId}:gift:${randomUUID()}`,
         currency_code: "ngn",
-        order_total: -Number(body.amount),
+        order_total: -settlementAmount,
         rate: 0,
         commission_amount: 0,
-        net_amount: -Number(body.amount),
+        net_amount: -settlementAmount,
         status: "available",
         available_at: new Date(),
         seller_id: sellerId,
@@ -130,19 +147,71 @@ export const POST = async (
     redeemableCode = redeem.code
   }
 
-  const tip = await tipping.createTip({
-    direction: "to_buyer",
-    orderId: body.order_id,
-    buyerEmail: body.buyer_email,
-    sellerId,
-    amount: isCash ? Number(body.amount) : null,
-    productId: body.product_id,
-    productTitle: body.product_title,
-    redeemableId,
-    redeemableCode,
-    note: body.note,
-    commissionLineId,
+  let tip: any
+  try {
+    tip = await tipping.createTip({
+      direction: "to_buyer",
+      orderId: body.order_id,
+      buyerEmail: body.buyer_email,
+      sellerId,
+      amount: isCash ? Number(body.amount) : null,
+      productId: body.product_id,
+      productTitle: body.product_title,
+      redeemableId,
+      redeemableCode,
+      note: body.note,
+      commissionLineId,
+    })
+
+    if (isCash) {
+      await wallet.credit({
+        buyerEmail: body.buyer_email,
+        amount: Number(body.amount),
+        source: "tip_credit",
+        reference: `tip:${tip.id}`,
+        currencyCode: "ngn",
+      })
+    }
+  } catch (error) {
+    if (commissionLineId) {
+      await marketplace.updateCommissionLines({ id: commissionLineId, status: "reversed" })
+    }
+    if (tip?.id) {
+      await tipping.updateTips({ id: tip.id, status: "reversed" })
+    }
+    throw error
+  }
+
+  const { data: [seller] } = await query.graph({
+    entity: "seller",
+    fields: ["name", "handle"],
+    filters: { id: sellerId },
   })
+  try {
+    await follows.createCustomerNotification({
+      customer_id: recipient.id,
+      kind: "tip_received",
+      seller_id: sellerId,
+      actor_label: seller?.name ?? "A store",
+      actor_handle: seller?.handle ?? null,
+      title: isCash ? "You received a thank-you" : "You received a store gift",
+      body: isCash
+        ? `${seller?.name ?? "A store"} sent you a ${Number(body.amount).toLocaleString("en-NG")} NGN wallet credit.`
+        : redeemableCode
+          ? `${seller?.name ?? "A store"} sent you a redeemable code.`
+          : `${seller?.name ?? "A store"} sent you ${body.product_title ?? "a product gift"}.`,
+      payload: {
+        tip_id: tip.id,
+        amount: isCash ? Number(body.amount) : null,
+        redeemable_code: redeemableCode,
+        product_id: body.product_id ?? null,
+        product_title: body.product_title ?? null,
+      },
+    })
+  } catch {
+    // Money and tip records are already settled. A notification retry can
+    // happen independently without making the seller's gift fail.
+  }
 
   res.json({ tip })
 }

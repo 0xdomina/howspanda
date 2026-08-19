@@ -8,7 +8,8 @@ import TippingModuleService from "../../../../../modules/tipping/service"
 import type MarketplaceModuleService from "../../../../../modules/marketplace/service"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
 import { assertOrderEmail } from "../../../../../lib/escrow/order-access"
-import { computeCommission } from "../../../../../lib/marketplace/commission"
+import { BUYER_WALLET_MODULE } from "../../../../../modules/buyer-wallet"
+import BuyerWalletModuleService from "../../../../../modules/buyer-wallet/service"
 
 // A cash tip is booked as an immediately-withdrawable `available` commission
 // line for the seller, so it MUST be treated as money-in: only a signed-in
@@ -54,6 +55,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
   const marketplace =
     req.scope.resolve<MarketplaceModuleService>(MARKETPLACE_MODULE)
+  const buyerWallet = req.scope.resolve<BuyerWalletModuleService>(BUYER_WALLET_MODULE)
   const lines = await marketplace.resolveLinesForOrder(orderId)
   const sellerId = lines.find((l) => l.seller_id)?.seller_id
   if (!sellerId) {
@@ -63,14 +65,12 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     )
   }
   const currency = lines.find((l) => l.currency_code)?.currency_code ?? "ngn"
+  const settlementAmount = Math.round(amount * 100)
 
-  // Tips ride the same tiered platform commission as orders (3–5%, tapering
-  // down on larger values). A ₦15k tip is a small value → 5%; withheld here at
-  // the ledger line so it holds whether the order was paid by card or USDC.
-  const { rate, commission, net } = computeCommission(amount)
-  // Record the social action first. The database uniqueness guard makes this
-  // idempotent under concurrent clicks; the ledger line is linked only after
-  // the tip record exists, so a rejected duplicate cannot mint balance.
+  // Until a live payment rail is enabled, tips are funded by the buyer's
+  // existing How's U wallet. Never mint seller balance from an uncharged
+  // browser request. Create the social record first, then debit the wallet,
+  // then write the seller's immediately available ledger line.
   const tip = await tipping.createTip({
     direction: "to_seller",
     orderId,
@@ -81,25 +81,48 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     note,
     commissionLineId: null,
   })
-
+  let debited = false
+  let commissionLineId: string | null = null
   try {
+    await buyerWallet.debit({
+      buyerEmail: access.email,
+      amount,
+      source: "tip_sent",
+      reference: `tip:order:${orderId}`,
+      currencyCode: currency,
+    })
+    debited = true
+
     const line = await marketplace.createCommissionLines([
       {
         order_id: `tip:${orderId}:${tip.id}`,
         parent_order_id: orderId,
         currency_code: currency,
-        order_total: amount,
-        rate,
-        commission_amount: commission,
-        net_amount: net,
+        order_total: settlementAmount,
+        rate: 0,
+        commission_amount: 0,
+        net_amount: settlementAmount,
         status: "available",
         available_at: new Date(),
         seller_id: sellerId,
       },
     ])
+    commissionLineId = line[0]?.id ?? null
     await tipping.updateTips({ id: tip.id, commission_line_id: line[0]?.id ?? null })
   } catch (error) {
     await tipping.updateTips({ id: tip.id, status: "reversed" })
+    if (commissionLineId) {
+      await marketplace.updateCommissionLines({ id: commissionLineId, status: "reversed" })
+    }
+    if (debited) {
+      await buyerWallet.credit({
+        buyerEmail: access.email,
+        amount,
+        source: "adjustment",
+        reference: `tip:order:${orderId}:reversal`,
+        currencyCode: currency,
+      })
+    }
     throw error
   }
 

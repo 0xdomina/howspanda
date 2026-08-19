@@ -170,6 +170,31 @@ class FollowsModuleService extends MedusaService({
 
   // ── notifications ──────────────────────────────────────────────────────
 
+  async createCustomerNotification(input: {
+    customer_id: string
+    kind: "tip_received" | "product_request_update"
+    seller_id?: string | null
+    actor_label?: string | null
+    actor_handle?: string | null
+    title: string
+    body: string
+    payload?: Record<string, unknown> | null
+  }) {
+    const notification = await this.createAppNotifications({
+      customer_id: input.customer_id,
+      kind: input.kind,
+      broadcast_id: null,
+      seller_id: input.seller_id ?? null,
+      actor_label: input.actor_label ?? null,
+      actor_handle: input.actor_handle ?? null,
+      title: input.title,
+      body: input.body,
+      payload: input.payload ?? null,
+      read_at: null,
+    })
+    return notification
+  }
+
   async listNotifications(customerId: string) {
     const all = await this.listAppNotifications(
       { customer_id: customerId },

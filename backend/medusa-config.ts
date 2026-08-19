@@ -178,6 +178,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/follows",
     },
     {
+      resolve: "./src/modules/product-requests",
+    },
+    {
       resolve: "./src/modules/user-wallet",
     },
     {

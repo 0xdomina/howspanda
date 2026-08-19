@@ -10,6 +10,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100
 export type WalletLedgerSource =
   | "campaign"
   | "tip_credit"
+  | "tip_sent"
   | "referral"
   | "withdrawal"
   | "adjustment"
@@ -159,6 +160,19 @@ class BuyerWalletModuleService extends MedusaService({
       )
     }
 
+    const reference = input.reference?.trim() || null
+    if (reference) {
+      const [existing] = await this.listWalletLedgers({
+        wallet: wallet.id,
+        source: input.source,
+        reference,
+      })
+      if (existing) {
+        const [fresh] = await this.listWallets({ id: wallet.id })
+        return { wallet: fresh, ledger: existing }
+      }
+    }
+
     const manager = (this as any).baseRepository_.getActiveManager() as {
       execute: (
         sql: string,
@@ -179,14 +193,41 @@ class BuyerWalletModuleService extends MedusaService({
       )
     }
 
-    const [ledger] = await this.createWalletLedgers([
-      {
-        wallet: wallet.id,
-        amount: -amount,
-        source: input.source,
-        reference: input.reference ?? null,
-      },
-    ])
+    let ledger
+    try {
+      ;[ledger] = await this.createWalletLedgers([
+        {
+          wallet: wallet.id,
+          amount: -amount,
+          source: input.source,
+          reference,
+        },
+      ])
+    } catch (error) {
+      // A concurrent retry may have recorded the same debit after the
+      // conditional balance update. The idempotency index makes the second
+      // ledger write fail; restore the balance before returning the winner.
+      if (reference) {
+        const [existing] = await this.listWalletLedgers({
+          wallet: wallet.id,
+          source: input.source,
+          reference,
+        })
+        if (existing) {
+          await manager.execute(
+            `UPDATE buyer_wallet SET balance = balance + ?, updated_at = now() WHERE id = ?`,
+            [amount, wallet.id]
+          )
+          const [fresh] = await this.listWallets({ id: wallet.id })
+          return { wallet: fresh, ledger: existing }
+        }
+      }
+      await manager.execute(
+        `UPDATE buyer_wallet SET balance = balance + ?, updated_at = now() WHERE id = ?`,
+        [amount, wallet.id]
+      )
+      throw error
+    }
     const [fresh] = await this.listWallets({ id: wallet.id })
     return { wallet: fresh, ledger }
   }

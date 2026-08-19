@@ -15,6 +15,7 @@ import {
   type EscrowStatus,
 } from "@lib/data/order-buyer"
 import ErrorMessage from "@modules/checkout/components/error-message"
+import { getBuyerWallet } from "@lib/data/wallet"
 
 const inputClass =
   "px-3 py-2 text-sm border border-ink-hairline rounded-control bg-paper focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
@@ -44,6 +45,7 @@ export default function BuyerOrderActions({
   const [returnReason, setReturnReason] = useState("")
   const [tipAmount, setTipAmount] = useState("")
   const [tipNote, setTipNote] = useState("")
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
   const [rating, setRating] = useState("5")
   const [comment, setComment] = useState("")
   const [productRatings, setProductRatings] = useState<Record<string, string>>({})
@@ -59,6 +61,8 @@ export default function BuyerOrderActions({
         return
       }
       setStatus(result)
+      const wallet = await getBuyerWallet(email)
+      setWalletBalance(wallet?.balance ?? 0)
       router.refresh()
     })
   }
@@ -74,6 +78,8 @@ export default function BuyerOrderActions({
       }
       setStatus(result)
       setUnlocked(true)
+      const wallet = await getBuyerWallet(email)
+      setWalletBalance(wallet?.balance ?? 0)
     })
   }
 
@@ -236,11 +242,13 @@ export default function BuyerOrderActions({
           )}
 
           <div className="border-t border-ink-hairline pt-5 flex flex-col gap-y-3">
-            <label className={labelClass}>Send a tip</label>
+            <label className={labelClass}>Thank the store</label>
+            <p className="text-xs text-ink-muted">Tips come from your How&apos;s U wallet and go straight to the store.</p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="number"
-                min="1"
+                min="100"
+                max="50000"
                 step="any"
                 inputMode="decimal"
                 value={tipAmount}
@@ -260,7 +268,7 @@ export default function BuyerOrderActions({
               <Button
                 size="base"
                 isLoading={isPending}
-                disabled={!tipAmount}
+                disabled={!tipAmount || walletBalance === null || walletBalance < Number(tipAmount) || Number(tipAmount) < 100}
                 onClick={() =>
                   startTransition(async () => {
                     const r = await tipSeller(
@@ -283,6 +291,9 @@ export default function BuyerOrderActions({
                 Send tip
               </Button>
             </div>
+            <p className="text-xs text-ink-muted">
+              {walletBalance === null ? "Checking wallet balance…" : `Wallet balance: ${convertToLocale({ amount: walletBalance, currency_code: "ngn" })}. Minimum ₦100.`}
+            </p>
           </div>
 
           {anyDelivered && !multiSeller ? (

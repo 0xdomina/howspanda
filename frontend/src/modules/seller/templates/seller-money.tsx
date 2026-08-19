@@ -6,6 +6,8 @@ import { NIGERIAN_BANKS, bankNameToCode } from "@lib/data/banks"
 import {
   createPayoutAccount,
   requestSellerPayout,
+  giveSellerTip,
+  type SellerTip,
 } from "@lib/data/seller"
 
 const money = (amount: number | string, currency: string) =>
@@ -401,18 +403,43 @@ const CommissionsCard = ({ commissions }: { commissions: any }) => {
   )
 }
 
+const TipsCard = ({ tips, summary }: { tips: SellerTip[]; summary: any }) => {
+  const [buyerEmail, setBuyerEmail] = useState("")
+  const [amount, setAmount] = useState("")
+  const [code, setCode] = useState("")
+  const [note, setNote] = useState("")
+  const [message, setMessage] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const send = () => startTransition(async () => {
+    setMessage(null)
+    const result = await giveSellerTip({ buyer_email: buyerEmail, amount: amount ? Number(amount) : undefined, redeemable_code: code || undefined, note: note || undefined })
+    if (result.success) { setBuyerEmail(""); setAmount(""); setCode(""); setNote(""); setMessage("Thank-you sent.") } else setMessage(result.error)
+  })
+
+  return <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-display text-lg font-medium text-ink">Thank a buyer</h3><p className="mt-1 text-sm text-ink-muted">Send cash from your available balance or a store redeemable.</p></div><div className="text-right text-xs text-ink-muted"><p>Received {money(Number(summary?.in_amount ?? 0) * 100, "ngn")}</p><p>Given {money(Number(summary?.out_amount ?? 0) * 100, "ngn")}</p></div></div>
+    <div className="mt-4 grid gap-2 small:grid-cols-2"><input value={buyerEmail} onChange={(e) => setBuyerEmail(e.target.value)} type="email" placeholder="Buyer email" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /><input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="100" placeholder="Cash amount (NGN)" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /><input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Or redeemable code" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Short note (optional)" className="rounded-medium border border-ink-hairline bg-white/70 px-3 py-2 text-sm text-ink" /></div>
+    <div className="mt-3 flex items-center justify-between gap-3"><p className="text-xs text-ink-muted">Cash gifts use your available seller balance.</p><button type="button" disabled={isPending || !buyerEmail || (!amount && !code)} onClick={send} className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Sending…" : "Send thank-you"}</button></div>{message && <p className="mt-2 text-sm text-ink-muted">{message}</p>}
+    <div className="mt-5 border-t border-ink-hairline pt-4"><p className="text-sm font-medium text-ink">Recent tips</p>{tips.length === 0 ? <p className="mt-2 text-sm text-ink-muted">No tips yet.</p> : <ul className="mt-2 divide-y divide-ink-hairline">{tips.slice(0, 8).map((tip) => <li key={tip.id} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="text-ink-muted">{tip.direction === "to_seller" ? "Received" : "Given"} · {tip.buyer_email ?? "buyer"}</span><span className="font-mono text-ink">{tip.amount ? money(Number(tip.amount) * 100, "ngn") : tip.redeemable_code ?? tip.product_title ?? "Gift"}</span></li>)}</ul>}</div>
+  </div>
+}
+
 const SellerMoneyClient = ({
   balance,
   commissions,
   payoutAccounts,
   payouts,
   enabledRails,
+  tips,
+  tipSummary,
 }: {
   balance: any
   commissions: any
   payoutAccounts: any[]
   payouts: any[]
   enabledRails: string[]
+  tips: SellerTip[]
+  tipSummary: any
 }) => {
   const ngn = balance?.balances?.ngn ?? {}
   const buckets: { label: string; value: number }[] = [
@@ -443,6 +470,7 @@ const SellerMoneyClient = ({
       </div>
 
       <CommissionsCard commissions={commissions} />
+      <TipsCard tips={tips} summary={tipSummary} />
 
       <div className="grid grid-cols-1 gap-6 small:grid-cols-2">
         <RequestPayout

@@ -10,6 +10,7 @@ export const SELLER_PERMISSION_LABELS = {
   referrals: "Referrals",
   ai: "AI tools",
   redeemables: "Redeemables (view & redeem)",
+  requests: "Product requests",
 } as const
 
 export type SellerPermission = keyof typeof SELLER_PERMISSION_LABELS
@@ -23,6 +24,7 @@ export const DEFAULT_STAFF_PERMISSIONS: SellerPermission[] = [
   "orders",
   "delivery",
   "broadcasts",
+  "requests",
 ]
 
 export const sellerHasPermission = (

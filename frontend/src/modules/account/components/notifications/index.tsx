@@ -15,6 +15,8 @@ const TYPE_LABEL: Record<string, string> = {
   offer: "Offer",
   voucher: "Voucher",
   giveaway: "Giveaway",
+  tip_received: "Thank-you",
+  product_request_update: "Request update",
 }
 
 const NotificationsClient = ({
@@ -101,6 +103,9 @@ const NotificationsClient = ({
                       {n.payload.voucher_code}
                     </p>
                   )}
+                  {n.kind === "tip_received" && n.payload?.redeemable_code && (
+                    <p className="mt-2 inline-block rounded-medium bg-ink/5 px-2 py-1 font-mono text-sm text-ink">{n.payload.redeemable_code}</p>
+                  )}
                 </div>
                 {n.actor_handle && (
                   <LocalizedClientLink
@@ -116,6 +121,9 @@ const NotificationsClient = ({
                   {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                 </p>
                 <div className="flex gap-2">
+                  {n.kind === "product_request_update" && n.payload?.status === "available" && (
+                    <LocalizedClientLink href="/account/requests" className="rounded-medium bg-ink px-3 py-1 text-xs font-medium text-white">View request</LocalizedClientLink>
+                  )}
                   {n.payload?.type === "giveaway" && n.broadcast_id && (
                     <button
                       type="button"

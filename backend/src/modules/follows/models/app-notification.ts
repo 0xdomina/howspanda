@@ -3,6 +3,8 @@ import { model } from "@medusajs/framework/utils"
 export const NOTIFICATION_KINDS = [
   "store_broadcast",
   "giveaway_claimed",
+  "tip_received",
+  "product_request_update",
 ] as const
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number]
 
