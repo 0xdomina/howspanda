@@ -1,4 +1,5 @@
 import { MedusaError } from "@medusajs/framework/utils"
+import { sendEmail as sendNotificationEmail } from "../notifications/transport"
 
 // Verification delivery seam for KYC OTPs. WIRED BUT OFF BY DEFAULT:
 // nothing actually emails/SMSes/WhatsApps until KYC_VERIFICATION_ENABLED=true.
@@ -6,9 +7,8 @@ import { MedusaError } from "@medusajs/framework/utils"
 //
 // Post-launch, set:
 //   KYC_VERIFICATION_ENABLED=true
-//   KYC_VERIFICATION_CHANNEL=mock | email | whatsapp
-// and drop the provider's keys in. The `mock` channel returns the raw code so
-// dev/staging can still exercise the full ladder without external cost.
+//   KYC_VERIFICATION_CHANNEL=email | whatsapp
+// and configure the selected provider. The `mock` channel is dev-only.
 
 export type OtpSendResult = string | null
 
@@ -45,38 +45,16 @@ export async function sendOtp(input: {
   }
 }
 
-// A Resend-style email send. Replace with any provider; only fires when
-// verification is enabled AND an API key is present.
+// Email verification uses the same configured transactional transport as the
+// rest of the platform. This keeps OTP delivery on Brevo when the production
+// notification channel is set to `brevo`, without requiring a second provider
+// account or a second secret.
 async function sendEmail(destination: string, code: string): Promise<OtpSendResult> {
-  const apiKey = process.env.KYC_EMAIL_API_KEY
-  const from = process.env.KYC_EMAIL_FROM || "verify@howsu.local"
-  if (!apiKey) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      "KYC_EMAIL_API_KEY is not configured"
-    )
-  }
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [destination],
-      subject: "Your How's u verification code",
-      html: `<p>Your verification code is <strong>${code}</strong>. It expires in 15 minutes.</p>`,
-    }),
+  await sendNotificationEmail({
+    to: destination,
+    subject: "Your How's U verification code",
+    html: `<p>Your verification code is <strong>${code}</strong>. It expires in 15 minutes.</p>`,
   })
-
-  if (!response.ok) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      `Failed to send verification email (${response.status})`
-    )
-  }
   return null
 }
 
