@@ -1,4 +1,10 @@
+import { setDefaultResultOrder } from 'node:dns'
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
+
+// Some managed container networks advertise both IPv6 and IPv4 for public
+// PostgreSQL providers but do not provide reliable IPv6 egress. Prefer IPv4
+// for outbound database connections so Medusa can reach Neon consistently.
+setDefaultResultOrder('ipv4first')
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
