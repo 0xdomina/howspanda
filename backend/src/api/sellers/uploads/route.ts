@@ -118,8 +118,8 @@ export const POST = async (
 
   // S3-compatible storage (Backblaze B2 in production) when configured —
   // deploy containers have ephemeral disks, so local writes only serve dev.
-  // The file service returns the public URL built from S3_URL; the media
-  // reference validator accepts absolute http(s) URLs as well as /uploads.
+  // Objects stay private; S3_URL points to the API media proxy, which issues
+  // short-lived read URLs without exposing the bucket.
   if (
     process.env.S3_BUCKET &&
     process.env.S3_ACCESS_KEY_ID &&
@@ -130,14 +130,14 @@ export const POST = async (
         filename: string
         mimeType: string
         content: string
-        access: "public"
+        access: "private"
       }): Promise<{ url: string; key: string }>
     }
     const uploaded = await fileService.upload({
       filename,
       mimeType: sniffed.mime,
       content: file.buffer.toString("base64"),
-      access: "public",
+      access: "private",
     })
     return res.json({
       url: uploaded.url,

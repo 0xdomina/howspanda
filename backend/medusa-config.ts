@@ -73,9 +73,8 @@ module.exports = defineConfig({
   // Media storage on any S3-compatible object store (Backblaze B2 in
   // production — B2 speaks the S3 API, so only endpoint/region differ from
   // AWS). Activates only when S3_BUCKET + keys are set; otherwise Medusa's
-  // local-disk file service keeps dev working. Make the bucket's files
-  // public-read via the Backblaze bucket settings and point S3_URL at the
-  // bucket's public file host (or a CDN domain in front of it).
+  // local-disk file service keeps dev working. Production media stays private;
+  // S3_URL points at the API media proxy, which returns short-lived signed URLs.
   ...((process.env.S3_BUCKET &&
     process.env.S3_ACCESS_KEY_ID &&
     process.env.S3_SECRET_ACCESS_KEY)
