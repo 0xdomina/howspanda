@@ -67,6 +67,24 @@ module.exports = defineConfig({
   },
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
+    ...(isProduction
+      ? {
+          // Neon is an external managed PostgreSQL service. Keep TLS
+          // certificate verification explicit and keep the pool modest for
+          // the split free-tier deployment (PandaStack + Neon + Valkey).
+          databaseDriverOptions: {
+            connection: {
+              ssl: { rejectUnauthorized: true },
+            },
+            pool: {
+              min: 0,
+              max: Number(process.env.DATABASE_POOL_MAX ?? 5),
+              acquireTimeoutMillis: 15000,
+              idleTimeoutMillis: 30000,
+            },
+          },
+        }
+      : {}),
     redisUrl: process.env.REDIS_URL,
     http: {
       storeCors: process.env.STORE_CORS!,
