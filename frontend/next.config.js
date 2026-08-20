@@ -22,7 +22,10 @@ const mediaImageHostnames = (process.env.MEDIA_IMAGE_HOSTNAMES || "")
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
-  output: "standalone",
+  // Vercel supplies its own server output and build tracing. Keep standalone
+  // output for container deployments, but do not make Vercel post-processing
+  // look for the container-only NFT manifest.
+  ...(process.env.VERCEL ? {} : { output: "standalone" }),
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
