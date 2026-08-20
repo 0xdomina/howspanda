@@ -21,3 +21,6 @@ out
 
 # Local dev media uploads (production stores media on S3/Backblaze)
 backend/uploads
+
+.vercel
+.env*.local
