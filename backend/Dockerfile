@@ -39,4 +39,4 @@ COPY --from=build /medusa/medusa-config.ts ./medusa-config.ts 2>/dev/null || tru
 COPY --from=build /medusa/src ./src 2>/dev/null || true
 COPY --from=build /medusa/tsconfig.json ./tsconfig.json 2>/dev/null || true
 EXPOSE 9000
-CMD ["bash", "-c", "yarn medusa migrations run && yarn start"]
+CMD ["bash", "-c", "yarn medusa db:migrate && yarn start"]
