@@ -1,4 +1,6 @@
 import { setDefaultResultOrder } from 'node:dns'
+import { neonConfig } from '@neondatabase/serverless'
+import ws from 'ws'
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
 
 // Some managed container networks advertise both IPv6 and IPv4 for public
@@ -12,6 +14,12 @@ loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 // signing auth tokens with a known value is a critical exposure. Dev/test keep
 // the lenient fallbacks so local work and the integration harness are untouched.
 const isProduction = process.env.NODE_ENV === 'production'
+if (isProduction) {
+  // PandaStack's free runtime can reach HTTPS/WebSocket endpoints even when
+  // raw PostgreSQL TCP egress is unavailable. Neon’s node-postgres-compatible
+  // driver uses secure WebSockets while preserving Medusa/Knex transactions.
+  neonConfig.webSocketConstructor = ws
+}
 const DEV_JWT = 'supersecret'
 const DEV_COOKIE = 'supersecret'
 if (isProduction) {
