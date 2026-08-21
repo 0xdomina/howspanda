@@ -25,7 +25,9 @@ RUN npm run build
 FROM node:22.12-slim AS runtime
 
 ENV NODE_ENV=production \
-    NPM_CONFIG_UPDATE_NOTIFIER=false
+    NPM_CONFIG_UPDATE_NOTIFIER=false \
+    HOST=0.0.0.0 \
+    PORT=9000
 
 WORKDIR /app
 
@@ -40,4 +42,4 @@ COPY --from=build /app/.medusa/server/src ./src
 
 EXPOSE 9000
 
-CMD ["sh", "-c", "./node_modules/.bin/medusa db:migrate && npm run start"]
+CMD ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "9000"]
