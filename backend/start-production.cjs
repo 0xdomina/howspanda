@@ -83,10 +83,22 @@ proxy.listen(publicPort, "0.0.0.0", () => {
         HOST: "127.0.0.1",
         PORT: String(internalPort),
       },
-      stdio: "inherit",
+      stdio: ["ignore", "pipe", "pipe"],
     }
   )
   medusaProcess = child
+
+  const forwardOutput = (stream) => {
+    stream.on("data", (chunk) => {
+      const text = chunk.toString()
+      process.stdout.write(text)
+      if (text.includes(`Server is ready on port: ${internalPort}`)) {
+        ready = true
+      }
+    })
+  }
+  forwardOutput(child.stdout)
+  forwardOutput(child.stderr)
 
   child.on("error", () => {
     failed = true
