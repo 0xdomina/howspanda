@@ -5,7 +5,7 @@ import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
 import { getCacheOptions } from "./cookies"
 
-export const listRegions = async () => {
+export const listRegions = async (): Promise<HttpTypes.StoreRegion[]> => {
   const next = {
     ...(await getCacheOptions("regions")),
   }
@@ -17,7 +17,7 @@ export const listRegions = async () => {
       cache: "force-cache",
     })
     .then(({ regions }) => regions)
-    .catch(medusaError)
+    .catch(() => [])
 }
 
 export const retrieveRegion = async (id: string) => {
