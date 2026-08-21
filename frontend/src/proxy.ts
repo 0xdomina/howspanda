@@ -108,7 +108,7 @@ async function getCountryCode(
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error(
-        "proxy.ts: Error getting the country code. Did you set up regions in the How's u backend and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
+        "proxy.ts: Error getting the country code. Did you set up regions in the How's u backend and define MEDUSA_BACKEND_URL for the server proxy? Client-side requests also require NEXT_PUBLIC_MEDUSA_BACKEND_URL."
       )
     }
   }

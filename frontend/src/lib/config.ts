@@ -1,12 +1,13 @@
 import { getLocaleHeader } from "@lib/util/get-locale-header"
 import Medusa, { FetchArgs, FetchInput } from "@medusajs/js-sdk"
 
-// Defaults to standard port for Medusa server
-let MEDUSA_BACKEND_URL = "http://localhost:9000"
-
-if (process.env.MEDUSA_BACKEND_URL) {
-  MEDUSA_BACKEND_URL = process.env.MEDUSA_BACKEND_URL
-}
+// The browser bundle cannot read server-only env vars. Keep the public URL
+// explicit for client-side auth/store requests, while retaining the private
+// server-side name for server actions and local development.
+let MEDUSA_BACKEND_URL =
+  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ||
+  process.env.MEDUSA_BACKEND_URL ||
+  "http://localhost:9000"
 
 export { MEDUSA_BACKEND_URL }
 
