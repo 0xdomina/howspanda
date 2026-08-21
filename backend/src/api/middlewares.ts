@@ -28,6 +28,7 @@ import {
   getBankTransferSellerForCart,
 } from "../lib/payments/bank-transfer-gate"
 import { requirePlatformFeature } from "../lib/features/access"
+import { signMediaPath } from "../lib/media/private-media"
 
 // Abuse-throttling for sensitive routes. Keyed by identity where the request
 // body already carries the actor's email (so NAT'd users behind one IP are not
@@ -108,6 +109,22 @@ const GEO_RATE_LIMIT = rateLimit({
   limit: 30,
   windowMs: 15 * 60 * 1000,
 })
+
+const MEDIA_REDIRECT: MedusaRequestHandler = async (req, res, next) => {
+  if (req.method !== "GET") return next()
+
+  const originalUrl = req.originalUrl || req.url
+  const rawPath = originalUrl.replace(/^\/media\/?/, "").split("?", 1)[0]
+  const signedUrl = await signMediaPath(rawPath)
+
+  if (!signedUrl) {
+    res.status(404).json({ message: "Media not found" })
+    return
+  }
+
+  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  res.redirect(302, signedUrl)
+}
 // Escrow-status polls are per-order ownership reads (email-gated); throttle by
 // the queried email so an attacker cannot scrape order states wholesale.
 const ESCROW_STATUS_RATE_LIMIT = rateLimit({
@@ -1824,6 +1841,13 @@ export default defineMiddlewares({
       matcher: "/sellers/broadcasts",
       methods: ["POST"],
       middlewares: [validateAndTransformBody(PostBroadcastSchema)],
+    },
+    {
+      // Backblaze media URLs can contain nested object-key segments. Keep the
+      // proxy in middleware so Express receives a normal prefix mount instead
+      // of a bracket-style catch-all route.
+      matcher: "/media",
+      middlewares: [MEDIA_REDIRECT],
     },
     {
       // Uploaded media is served publicly (product photos render in <img> tags
