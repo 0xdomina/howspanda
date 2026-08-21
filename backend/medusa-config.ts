@@ -1,5 +1,5 @@
 import { setDefaultResultOrder } from 'node:dns'
-import { neonConfig } from '@neondatabase/serverless'
+import { neonConfig } from 'pg'
 import ws from 'ws'
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
 
