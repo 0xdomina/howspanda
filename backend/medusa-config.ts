@@ -14,6 +14,10 @@ loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 // signing auth tokens with a known value is a critical exposure. Dev/test keep
 // the lenient fallbacks so local work and the integration harness are untouched.
 const isProduction = process.env.NODE_ENV === 'production'
+// PandaStack injects KV_URL for the private in-platform Valkey store. Prefer
+// that low-latency internal connection in production and keep REDIS_URL as a
+// portable fallback for local development and other hosts.
+const redisUrl = process.env.KV_URL || process.env.REDIS_URL
 if (isProduction) {
   // PandaStack's free runtime can reach HTTPS/WebSocket endpoints even when
   // raw PostgreSQL TCP egress is unavailable. Neon’s node-postgres-compatible
@@ -93,7 +97,7 @@ module.exports = defineConfig({
           },
         }
       : {}),
-    redisUrl: process.env.REDIS_URL,
+    redisUrl,
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
@@ -223,14 +227,14 @@ module.exports = defineConfig({
     {
       resolve: "@medusajs/medusa/event-bus-redis",
       options: {
-        redisUrl: process.env.REDIS_URL,
+        redisUrl,
       },
     },
     {
       resolve: "@medusajs/medusa/workflow-engine-redis",
       options: {
         redis: {
-          redisUrl: process.env.REDIS_URL,
+          redisUrl,
         },
       },
     },

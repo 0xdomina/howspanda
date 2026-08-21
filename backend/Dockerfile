@@ -1,42 +1,47 @@
 # syntax=docker/dockerfile:1
 
-# ---------------------------------------------------------------------------
-# BASE: shared build/runtime prerequisites
-# ---------------------------------------------------------------------------
-FROM node:22.12-slim AS base
-ENV NODE_ENV=production \
-    MEDUSA_BE_PATH=/medusa \
+# Medusa needs its generated .medusa/server output at runtime, including the
+# admin build. PandaStack must build this image as a Docker project so the
+# generated output is copied into the final image instead of being discarded
+# by the platform's generic Node runtime.
+
+FROM node:22.12-slim AS build
+
+ENV NODE_ENV=development \
     YARN_ENABLE_IMMUTABLE_INSTALLS=false
-WORKDIR /medusa
+
+WORKDIR /app
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# ---------------------------------------------------------------------------
-# DEPS: full dependency tree (build-time incl. devDeps for tsc/build)
-# ---------------------------------------------------------------------------
-FROM base AS deps
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN corepack enable && yarn install --frozen-lockfile
 
-# ---------------------------------------------------------------------------
-# BUILD: compile to .medusa
-# ---------------------------------------------------------------------------
-FROM deps AS build
 COPY . .
 RUN yarn build
 
-# ---------------------------------------------------------------------------
-# RUNTIME: production deps + compiled output only
-# ---------------------------------------------------------------------------
-FROM base AS runner
+FROM node:22.12-slim AS runtime
+
+ENV NODE_ENV=production \
+    YARN_ENABLE_IMMUTABLE_INSTALLS=false
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile --production=true \
+RUN corepack enable \
+    && yarn install --frozen-lockfile --production=true \
     && yarn cache clean
-COPY --from=build /medusa/.medusa ./.medusa
-COPY --from=build /medusa/medusa-config.js ./medusa-config.js 2>/dev/null || true
-COPY --from=build /medusa/medusa-config.ts ./medusa-config.ts 2>/dev/null || true
-COPY --from=build /medusa/src ./src 2>/dev/null || true
-COPY --from=build /medusa/tsconfig.json ./tsconfig.json 2>/dev/null || true
+
+# Keep the compiled Medusa server and admin assets together. The start command
+# uses this output and does not rebuild on every container boot.
+COPY --from=build /app/.medusa ./.medusa
+
 EXPOSE 9000
-CMD ["bash", "-c", "yarn medusa db:migrate && yarn start"]
+
+CMD ["sh", "-c", "yarn medusa db:migrate && yarn start"]
