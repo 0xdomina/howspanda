@@ -14,12 +14,11 @@ async function getRegionMap(cacheId: string) {
   const { regionMap, regionMapUpdated } = regionMapCache
 
   if (!BACKEND_URL) {
-    throw new Error(
-      "proxy.ts: Error fetching regions. Did you set up regions in the How's u backend and define a MEDUSA_BACKEND_URL environment variable? Note that the variable is no longer named NEXT_PUBLIC_MEDUSA_BACKEND_URL."
-    )
+    return fallbackRegionMap()
   }
 
-  if (
+  try {
+    if (
     !regionMap.keys().next().value ||
     regionMapUpdated < Date.now() - 3600 * 1000
   ) {
@@ -57,8 +56,23 @@ async function getRegionMap(cacheId: string) {
     })
 
     regionMapCache.regionMapUpdated = Date.now()
+    }
+  } catch (error) {
+    // A cold or briefly unreachable API must not turn every storefront URL
+    // into a 500. Keep the configured country usable; server components will
+    // render their normal empty state until the API responds again.
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Region bootstrap failed", error)
+    }
   }
 
+  return fallbackRegionMap()
+}
+
+function fallbackRegionMap() {
+  if (!regionMapCache.regionMap.size && DEFAULT_REGION) {
+    regionMapCache.regionMap.set(DEFAULT_REGION, {} as HttpTypes.StoreRegion)
+  }
   return regionMapCache.regionMap
 }
 
