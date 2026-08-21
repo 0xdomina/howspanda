@@ -40,7 +40,8 @@ COPY --from=build /app/.medusa ./.medusa
 COPY --from=build /app/.medusa/server/medusa-config.js ./medusa-config.js
 COPY --from=build /app/.medusa/server/src ./src
 COPY --from=build /app/.medusa/server/public ./public
+COPY --from=build /app/start-production.cjs ./start-production.cjs
 
 EXPOSE 9000
 
-CMD ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "9000"]
+CMD ["node", "start-production.cjs"]
