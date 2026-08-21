@@ -42,7 +42,22 @@ export async function sendOtp(input: {
       }
       return input.code
     case "email":
-      return sendEmail(input.destination, input.code)
+      try {
+        return await sendEmail(input.destination, input.code)
+      } catch (error) {
+        // Keep SMTP/provider details in server logs only. The signup surface
+        // should receive a short recovery message rather than a raw relay
+        // error or an opaque generic 500.
+        // eslint-disable-next-line no-console
+        console.error(
+          "[otp] email delivery failed",
+          error instanceof Error ? error.message : "unknown error"
+        )
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          "We couldn't send your verification code right now. Please try again."
+        )
+      }
     default:
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
