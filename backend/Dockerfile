@@ -8,7 +8,7 @@
 FROM node:22.12-slim AS build
 
 ENV NODE_ENV=development \
-    YARN_ENABLE_IMMUTABLE_INSTALLS=false
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 
 WORKDIR /app
 
@@ -16,16 +16,16 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json yarn.lock ./
-RUN corepack enable && yarn install --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev --legacy-peer-deps
 
 COPY . .
-RUN yarn build
+RUN npm run build
 
 FROM node:22.12-slim AS runtime
 
 ENV NODE_ENV=production \
-    YARN_ENABLE_IMMUTABLE_INSTALLS=false
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 
 WORKDIR /app
 
@@ -33,10 +33,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json yarn.lock ./
-RUN corepack enable \
-    && yarn install --frozen-lockfile --production=true \
-    && yarn cache clean
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --legacy-peer-deps \
+    && npm cache clean --force
 
 # Keep the compiled Medusa server and admin assets together. The start command
 # uses this output and does not rebuild on every container boot.
@@ -44,4 +43,4 @@ COPY --from=build /app/.medusa ./.medusa
 
 EXPOSE 9000
 
-CMD ["sh", "-c", "yarn medusa db:migrate && yarn start"]
+CMD ["sh", "-c", "./node_modules/.bin/medusa db:migrate && npm run start"]
