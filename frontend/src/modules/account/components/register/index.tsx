@@ -297,8 +297,7 @@ const Register = ({ setCurrentView }: Props) => {
             </div>
             {sent && (
               <p className="text-center text-[11px] leading-4 text-ink-muted">
-                Tip: check Spam / Promotions. Add no-reply@howsu.com to contacts so the
-                next code lands in Primary.
+                Check Spam or Promotions if the message is not in your inbox.
               </p>
             )}
 

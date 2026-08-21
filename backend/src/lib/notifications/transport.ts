@@ -7,7 +7,7 @@ import nodemailer from "nodemailer"
 //              in production so a misconfigured deploy can't silently "send").
 //   - email  — Resend HTTP API (EMAIL_API_KEY / EMAIL_FROM).
 //   - brevo  — Brevo SMTP relay via nodemailer (BREVO_SMTP_HOST / BREVO_SMTP_PORT /
-//              BREVO_SMTP_USER / BREVO_SMTP_PASS / EMAIL_FROM). SMTP creds come
+//              BREVO_SMTP_USER / BREVO_SMTP_PASS / BREVO_SENDER_EMAIL). SMTP creds come
 //              from Brevo SMTP > SMTP keys; the "user" is the SMTP login and the
 //              "pass" is the master SMTP key (NOT the account password).
 // Callers treat failures as non-fatal; the outbox drain job records outcomes.
@@ -16,6 +16,32 @@ export type EmailMessage = {
   to: string
   subject: string
   html: string
+}
+
+type EmailSender = {
+  name: string
+  address: string
+}
+
+function resolveSender(): EmailSender {
+  // BREVO_SENDER_EMAIL must be a sender or authenticated domain in Brevo.
+  // EMAIL_FROM remains the backwards-compatible fallback for existing deploys.
+  const configured =
+    process.env.BREVO_SENDER_EMAIL || process.env.EMAIL_FROM || ""
+  const match = configured.match(/<([^>]+)>/) || configured.match(/([\w.+-]+@[\w.-]+\.[A-Za-z]{2,})/)
+  const address = (match?.[1] || configured).trim().toLowerCase()
+
+  if (!address || !address.includes("@") || address.endsWith(".local")) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "A verified email sender is not configured"
+    )
+  }
+
+  return {
+    name: process.env.BREVO_FROM_NAME || "How's U",
+    address,
+  }
 }
 
 export type SendResult = {
@@ -53,7 +79,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
           "EMAIL_API_KEY is not configured"
         )
       }
-      const from = process.env.EMAIL_FROM || "team@howsu.local"
+      const sender = resolveSender()
 
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -62,7 +88,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from,
+          from: `${sender.name} <${sender.address}>`,
           to: [message.to],
           subject: message.subject,
           html: message.html,
@@ -95,7 +121,7 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
           "BREVO_SMTP_HOST / BREVO_SMTP_USER / BREVO_SMTP_PASS are not configured"
         )
       }
-      const from = process.env.EMAIL_FROM || "team@howsu.local"
+      const sender = resolveSender()
 
       const transporter = nodemailer.createTransport({
         host,
@@ -106,7 +132,10 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
 
       try {
         const info = await transporter.sendMail({
-          from,
+          from: sender,
+          ...(process.env.BREVO_REPLY_TO
+            ? { replyTo: process.env.BREVO_REPLY_TO }
+            : {}),
           to: message.to,
           subject: message.subject,
           html: message.html,
