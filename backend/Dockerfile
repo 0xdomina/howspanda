@@ -29,13 +29,8 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --legacy-peer-deps \
-    && npm cache clean --force
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/node_modules ./node_modules
 
 # Keep the compiled Medusa server and admin assets together. The start command
 # uses this output and does not rebuild on every container boot.
