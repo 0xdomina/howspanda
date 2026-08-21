@@ -39,6 +39,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.medusa ./.medusa
 COPY --from=build /app/.medusa/server/medusa-config.js ./medusa-config.js
 COPY --from=build /app/.medusa/server/src ./src
+COPY --from=build /app/.medusa/server/public ./public
 
 EXPOSE 9000
 
