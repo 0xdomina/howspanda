@@ -6,10 +6,8 @@ import nodemailer from "nodemailer"
 //   - mock   — log the message, never hit the network (dev/test only; refused
 //              in production so a misconfigured deploy can't silently "send").
 //   - email  — Resend HTTP API (EMAIL_API_KEY / EMAIL_FROM).
-//   - brevo  — Brevo SMTP relay via nodemailer (BREVO_SMTP_HOST / BREVO_SMTP_PORT /
-//              BREVO_SMTP_USER / BREVO_SMTP_PASS / BREVO_SENDER_EMAIL). SMTP creds come
-//              from Brevo SMTP > SMTP keys; the "user" is the SMTP login and the
-//              "pass" is the master SMTP key (NOT the account password).
+//   - brevo  — Brevo HTTP API when BREVO_API_KEY is present (recommended for
+//              cloud runtimes), with SMTP relay as a supported fallback.
 // Callers treat failures as non-fatal; the outbox drain job records outcomes.
 
 export type EmailMessage = {
@@ -110,6 +108,51 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
     }
 
     case "brevo": {
+      const sender = resolveSender()
+      const apiKey = process.env.BREVO_API_KEY
+
+      // Prefer Brevo's HTTPS API. Some managed runtimes block outbound SMTP
+      // ports even when the application itself has normal HTTPS egress.
+      if (apiKey) {
+        const controller = new AbortController()
+        const timeout = setTimeout(
+          () => controller.abort(),
+          Number(process.env.BREVO_API_TIMEOUT_MS ?? 10000)
+        )
+
+        try {
+          const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
+            headers: {
+              "api-key": apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              sender: { name: sender.name, email: sender.address },
+              to: [{ email: message.to }],
+              subject: message.subject,
+              htmlContent: message.html,
+            }),
+            signal: controller.signal,
+          })
+
+          if (!response.ok) {
+            throw new MedusaError(
+              MedusaError.Types.INVALID_DATA,
+              `Brevo email delivery failed (${response.status})`
+            )
+          }
+
+          const data = (await response.json().catch(() => null)) as {
+            messageId?: string
+          } | null
+
+          return { channel: "brevo", messageId: data?.messageId ?? null }
+        } finally {
+          clearTimeout(timeout)
+        }
+      }
+
       const host = process.env.BREVO_SMTP_HOST
       const port = Number(process.env.BREVO_SMTP_PORT ?? 587)
       const user = process.env.BREVO_SMTP_USER
@@ -121,8 +164,6 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
           "BREVO_SMTP_HOST / BREVO_SMTP_USER / BREVO_SMTP_PASS are not configured"
         )
       }
-      const sender = resolveSender()
-
       const transporter = nodemailer.createTransport({
         host,
         port,
