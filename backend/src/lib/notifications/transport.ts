@@ -128,6 +128,19 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
         port,
         secure: port === 465,
         auth: { user, pass },
+        // Never hold signup, password reset, or checkout notifications open
+        // for a platform-level SMTP outage. These can be overridden for a
+        // slower relay, but the production defaults fail fast and retry via
+        // the caller's normal flow instead of freezing the UI.
+        connectionTimeout: Number(
+          process.env.BREVO_SMTP_CONNECTION_TIMEOUT_MS ?? 10000
+        ),
+        greetingTimeout: Number(
+          process.env.BREVO_SMTP_GREETING_TIMEOUT_MS ?? 10000
+        ),
+        socketTimeout: Number(
+          process.env.BREVO_SMTP_SOCKET_TIMEOUT_MS ?? 15000
+        ),
       })
 
       try {
