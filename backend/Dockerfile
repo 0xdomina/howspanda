@@ -41,6 +41,7 @@ RUN npm ci --omit=dev --legacy-peer-deps \
 # uses this output and does not rebuild on every container boot.
 COPY --from=build /app/.medusa ./.medusa
 COPY --from=build /app/.medusa/server/medusa-config.js ./medusa-config.js
+COPY --from=build /app/.medusa/server/src ./src
 
 EXPOSE 9000
 
