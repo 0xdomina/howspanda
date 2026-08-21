@@ -109,7 +109,10 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
 
     case "brevo": {
       const sender = resolveSender()
-      const apiKey = process.env.BREVO_API_KEY
+      // KYC_EMAIL_API_KEY is retained as a backwards-compatible alias for
+      // existing deployments that stored the Brevo API key under the older
+      // verification-specific name.
+      const apiKey = process.env.BREVO_API_KEY || process.env.KYC_EMAIL_API_KEY
 
       // Prefer Brevo's HTTPS API. Some managed runtimes block outbound SMTP
       // ports even when the application itself has normal HTTPS egress.
