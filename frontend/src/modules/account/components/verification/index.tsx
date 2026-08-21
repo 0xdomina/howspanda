@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 
 import { NIGERIAN_BANKS, bankNameToCode } from "@lib/data/banks"
 import { reverseGeocode } from "@lib/data/delivery"
@@ -68,9 +68,17 @@ const EmailStep = ({
   const [code, setCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+  const [cooldown, setCooldown] = useState(0)
   const [isPending, startTransition] = useTransition()
 
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
+
   const send = () => {
+    if (cooldown > 0 || isPending) return
     setError(null)
     startTransition(async () => {
       const res = await requestKycOtp({
@@ -80,12 +88,18 @@ const EmailStep = ({
       })
       if (res.ok) {
         setSent(true)
-        setHint("A verification code was sent to your email.")
+        setCooldown(45)
+        setHint(`We sent a 6-digit code to ${email}. It expires in 15 minutes.`)
       } else {
-        setError(res.error ?? "Could not send the code.")
+        setError(res.error ?? "Could not send the code. Check your email and try again.")
       }
     })
   }
+
+  useEffect(() => {
+    if (!sent) send()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const verify = () => {
     setError(null)
@@ -99,48 +113,71 @@ const EmailStep = ({
       if (res.ok && res.profile) {
         onDone(res.profile)
       } else {
-        setError(res.error ?? "Could not verify the code.")
+        setError(res.error ?? "Incorrect code. Check your inbox and try again.")
       }
     })
   }
 
   return (
-    <div className="space-y-3">
-      {!sent ? (
+    <div className="space-y-3 rounded-control border border-ink-hairline bg-white/70 p-4 shadow-sm backdrop-blur animate-[fadeIn_0.4s_ease]">
+      <p className="text-sm font-medium text-ink">Verify your email</p>
+      <p className="text-sm text-ink-muted">
+        {sent
+          ? `We sent a code to ${email}. Enter it below.`
+          : `Sending a code to ${email}…`}
+      </p>
+      <div className="flex gap-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <input
+            key={i}
+            value={code[i] ?? ""}
+            onChange={(e) => {
+              const d = e.target.value.replace(/\D/g, "").slice(-1)
+              const next = code.split("")
+              while (next.length < 6) next.push("")
+              next[i] = d
+              const joined = next.join("").slice(0, 6)
+              setCode(joined)
+              if (d && i < 5) {
+                const nxt = document.getElementById(`kyc-otp-${i + 1}`) as HTMLInputElement | null
+                nxt?.focus()
+              }
+            }}
+            id={`kyc-otp-${i}`}
+            inputMode="numeric"
+            className="h-11 w-10 rounded-control border border-ink-hairline bg-white text-center text-lg font-semibold text-ink outline-none focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+        ))}
+      </div>
+      {/* single hidden input for tests */}
+      <input
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/[^\d]/g, "").slice(0, 6))}
+        className="sr-only"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          disabled={isPending}
-          onClick={send}
+          disabled={code.length !== 6 || isPending}
+          onClick={verify}
           className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
         >
-          {isPending ? "Sending…" : "Send code to my email"}
+          {isPending ? "Verifying…" : "Verify"}
         </button>
-      ) : (
-        <>
-          <p className="text-sm text-ink-muted">
-            Enter the 6-digit code sent to {email}.
-          </p>
-          <input
-            value={code}
-            onChange={(e) =>
-              setCode(e.target.value.replace(/[^\d]/g, "").slice(0, 6))
-            }
-            inputMode="numeric"
-            placeholder="••••••"
-            className={inputClass}
-          />
-          <button
-            type="button"
-            disabled={code.length !== 6 || isPending}
-            onClick={verify}
-            className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-          >
-            {isPending ? "Verifying…" : "Verify"}
-          </button>
-        </>
-      )}
-      {hint && <p className="text-xs text-ink-muted">{hint}</p>}
+        <button
+          type="button"
+          disabled={cooldown > 0 || isPending}
+          onClick={send}
+          className="text-xs font-medium text-ink underline decoration-ink/20 underline-offset-4 hover:decoration-ink disabled:opacity-40"
+        >
+          {cooldown > 0 ? `Resend in ${cooldown}s` : sent ? "Resend code" : "Sending…"}
+        </button>
+      </div>
+      {hint && <p className="text-xs text-emerald-700">{hint}</p>}
       {error && <p className="text-sm text-rose-600">{error}</p>}
+      <p className="text-[11px] text-ink-muted">Tip: check Spam / Promotions and add no-reply@howsu.com to contacts.</p>
     </div>
   )
 }

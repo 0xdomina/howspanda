@@ -20,7 +20,7 @@ export default async function ProductPreview({
   })
 
   return (
-    <div className="group">
+    <div className="group card-lift rounded-control p-1">
       <div data-testid="product-wrapper" className="rounded-control">
         <LocalizedClientLink
           href={`/products/${product.handle}`}

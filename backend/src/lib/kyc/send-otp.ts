@@ -18,7 +18,13 @@ export async function sendOtp(input: {
   code: string
 }): Promise<OtpSendResult> {
   if (process.env.KYC_VERIFICATION_ENABLED !== "true") {
-    // No-op: verification is intentionally disabled (pre-launch default).
+    if (process.env.NODE_ENV === "production") {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Email verification is not configured on this deployment (KYC_VERIFICATION_ENABLED). Add it in Pandastack env and redeploy."
+      )
+    }
+    // dev: no-op
     return null
   }
 

@@ -43,7 +43,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
       data-mode="light"
     >
       <body className="bg-paper font-sans text-ink antialiased">
-        <WishlistProvider initialItems={initialWishlist}><main className="relative">{props.children}</main></WishlistProvider>
+        <WishlistProvider initialItems={initialWishlist}><main className="relative page-enter">{props.children}</main></WishlistProvider>
       </body>
     </html>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Input from "@modules/common/components/input"
 import Button from "@modules/common/components/button"
@@ -13,6 +13,62 @@ import { requestAuthOtp, verifyAuthOtp } from "@lib/data/auth-otp"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
+}
+
+const RESEND_SECONDS = 45
+
+const OtpBoxes = ({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+}) => {
+  const refs = useRef<Array<HTMLInputElement | null>>([])
+  const handle = (idx: number, v: string) => {
+    const digit = v.replace(/\D/g, "").slice(-1)
+    const next = value.split("")
+    while (next.length < 6) next.push("")
+    next[idx] = digit
+    const joined = next.join("").slice(0, 6)
+    onChange(joined)
+    if (digit && idx < 5) refs.current[idx + 1]?.focus()
+  }
+  const onKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !value[idx] && idx > 0) {
+      refs.current[idx - 1]?.focus()
+    }
+  }
+  const onPaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
+    if (pasted) {
+      e.preventDefault()
+      onChange(pasted)
+      refs.current[Math.min(pasted.length, 5)]?.focus()
+    }
+  }
+  return (
+    <div className="flex justify-center gap-2" onPaste={onPaste}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <input
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+          value={value[i] ?? ""}
+          onChange={(e) => handle(i, e.target.value)}
+          onKeyDown={(e) => onKeyDown(i, e)}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          disabled={disabled}
+          className="h-12 w-11 rounded-control border border-ink-hairline bg-white text-center text-lg font-semibold tracking-widest text-ink shadow-sm outline-none transition-all focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:opacity-50"
+          data-testid={i === 0 ? "otp-input" : `otp-input-${i}`}
+        />
+      ))}
+    </div>
+  )
 }
 
 const Register = ({ setCurrentView }: Props) => {
@@ -28,6 +84,14 @@ const Register = ({ setCurrentView }: Props) => {
   const [hint, setHint] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [cooldown, setCooldown] = useState(0)
+
+  // countdown for resend
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
 
   const continueToCode = () => {
     setError(null)
@@ -43,6 +107,7 @@ const Register = ({ setCurrentView }: Props) => {
   }
 
   const requestCode = () => {
+    if (cooldown > 0 || isPending) return
     setError(null)
     startTransition(async () => {
       const res = await requestAuthOtp({
@@ -50,18 +115,27 @@ const Register = ({ setCurrentView }: Props) => {
         purpose: "signup",
       })
       if (!res.ok) {
-        setError(res.error ?? "Could not send the code.")
+        setError(res.error ?? "Could not send the code. Check your email and try again.")
         return
       }
       setSent(true)
-      setHint("A verification code was sent to your email.")
+      setCooldown(RESEND_SECONDS)
+      setHint(`We sent a 6-digit code to ${email.trim()}. It expires in 15 minutes.`)
     })
   }
 
+  // auto-send when entering the code step
+  useEffect(() => {
+    if (step === "code" && !sent && !isPending) {
+      requestCode()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
   const verifyAndCreate = () => {
     setError(null)
-    if (code.trim().length === 0) {
-      setError("Enter the verification code.")
+    if (code.trim().length !== 6) {
+      setError("Enter the 6-digit code.")
       return
     }
     startTransition(async () => {
@@ -71,7 +145,7 @@ const Register = ({ setCurrentView }: Props) => {
         code: code.trim(),
       })
       if (!res.ok || !res.proof) {
-        setError(res.error ?? "Could not verify the code.")
+        setError(res.error ?? "Incorrect code. Check your inbox and try again.")
         return
       }
 
@@ -104,7 +178,7 @@ const Register = ({ setCurrentView }: Props) => {
       </p>
       <div className="w-full flex flex-col">
         {step === "credentials" ? (
-          <div className="flex flex-col gap-y-2">
+          <div className="flex flex-col gap-y-2 animate-[fadeIn_0.4s_ease]">
             <div className="grid grid-cols-2 gap-x-4">
               <Input
                 label="First name"
@@ -166,50 +240,68 @@ const Register = ({ setCurrentView }: Props) => {
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-y-2">
+          <div className="flex flex-col gap-y-3 rounded-control border border-ink-hairline bg-white/70 p-5 shadow-sm backdrop-blur animate-[fadeIn_0.45s_ease]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-ink">Verify your email</p>
+              <span className="rounded-full bg-ink/5 px-2.5 py-1 text-xs text-ink-muted">
+                step 2 of 2
+              </span>
+            </div>
             <p className="text-sm text-ui-fg-subtle">
-              Verify your email to finish creating your account. We sent the
-              code to <span className="font-medium text-ui-fg-base">{email.trim()}</span>.
+              We sent a code to{" "}
+              <span className="font-medium text-ink">{email.trim()}</span>. Enter
+              it below — it expires in 15 minutes.
             </p>
-            {!sent ? (
-              <Button
-                size="large"
-                className="w-full mt-2"
-                isLoading={isPending}
+
+            <div className="pt-2">
+              <OtpBoxes value={code} onChange={setCode} disabled={isPending} />
+              {/* hidden single input for password managers */}
+              <input
+                type="hidden"
+                name="code"
+                value={code}
+                readOnly
+                data-testid="otp-input"
+              />
+            </div>
+
+            {hint && (
+              <p className="text-center text-xs text-emerald-700 animate-[fadeIn_0.3s_ease]">
+                {hint}
+              </p>
+            )}
+            <ErrorMessage error={error} data-testid="register-error" />
+
+            <Button
+              size="large"
+              className="w-full mt-1"
+              isLoading={isPending}
+              disabled={code.trim().length !== 6}
+              onClick={verifyAndCreate}
+              data-testid="register-button"
+            >
+              Verify &amp; create account
+            </Button>
+
+            <div className="flex items-center justify-center gap-2 text-xs text-ink-muted">
+              <span>Didn&apos;t get the code?</span>
+              <button
+                type="button"
+                disabled={cooldown > 0 || isPending}
                 onClick={requestCode}
+                className="font-medium text-ink underline decoration-ink/20 underline-offset-4 hover:decoration-ink disabled:opacity-40"
                 data-testid="register-send-code-button"
               >
-                Send code to my email
-              </Button>
-            ) : (
-              <>
-                <Input
-                  label="Verification code"
-                  name="code"
-                  required
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={code}
-                  onChange={(e) =>
-                    setCode(
-                      e.target.value.replace(/[^\d]/g, "").slice(0, 6)
-                    )
-                  }
-                  data-testid="otp-input"
-                />
-                {hint && <p className="text-xs text-ui-fg-subtle">{hint}</p>}
-                <Button
-                  size="large"
-                  className="w-full mt-2"
-                  isLoading={isPending}
-                  disabled={code.trim().length === 0}
-                  onClick={verifyAndCreate}
-                  data-testid="register-button"
-                >
-                  Verify &amp; create account
-                </Button>
-              </>
+                {cooldown > 0 ? `Resend in ${cooldown}s` : sent ? "Resend code" : isPending ? "Sending…" : "Send again"}
+              </button>
+            </div>
+            {sent && (
+              <p className="text-center text-[11px] leading-4 text-ink-muted">
+                Tip: check Spam / Promotions. Add no-reply@howsu.com to contacts so the
+                next code lands in Primary.
+              </p>
             )}
+
             <button
               type="button"
               onClick={() => {
@@ -218,10 +310,11 @@ const Register = ({ setCurrentView }: Props) => {
                 setSent(false)
                 setHint(null)
                 setCode("")
+                setCooldown(0)
               }}
-              className="text-center text-ui-fg-subtle text-small-regular mt-2 underline"
+              className="text-center text-small-regular text-ui-fg-subtle underline"
             >
-              Back
+              Back — edit details
             </button>
           </div>
         )}

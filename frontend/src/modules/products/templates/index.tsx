@@ -46,8 +46,8 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
 
   const videoUrl =
     typeof product.metadata?.product_video === "string"
-      ? product.metadata.product_video
-      : null
+      ? (product.metadata.product_video as string)
+      : undefined
 
   return (
     <>
