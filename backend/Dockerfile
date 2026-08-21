@@ -40,6 +40,7 @@ RUN npm ci --omit=dev --legacy-peer-deps \
 # Keep the compiled Medusa server and admin assets together. The start command
 # uses this output and does not rebuild on every container boot.
 COPY --from=build /app/.medusa ./.medusa
+COPY --from=build /app/.medusa/server/medusa-config.js ./medusa-config.js
 
 EXPOSE 9000
 
