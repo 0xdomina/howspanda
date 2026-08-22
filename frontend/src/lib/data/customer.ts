@@ -1,6 +1,6 @@
 "use server"
 
-import { sdk } from "@lib/config"
+import { MEDUSA_BACKEND_URL, sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
@@ -28,14 +28,26 @@ export const loginWithEmailPassword = async (
   email: string,
   password: string
 ) => {
-  const { token } = await sdk.client.fetch<{ token: string }>(
-    `/auth/${actor}/emailpass`,
+  const response = await fetch(
+    `${MEDUSA_BACKEND_URL}/auth/${actor}/emailpass`,
     {
       method: "POST",
-      body: { email, password },
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
       cache: "no-store",
     }
   )
+
+  const result = (await response.json().catch(() => null)) as {
+    token?: string
+    message?: string
+  } | null
+
+  if (!response.ok) {
+    throw new Error(result?.message || `Authentication failed (${response.status})`)
+  }
+
+  const { token } = result || {}
 
   if (!token) throw new Error("Authentication did not return a session token")
 
