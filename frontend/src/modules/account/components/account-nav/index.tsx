@@ -13,7 +13,6 @@ import Bell from "@modules/common/icons/bell"
 import FastDelivery from "@modules/common/icons/fast-delivery"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { HttpTypes } from "@medusajs/types"
-import { signout } from "@lib/data/customer"
 import { getDisplayName } from "@lib/util/name"
 
 const AccountNav = ({
@@ -25,7 +24,8 @@ const AccountNav = ({
   const { countryCode } = useParams() as { countryCode: string }
 
   const handleLogout = async () => {
-    await signout(countryCode)
+    await fetch("/api/auth/logout", { method: "POST" })
+    window.location.assign(`/${countryCode}/account`)
   }
 
   return (
