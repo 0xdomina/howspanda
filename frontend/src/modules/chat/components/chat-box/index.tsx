@@ -17,6 +17,21 @@ import {
 
 const CLIENT_KEY_STORAGE = "howsu_ai_chat_client_key"
 
+const safeAssistantCopy = (message: AiChatMessage): AiChatMessage => {
+  if (message.role !== "assistant") return message
+
+  // Older conversations may contain a fallback phrase from before the
+  // production copy cleanup. Keep that legacy text from resurfacing.
+  if (/^Mock reply:/i.test(message.content)) {
+    return {
+      ...message,
+      content: "Here’s a helpful answer based on How’s U shopping guidance.",
+    }
+  }
+
+  return message
+}
+
 const getStoredKey = (): string => {
   if (typeof window === "undefined") return ""
   const existing = window.localStorage.getItem(CLIENT_KEY_STORAGE)
@@ -27,8 +42,9 @@ const getStoredKey = (): string => {
 }
 
 const ChatMessage = ({ message }: { message: AiChatMessage }) => {
-  const isUser = message.role === "user"
-  const isSystem = message.role === "system"
+  const safeMessage = safeAssistantCopy(message)
+  const isUser = safeMessage.role === "user"
+  const isSystem = safeMessage.role === "system"
 
   if (isSystem) return null
 
@@ -41,7 +57,7 @@ const ChatMessage = ({ message }: { message: AiChatMessage }) => {
             : "bg-paper-surface border border-ink-hairline text-ink"
         }`}
       >
-        <p className="whitespace-pre-wrap">{message.content}</p>
+        <p className="whitespace-pre-wrap">{safeMessage.content}</p>
       </div>
     </div>
   )
