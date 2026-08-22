@@ -2,7 +2,10 @@
 
 import { sdk } from "@lib/config"
 import { redirect } from "next/navigation"
-import { signout as customerSignout } from "./customer"
+import {
+  loginWithEmailPassword,
+  signout as customerSignout,
+} from "./customer"
 import { revalidateTag } from "next/cache"
 import { getAuthHeaders, getCacheTag } from "./cookies"
 import {
@@ -124,10 +127,7 @@ export async function sellerRegister(
     })
 
     // 3. Re-login so the token carries the seller admin actor for /sellers/*.
-    const loginToken = await sdk.auth.login("seller", "emailpass", {
-      email,
-      password,
-    })
+    const loginToken = await loginWithEmailPassword("seller", email, password)
     await setSellerAuthToken(loginToken as string)
 
     const tag = await getSellerCacheTag("seller")
@@ -146,10 +146,7 @@ export async function sellerLogin(_currentState: unknown, formData: FormData) {
   const password = formData.get("password") as string
 
   try {
-    const token = await sdk.auth.login("seller", "emailpass", {
-      email,
-      password,
-    })
+    const token = await loginWithEmailPassword("seller", email, password)
     await setSellerAuthToken(token as string)
 
     const tag = await getSellerCacheTag("seller")

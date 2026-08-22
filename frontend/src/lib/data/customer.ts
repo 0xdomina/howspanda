@@ -16,6 +16,32 @@ import {
 } from "./cookies"
 import { setSellerAuthToken } from "./seller-cookies"
 
+type EmailPasswordActor = "customer" | "seller"
+
+/**
+ * Authenticate against the explicit Medusa email/password endpoint. The SDK
+ * auth helper can negotiate session mode differently between runtimes; the
+ * platform stores this bearer token in its own httpOnly cookie.
+ */
+export const loginWithEmailPassword = async (
+  actor: EmailPasswordActor,
+  email: string,
+  password: string
+) => {
+  const { token } = await sdk.client.fetch<{ token: string }>(
+    `/auth/${actor}/emailpass`,
+    {
+      method: "POST",
+      body: { email, password },
+      cache: "no-store",
+    }
+  )
+
+  if (!token) throw new Error("Authentication did not return a session token")
+
+  return token
+}
+
 export const retrieveCustomer =
   async (): Promise<HttpTypes.StoreCustomer | null> => {
     const authHeaders = await getAuthHeaders()
@@ -87,10 +113,7 @@ export async function signup(_currentState: unknown, formData: FormData) {
     })
 
     stage = "sign in"
-    const loginToken = await sdk.auth.login("customer", "emailpass", {
-      email,
-      password,
-    })
+    const loginToken = await loginWithEmailPassword("customer", email, password)
 
     await setAuthToken(loginToken as string)
 
@@ -119,10 +142,11 @@ export async function login(_currentState: unknown, formData: FormData) {
   const countryCode = (formData.get("countryCode") as string) || "ng"
 
   try {
-    const customerToken = await sdk.auth.login("customer", "emailpass", {
+    const customerToken = await loginWithEmailPassword(
+      "customer",
       email,
-      password,
-    })
+      password
+    )
     await setAuthToken(customerToken as string)
     // Some legacy seller identities can authenticate through the customer
     // provider but do not have a customer record. Treat those as seller
@@ -140,10 +164,7 @@ export async function login(_currentState: unknown, formData: FormData) {
     // all new upgrades continue using the customer session.
     let sellerToken: unknown
     try {
-      sellerToken = await sdk.auth.login("seller", "emailpass", {
-        email,
-        password,
-      })
+      sellerToken = await loginWithEmailPassword("seller", email, password)
     } catch {
       return customerError.toString()
     }
