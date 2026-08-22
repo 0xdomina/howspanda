@@ -73,10 +73,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (result.response.status >= 500 || !result.response.ok || !result.token) {
-      return NextResponse.json(
+      const failure = NextResponse.json(
         { message: "The email or password is incorrect." },
         { status: 401 }
       )
+      failure.headers.set("x-auth-backend-host", new URL(MEDUSA_AUTH_BASE_URL).host)
+      failure.headers.set("x-auth-upstream-status", String(result.response.status))
+      failure.headers.set("x-auth-token-present", String(Boolean(result.token)))
+      return failure
     }
 
     const response = NextResponse.json({ ok: true, actor })
