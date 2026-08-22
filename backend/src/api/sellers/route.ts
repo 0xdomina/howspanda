@@ -68,23 +68,14 @@ export const POST = async (
         "first_name",
         "last_name",
         "phone",
-        "addresses.*",
       ],
       filters: { id: [req.auth_context.actor_id] },
     })
 
-    const address = (customer as any)?.addresses?.find(
-      (candidate: any) =>
-        candidate?.address_1?.trim() &&
-        candidate?.city?.trim() &&
-        candidate?.country_code?.trim()
-    )
-
     profileComplete = Boolean(
       customer?.first_name?.trim() &&
         customer?.last_name?.trim() &&
-        customer?.phone?.trim() &&
-        address
+        customer?.phone?.trim()
     )
   }
 

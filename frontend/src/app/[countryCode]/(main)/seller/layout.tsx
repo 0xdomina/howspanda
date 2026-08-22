@@ -26,13 +26,7 @@ export default async function SellerRouteLayout({
     const profileComplete = Boolean(
       customer.first_name?.trim() &&
         customer.last_name?.trim() &&
-        customer.phone?.trim() &&
-        customer.addresses?.some(
-          (address) =>
-            address.address_1?.trim() &&
-            address.city?.trim() &&
-            address.country_code?.trim()
-        )
+        customer.phone?.trim()
     )
 
     return (
