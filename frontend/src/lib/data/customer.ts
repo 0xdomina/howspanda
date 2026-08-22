@@ -4,6 +4,7 @@ import { MEDUSA_BACKEND_URL, sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
+import { headers as nextHeaders } from "next/headers"
 import { redirect } from "next/navigation"
 import {
   getAuthHeaders,
@@ -17,6 +18,37 @@ import {
 import { removeSellerAuthToken, setSellerAuthToken } from "./seller-cookies"
 
 type EmailPasswordActor = "customer" | "seller"
+
+async function getStorefrontOrigin(): Promise<string> {
+  const requestHeaders = await nextHeaders()
+  const host = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host")
+  const protocol = requestHeaders.get("x-forwarded-proto") || "https"
+  if (!host) throw new Error("The storefront host is unavailable")
+  return `${protocol}://${host}`
+}
+
+async function saveAddressThroughEdge(
+  address: Record<string, unknown>,
+  addressId?: string
+) {
+  const origin = await getStorefrontOrigin()
+  const response = await fetch(`${origin}/api/customer/addresses`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin,
+    },
+    body: JSON.stringify({ address, addressId }),
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "")
+    throw new Error(body || "Unable to save the address")
+  }
+
+  return response.json().catch(() => ({}))
+}
 
 /**
  * Authenticate against the explicit Medusa email/password endpoint. The SDK
@@ -263,12 +295,7 @@ export const addCustomerAddress = async (
     is_default_shipping: isDefaultShipping,
   }
 
-  const headers = {
-    ...(await getAuthHeaders()),
-  }
-
-  return sdk.store.customer
-    .createAddress(address, {}, headers)
+  return saveAddressThroughEdge(address)
     .then(async ({ customer }) => {
       const customerCacheTag = await getCacheTag("customers")
       revalidateTag(customerCacheTag, "max")
@@ -327,12 +354,7 @@ export const updateCustomerAddress = async (
     address.phone = phone
   }
 
-  const headers = {
-    ...(await getAuthHeaders()),
-  }
-
-  return sdk.store.customer
-    .updateAddress(addressId, address, {}, headers)
+  return saveAddressThroughEdge(address, addressId)
     .then(async () => {
       const customerCacheTag = await getCacheTag("customers")
       revalidateTag(customerCacheTag, "max")
