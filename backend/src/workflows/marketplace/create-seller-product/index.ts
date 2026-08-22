@@ -35,31 +35,19 @@ const createSellerProductWorkflow = createWorkflow(
       fields: ["default_sales_channel_id", "default_location_id"],
     })
 
-    // Store defaults are not guaranteed to exist on older or manually-created
-    // stores. Keep product creation usable by falling back to the first active
-    // sales channel instead of sending an invalid `{ id: undefined }` link to
-    // the Medusa product workflow.
-    const { data: salesChannels } = useQueryGraphStep({
-      entity: "sales_channel",
-      fields: ["id", "is_disabled"],
-      filters: { is_disabled: false },
-    }).config({ name: "retrieve-active-sales-channel" })
-
     const productData = transform({
       input,
       stores,
-      salesChannels,
     }, (data) => {
-      const store = data.stores[0]
-      const salesChannelId =
-        store?.default_sales_channel_id ?? data.salesChannels[0]?.id
-      const product = {
-        ...data.input.product,
-        ...(salesChannelId ? { sales_channels: [{ id: salesChannelId }] } : {}),
-      }
-
       return {
-        products: [product],
+        products: [{
+          ...data.input.product,
+          sales_channels: [
+            {
+              id: data.stores[0].default_sales_channel_id,
+            },
+          ],
+        }],
       }
     })
 
