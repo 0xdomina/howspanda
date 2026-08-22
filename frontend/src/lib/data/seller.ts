@@ -919,7 +919,7 @@ export const createSellerProduct = async (
     // PandaStack may briefly return a warm-up 503 while the Medusa process is
     // waking. Retry only that explicit edge response; a timed-out or 5xx
     // product mutation is never repeated because its write outcome is unclear.
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         await sdk.client.fetch("/sellers/products", {
           method: "POST",
@@ -932,7 +932,7 @@ export const createSellerProduct = async (
         const warmup =
           [403, 502, 503].includes(Number(error?.status)) &&
           /warming|ready["']?\s*:\s*false|booting/i.test(raw)
-        if (!warmup || attempt === 2) throw error
+        if (!warmup || attempt === 4) throw error
         await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)))
       }
     }
