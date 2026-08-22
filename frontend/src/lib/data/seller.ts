@@ -925,7 +925,11 @@ export const createSellerProduct = async (
 
     return { success: true, error: null }
   } catch (error: any) {
-    return { success: false, error: error.toString() }
+    const raw = String(error?.message ?? error ?? "")
+    const errorMessage = /unknown error|<!doctype html|<html|just a moment|cloudflare|challenge-platform/i.test(raw)
+      ? "We couldn't add that product right now. Please try again shortly."
+      : raw.replace(/^Error:\s*/i, "") || "We couldn't add that product right now. Please try again shortly."
+    return { success: false, error: errorMessage }
   }
 }
 
