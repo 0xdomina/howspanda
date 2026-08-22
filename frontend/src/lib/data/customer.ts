@@ -32,7 +32,15 @@ export const loginWithEmailPassword = async (
     `${MEDUSA_BACKEND_URL}/auth/${actor}/emailpass`,
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+          ? {
+              "x-publishable-api-key":
+                process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY,
+            }
+          : {}),
+      },
       body: JSON.stringify({ email, password }),
       cache: "no-store",
     }
