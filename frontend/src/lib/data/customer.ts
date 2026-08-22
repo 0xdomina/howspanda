@@ -28,7 +28,7 @@ async function getStorefrontOrigin(): Promise<string> {
 }
 
 async function saveAddressThroughEdge(
-  address: Record<string, unknown>,
+  address: object,
   addressId?: string
 ) {
   const origin = await getStorefrontOrigin()
