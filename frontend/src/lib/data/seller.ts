@@ -888,37 +888,54 @@ export const createSellerProduct = async (
 
     const variants = variantsJson ? JSON.parse(variantsJson) : null
 
-    await sdk.client.fetch("/sellers/products", {
-      method: "POST",
-      headers,
-      body: variants
-        ? {
-            title,
-            description,
-            photos,
-            banner_url: bannerUrl || undefined,
-            video_url: videoUrl || undefined,
-            currency_code,
-            status: "published",
-            flash_sale: flashSale,
-            homepage_banner: homepageBanner,
-            options: variants.options,
-            variants: variants.variants,
-          }
-        : {
-            title,
-            description,
-            photos,
-            banner_url: bannerUrl || undefined,
-            video_url: videoUrl || undefined,
-            price,
-            stock,
-            currency_code,
-            status: "published",
-            flash_sale: flashSale,
-            homepage_banner: homepageBanner,
-          },
-    })
+    const productBody = variants
+      ? {
+          title,
+          description,
+          photos,
+          banner_url: bannerUrl || undefined,
+          video_url: videoUrl || undefined,
+          currency_code,
+          status: "published" as const,
+          flash_sale: flashSale,
+          homepage_banner: homepageBanner,
+          options: variants.options,
+          variants: variants.variants,
+        }
+      : {
+          title,
+          description,
+          photos,
+          banner_url: bannerUrl || undefined,
+          video_url: videoUrl || undefined,
+          price,
+          stock,
+          currency_code,
+          status: "published" as const,
+          flash_sale: flashSale,
+          homepage_banner: homepageBanner,
+        }
+
+    // PandaStack may briefly return a warm-up 503 while the Medusa process is
+    // waking. Retry only that explicit edge response; a timed-out or 5xx
+    // product mutation is never repeated because its write outcome is unclear.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await sdk.client.fetch("/sellers/products", {
+          method: "POST",
+          headers,
+          body: productBody,
+        })
+        break
+      } catch (error: any) {
+        const raw = String(error?.message ?? error ?? "")
+        const warmup =
+          [403, 502, 503].includes(Number(error?.status)) &&
+          /warming|ready["']?\s*:\s*false|booting/i.test(raw)
+        if (!warmup || attempt === 2) throw error
+        await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)))
+      }
+    }
 
     const tag = await getSellerCacheTag("seller")
     revalidateTag(tag, "max")
