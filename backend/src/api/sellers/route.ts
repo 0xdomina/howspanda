@@ -2,7 +2,7 @@ import {
   AuthenticatedMedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http"
-import { MedusaError } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
 import createSellerWorkflow, {
   CreateSellerWorkflowInput,
@@ -47,19 +47,58 @@ export const POST = async (
 
   const sellerData = req.validatedBody
 
-  // Creating a store is a ladder-gated action: the user must first reach the
-  // current unlock level (phone + complete profile; identity once NIN is on)
-  // before they can become a seller. The signup identifier keys the check.
+  // Creating a store is a ladder-gated action. Customer accounts use their
+  // actual profile as the source of truth: once the account has a name, phone,
+  // and a complete address, seller access is unlocked without requiring a
+  // second identity or a duplicate KYC form. The KYC ladder remains the
+  // compatibility path for older accounts and phone-first flows.
   const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
-  await kyc.assertLevel({
-    email: sellerData.admin.email,
-    phone: sellerData.admin.phone,
-    userType: req.auth_context?.actor_type === "customer" ? "customer" : null,
-    userId: req.auth_context?.actor_type === "customer"
-      ? req.auth_context.actor_id
-      : null,
-    required: kyc.requiredUnlockLevel(),
-  })
+  let profileComplete = false
+
+  if (
+    req.auth_context?.actor_type === "customer" &&
+    req.auth_context.actor_id
+  ) {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: [customer] } = await query.graph({
+      entity: "customer",
+      fields: [
+        "id",
+        "email",
+        "first_name",
+        "last_name",
+        "phone",
+        "addresses.*",
+      ],
+      filters: { id: [req.auth_context.actor_id] },
+    })
+
+    const address = (customer as any)?.addresses?.find(
+      (candidate: any) =>
+        candidate?.address_1?.trim() &&
+        candidate?.city?.trim() &&
+        candidate?.country_code?.trim()
+    )
+
+    profileComplete = Boolean(
+      customer?.first_name?.trim() &&
+        customer?.last_name?.trim() &&
+        customer?.phone?.trim() &&
+        address
+    )
+  }
+
+  if (!profileComplete) {
+    await kyc.assertLevel({
+      email: sellerData.admin.email,
+      phone: sellerData.admin.phone,
+      userType: req.auth_context?.actor_type === "customer" ? "customer" : null,
+      userId: req.auth_context?.actor_type === "customer"
+        ? req.auth_context.actor_id
+        : null,
+      required: kyc.requiredUnlockLevel(),
+    })
+  }
 
   const { result } = await createSellerWorkflow(req.scope)
     .run({

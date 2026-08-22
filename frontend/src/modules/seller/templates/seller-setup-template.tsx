@@ -15,11 +15,19 @@ type SellerSetupTemplateProps = {
     email?: string | null
   }
   kyc: KycProfileView | null
+  profileComplete?: boolean
 }
 
-export default function SellerSetupTemplate({ customer, kyc }: SellerSetupTemplateProps) {
+export default function SellerSetupTemplate({
+  customer,
+  kyc,
+  profileComplete = false,
+}: SellerSetupTemplateProps) {
   const [message, formAction] = useActionState(upgradeCustomerToSeller, null)
-  const canSell = kyc?.level === "profile_completed" || kyc?.level === "identity_verified"
+  const canSell =
+    profileComplete ||
+    kyc?.level === "profile_completed" ||
+    kyc?.level === "identity_verified"
 
   return (
     <div className="seller-workspace figma-container flex min-h-[calc(100vh-180px)] items-center justify-center py-12 small:py-20">
