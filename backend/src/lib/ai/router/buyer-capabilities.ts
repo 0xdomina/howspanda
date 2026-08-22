@@ -69,19 +69,19 @@ registerCapability({
 // is code-generated and schema-validated; the mock only supplies the prose).
 registerMockOutput(
   "buyer_search",
-  "Mock reply: here are matching products from the marketplace catalog."
+  "Here are products that match your search."
 )
 registerMockOutput(
   "buyer_price_compare",
-  "Mock reply: here is a price comparison of the matching products."
+  "Here’s a quick price comparison for the matching products."
 )
 registerMockOutput(
   "buyer_review_summary",
-  "Mock reply: here is a summary of buyer reviews for this product."
+  "Here’s a quick summary of the buyer reviews for this product."
 )
 registerMockOutput(
   "buyer_cart_proposal",
-  "Mock reply: I can update your cart — please confirm the change below."
+  "I can update your cart. Please confirm the change below."
 )
 
 // ---- capability runner --------------------------------------------------

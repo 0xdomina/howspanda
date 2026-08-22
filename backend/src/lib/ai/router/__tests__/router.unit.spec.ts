@@ -14,7 +14,7 @@ process.env.AI_ROUTER_STRATEGY = "round-robin"
 // even when this spec runs standalone.
 registerMockOutput(
   "chat",
-  "Mock reply: here is a helpful, marketplace-grounded answer for the buyer."
+  "Here’s a helpful answer based on How’s U shopping guidance."
 )
 
 describe("model router (deterministic mock)", () => {

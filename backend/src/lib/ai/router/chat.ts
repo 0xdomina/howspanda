@@ -24,11 +24,11 @@ registerCapability({
 
 registerMockOutput(
   "chat",
-  "Mock reply: here is a helpful, marketplace-grounded answer for the buyer."
+  "Here’s a helpful answer based on How’s U shopping guidance."
 )
 registerMockOutput(
   "seller_chat",
-  "Mock reply: here is a helpful, store-grounded answer for the seller."
+  "Here’s a helpful answer based on your store tools and guidance."
 )
 
 export const BUYER_CHAT_SYSTEM_PROMPT =
