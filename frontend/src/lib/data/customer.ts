@@ -14,7 +14,7 @@ import {
   removeCartId,
   setAuthToken,
 } from "./cookies"
-import { setSellerAuthToken } from "./seller-cookies"
+import { removeSellerAuthToken, setSellerAuthToken } from "./seller-cookies"
 
 type EmailPasswordActor = "customer" | "seller"
 
@@ -212,9 +212,8 @@ export async function login(_currentState: unknown, formData: FormData) {
 }
 
 export async function signout(countryCode: string) {
-  await sdk.auth.logout()
-
   await removeAuthToken()
+  await removeSellerAuthToken()
 
   const customerCacheTag = await getCacheTag("customers")
   revalidateTag(customerCacheTag, "max")
