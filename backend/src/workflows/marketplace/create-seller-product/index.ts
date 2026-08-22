@@ -7,6 +7,7 @@ import {
 import {
   createProductsWorkflow,
   CreateProductsWorkflowInput,
+  createInventoryLevelsWorkflow,
   createRemoteLinkStep,
   useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
@@ -16,19 +17,52 @@ import { Modules } from "@medusajs/framework/utils"
 type WorkflowInput = {
   seller_admin_id: string
   product: CreateProductWorkflowInputDTO
-  /** Optional per-variant stock quantities retained for the inventory step. */
+  /**
+   * Optional per-variant stock quantities, aligned by index with
+   * `product.variants`. A variant with a stock value gets a real inventory
+   * level at the store's default location; a variant without one is listed
+   * but not stocked (available = 0 until the seller adds stock later).
+   */
   stocks?: (number | undefined)[]
 }
 
 const createSellerProductWorkflow = createWorkflow(
   "create-seller-product",
   (input: WorkflowInput) => {
-    // Keep the creation transaction independent of optional store defaults.
-    // Sales-channel assignment is not required for the product entity itself
-    // and older stores may not have a readable default channel.
-    const productData = transform({ input }, (data) => ({
-      products: [data.input.product],
-    }))
+    // make the product available in the store's default sales channel
+    const { data: stores } = useQueryGraphStep({
+      entity: "store",
+      fields: ["default_sales_channel_id", "default_location_id"],
+    })
+
+    // assign the store's default shipping profile (or the first available one)
+    // so cart line items for the product are covered by the store's shipping
+    // options; without it the product has no profile link and checkout fails
+    // with "cart items require shipping profiles..."
+    const { data: shippingProfiles } = useQueryGraphStep({
+      entity: "shipping_profile",
+      fields: ["id", "type"],
+      filters: { type: "default" },
+    }).config({ name: "retrieve-default-shipping-profile" })
+
+    const productData = transform({
+      input,
+      stores,
+      shippingProfiles,
+    }, (data) => {
+      return {
+        products: [{
+          ...data.input.product,
+          shipping_profile_id:
+            data.shippingProfiles[0]?.id ?? data.input.product.shipping_profile_id,
+          sales_channels: [
+            {
+              id: data.stores[0].default_sales_channel_id,
+            },
+          ],
+        }],
+      }
+    })
 
     const createdProducts = createProductsWorkflow.runAsStep({
       input: productData as CreateProductsWorkflowInput,
@@ -61,8 +95,73 @@ const createSellerProductWorkflow = createWorkflow(
 
     createRemoteLinkStep(linksToCreate)
 
+    // Stock: give each stocked variant a real inventory level at the store's
+    // default location. The product workflow auto-creates one inventory item
+    // per manage_inventory variant; we add the level (stocked_quantity).
+    const { data: createdVariants } = useQueryGraphStep({
+      entity: "product_variant",
+      fields: ["id", "inventory_items.inventory_item_id"],
+      filters: {
+        product_id: createdProducts[0].id,
+      },
+    }).config({ name: "retrieve-created-variants" })
+
+    const inventoryLevels = transform({
+      input,
+      stores,
+      createdVariants,
+    }, (data) => {
+      const locationId = data.stores[0]?.default_location_id
+      if (!locationId) {
+        return { inventory_levels: [] }
+      }
+
+      const levels: {
+        inventory_item_id: string
+        location_id: string
+        stocked_quantity: number
+      }[] = []
+      for (const [index, variant] of data.createdVariants.entries()) {
+        const stock = data.input.stocks?.[index]
+        if (typeof stock !== "number" || stock < 0) {
+          continue
+        }
+        const inventoryItem = variant.inventory_items?.[0]?.inventory_item_id
+        if (!inventoryItem) {
+          continue
+        }
+        levels.push({
+          inventory_item_id: inventoryItem,
+          location_id: locationId,
+          stocked_quantity: stock,
+        })
+      }
+      return { inventory_levels: levels }
+    })
+
+    createInventoryLevelsWorkflow.runAsStep({
+      input: inventoryLevels,
+    })
+
+    const { data: products } = useQueryGraphStep({
+      entity: "product",
+      fields: [
+        "*",
+        "variants.*",
+        "variants.options.*",
+        "variants.prices.*",
+        "variants.prices.currency_code.*",
+        "images.*",
+        "options.*",
+        "options.values.*",
+      ],
+      filters: {
+        id: createdProducts[0].id,
+      },
+    }).config({ name: "retrieve-products" })
+
     return new WorkflowResponse({
-      product: createdProducts[0],
+      product: products[0],
     })
   }
 )
