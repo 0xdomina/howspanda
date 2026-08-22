@@ -151,11 +151,18 @@ export async function login(_currentState: unknown, formData: FormData) {
     // Some legacy seller identities can authenticate through the customer
     // provider but do not have a customer record. Treat those as seller
     // sessions so the single sign-in form still reaches Manage Business.
-    await sdk.client.fetch("/store/customers/me", {
-      method: "GET",
-      headers: { authorization: `Bearer ${customerToken as string}` },
-      cache: "no-store",
-    })
+    // A valid auth token is sufficient to establish the session. Profile
+    // hydration runs separately and must not turn a successful sign-in into
+    // a false "Forbidden" result when a store-key header is unavailable.
+    try {
+      await sdk.client.fetch("/store/customers/me", {
+        method: "GET",
+        headers: { authorization: `Bearer ${customerToken as string}` },
+        cache: "no-store",
+      })
+    } catch {
+      // Keep the session; the account page will retry profile hydration.
+    }
     const customerCacheTag = await getCacheTag("customers")
     revalidateTag(customerCacheTag, "max")
   } catch (customerError: any) {
