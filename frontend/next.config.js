@@ -24,7 +24,8 @@ const mediaImageHostnames = (process.env.MEDIA_IMAGE_HOSTNAMES || "")
 // arbitrary origins.
 const serverActionOrigins = [
   "hows-u.vercel.app",
-  "hows-u-*.vercel.app",
+  "hows-*.alpherxs-projects.vercel.app",
+  ...(process.env.VERCEL_URL ? [process.env.VERCEL_URL] : []),
   "localhost:8000",
 ]
 
