@@ -35,16 +35,6 @@ const createSellerProductWorkflow = createWorkflow(
       fields: ["default_sales_channel_id", "default_location_id"],
     })
 
-    // assign the store's default shipping profile (or the first available one)
-    // so cart line items for the product are covered by the store's shipping
-    // options; without it the product has no profile link and checkout fails
-    // with "cart items require shipping profiles..."
-    const { data: shippingProfiles } = useQueryGraphStep({
-      entity: "shipping_profile",
-      fields: ["id", "type"],
-      filters: { type: "default" },
-    }).config({ name: "retrieve-default-shipping-profile" })
-
     // Store defaults are not guaranteed to exist on older or manually-created
     // stores. Keep product creation usable by falling back to the first active
     // sales channel instead of sending an invalid `{ id: undefined }` link to
@@ -58,17 +48,13 @@ const createSellerProductWorkflow = createWorkflow(
     const productData = transform({
       input,
       stores,
-      shippingProfiles,
       salesChannels,
     }, (data) => {
       const store = data.stores[0]
-      const shippingProfileId =
-        data.shippingProfiles[0]?.id ?? data.input.product.shipping_profile_id
       const salesChannelId =
         store?.default_sales_channel_id ?? data.salesChannels[0]?.id
       const product = {
         ...data.input.product,
-        ...(shippingProfileId ? { shipping_profile_id: shippingProfileId } : {}),
         ...(salesChannelId ? { sales_channels: [{ id: salesChannelId }] } : {}),
       }
 
