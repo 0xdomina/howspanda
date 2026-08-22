@@ -1,6 +1,5 @@
 "use client"
 
-import { MEDUSA_BACKEND_URL } from "@lib/config"
 import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import Button from "@modules/common/components/button"
@@ -27,52 +26,23 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
       const formData = new FormData(event.currentTarget)
       const email = String(formData.get("email") || "").trim().toLowerCase()
       const password = String(formData.get("password") || "")
-      const headers = {
-        "content-type": "application/json",
-        ...(process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-          ? {
-              "x-publishable-api-key":
-                process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY,
-            }
-          : {}),
-      }
-
-      let actor: "customer" | "seller" = "customer"
-      let response = await fetch(`${MEDUSA_BACKEND_URL}/auth/customer/emailpass`, {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers,
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password }),
       })
-
-      if (!response.ok) {
-        actor = "seller"
-        response = await fetch(`${MEDUSA_BACKEND_URL}/auth/seller/emailpass`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ email, password }),
-        })
-      }
-
       const result = (await response.json().catch(() => null)) as {
-        token?: string
+        actor?: "customer" | "seller"
         message?: string
       } | null
 
-      if (!response.ok || !result?.token) {
+      if (!response.ok || !result?.actor) {
         throw new Error(result?.message || "The email or password is incorrect.")
       }
 
-      const sessionResponse = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: result.token, actor }),
-      })
-
-      if (!sessionResponse.ok) {
-        throw new Error("We could not start your session. Please try again.")
-      }
-
-      window.location.assign(`/${countryCode}/${actor === "seller" ? "seller" : "account"}`)
+      window.location.assign(
+        `/${countryCode}/${result.actor === "seller" ? "seller" : "account"}`
+      )
     } catch (error: any) {
       setMessage(error?.message || "We could not sign you in. Please try again.")
       setPending(false)
