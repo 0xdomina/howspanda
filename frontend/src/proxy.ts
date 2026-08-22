@@ -118,6 +118,14 @@ async function getCountryCode(
  * Proxy to handle region selection and onboarding status.
  */
 export async function proxy(request: NextRequest) {
+  // Server Actions post back to the current page with a `next-action` header.
+  // They must reach Next's action handler unchanged; redirecting them through
+  // the storefront country-code proxy causes a production 403 before the
+  // action can call the backend.
+  if (request.headers.has("next-action")) {
+    return NextResponse.next()
+  }
+
   let redirectUrl = request.nextUrl.href
 
   let response = NextResponse.redirect(redirectUrl, 307)
