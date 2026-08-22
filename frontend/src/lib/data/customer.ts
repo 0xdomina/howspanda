@@ -132,7 +132,12 @@ export async function signup(_currentState: unknown, formData: FormData) {
     const customerCacheTag = await getCacheTag("customers")
     revalidateTag(customerCacheTag, "max")
 
-    await transferCart()
+    try {
+      await transferCart()
+    } catch {
+      // Cart transfer is optional and must not invalidate a newly created
+      // account session.
+    }
 
     return createdCustomer
   } catch (error: any) {
@@ -193,8 +198,8 @@ export async function login(_currentState: unknown, formData: FormData) {
 
   try {
     await transferCart()
-  } catch (error: any) {
-    return error.toString()
+  } catch {
+    // A stale or unavailable guest cart must not make sign-in look failed.
   }
 }
 
