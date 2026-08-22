@@ -18,6 +18,16 @@ const mediaImageHostnames = (process.env.MEDIA_IMAGE_HOSTNAMES || "")
   .map((h) => h.trim())
   .filter(Boolean)
 
+// Vercel can serve the same production build through its canonical alias and
+// deployment host. Explicitly allow only How's U hosts for Server Actions so
+// Next's CSRF origin check works through that proxy without opening actions to
+// arbitrary origins.
+const serverActionOrigins = [
+  "hows-u.vercel.app",
+  "hows-u-*.vercel.app",
+  "localhost:8000",
+]
+
 /**
  * @type {import('next').NextConfig}
  */
@@ -29,6 +39,11 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  experimental: {
+    serverActions: {
+      allowedOrigins: serverActionOrigins,
+    },
+  },
   logging: {
     fetches: {
       fullUrl: process.env.NODE_ENV !== "production",
