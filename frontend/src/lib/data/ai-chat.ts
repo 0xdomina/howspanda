@@ -1,8 +1,3 @@
-"use server"
-
-import { sdk } from "@lib/config"
-import { getAuthHeaders } from "./cookies"
-
 // Buyer chat data helpers. Ownership is resolved server-side: a signed-in
 // customer is identified by their JWT actor; guests pass a private client_key
 // they generate and keep client-side (never sent in a URL when avoidable).
@@ -51,28 +46,33 @@ export const sendAiChatMessage = async (input: {
   title?: string
 }): Promise<AiChatResult<Partial<AiChatReply>>> => {
   try {
-    const headers = await getAuthHeaders()
-    const res = await sdk.client.fetch<AiChatReply>("/store/ai/chat", {
+    const response = await fetch("/api/ai/chat", {
       method: "POST",
-      headers,
-      body: {
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
         message: input.message,
         client_key: input.clientKey,
         conversation_id: input.conversationId,
         title: input.title,
-      },
+      }),
     })
+    const res = (await response.json().catch(() => ({}))) as AiChatReply
+    if (!response.ok) {
+      return {
+        ...res,
+        success: false,
+        ok: false,
+        code: res.code,
+        error: res.message ?? "The assistant is unavailable right now. Please try again shortly.",
+      }
+    }
     return { ...res, success: true, error: null }
   } catch (error: any) {
     return {
       success: false,
       ok: false,
-      code: error?.response?.data?.code,
-      error:
-        error?.response?.data?.message ??
-        error?.message ??
-        error?.toString?.() ??
-        String(error),
+      code: undefined,
+      error: error?.message ?? "The assistant is unavailable right now. Please try again shortly.",
     }
   }
 }
@@ -83,20 +83,17 @@ export const getAiChatHistory = async (input: {
   clientKey?: string
 }): Promise<{ conversation: { id: string; title: string | null }; messages: AiChatMessage[] } | null> => {
   try {
-    const headers = await getAuthHeaders()
-    const res = await sdk.client.fetch<{
+    const params = new URLSearchParams({ conversation_id: input.conversationId })
+    if (input.clientKey) params.set("client_key", input.clientKey)
+    const response = await fetch(`/api/ai/chat?${params.toString()}`, {
+      cache: "no-store",
+    })
+    if (!response.ok) return null
+    const res = (await response.json()) as {
       ok: boolean
       conversation: { id: string; title: string | null }
       messages: AiChatMessage[]
-    }>("/store/ai/chat", {
-      method: "GET",
-      headers,
-      query: {
-        conversation_id: input.conversationId,
-        client_key: input.clientKey,
-      },
-      cache: "no-store",
-    })
+    }
     return { conversation: res.conversation, messages: res.messages ?? [] }
   } catch {
     return null
@@ -108,19 +105,16 @@ export const listAiChatConversations = async (input: {
   clientKey?: string
 }): Promise<AiChatConversation[]> => {
   try {
-    const headers = await getAuthHeaders()
-    return await sdk.client
-      .fetch<{ conversations: AiChatConversation[] }>(
-        "/store/ai/chat/conversations",
-        {
-          method: "GET",
-          headers,
-          query: { client_key: input.clientKey },
-          cache: "no-store",
-        }
-      )
-      .then(({ conversations }) => conversations ?? [])
-      .catch(() => [])
+    const params = new URLSearchParams()
+    if (input.clientKey) params.set("client_key", input.clientKey)
+    const response = await fetch(`/api/ai/chat?${params.toString()}`, {
+      cache: "no-store",
+    })
+    if (!response.ok) return []
+    const { conversations } = (await response.json()) as {
+      conversations?: AiChatConversation[]
+    }
+    return conversations ?? []
   } catch {
     return []
   }
