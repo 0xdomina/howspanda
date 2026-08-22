@@ -1,7 +1,15 @@
-import { MEDUSA_BACKEND_URL } from "@lib/config"
 import { NextRequest, NextResponse } from "next/server"
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7
+const PRODUCTION_BACKEND_URL = "https://hows-u-api-final.pandastack.app"
+const configuredBackendUrl =
+  process.env.MEDUSA_BACKEND_URL || process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+const MEDUSA_AUTH_BASE_URL =
+  configuredBackendUrl &&
+  (configuredBackendUrl.includes("hows-u-api-final.pandastack.app") ||
+    configuredBackendUrl.startsWith("http://localhost"))
+    ? configuredBackendUrl.replace(/\/+$/, "")
+    : PRODUCTION_BACKEND_URL
 
 function isSameSiteRequest(request: NextRequest) {
   const origin = request.headers.get("origin")
@@ -15,7 +23,7 @@ function isSameSiteRequest(request: NextRequest) {
 }
 
 async function authenticate(actor: "customer" | "seller", email: string, password: string) {
-  const response = await fetch(`${MEDUSA_BACKEND_URL}/auth/${actor}/emailpass`, {
+  const response = await fetch(`${MEDUSA_AUTH_BASE_URL}/auth/${actor}/emailpass`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password }),
