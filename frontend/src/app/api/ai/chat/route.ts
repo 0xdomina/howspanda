@@ -19,14 +19,39 @@ function upstreamHeaders(request: NextRequest): Headers {
   return headers
 }
 
-async function relay(upstream: Response): Promise<NextResponse> {
-  const body = await upstream.text()
+async function relay(upstream: { status: number; body: string; contentType?: string }): Promise<NextResponse> {
+  const body = upstream.body
   return new NextResponse(body || "{}", {
     status: upstream.status,
     headers: {
-      "content-type": upstream.headers.get("content-type") || "application/json",
+      "content-type": upstream.contentType || "application/json",
     },
   })
+}
+
+async function fetchWithWarmupRetry(url: string, init: RequestInit) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(url, init)
+    const body = await response.text()
+    const isWarmup =
+      response.status === 403 ||
+      response.status === 502 ||
+      response.status === 503
+        ? /warming|ready["']?\s*:\s*false|booting/i.test(body)
+        : false
+
+    if (!isWarmup || attempt === 2) {
+      return {
+        status: response.status,
+        body,
+        contentType: response.headers.get("content-type") || "application/json",
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)))
+  }
+
+  return { status: 503, body: "{}", contentType: "application/json" }
 }
 
 export async function POST(request: NextRequest) {
@@ -40,7 +65,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(`${BACKEND_URL}/store/ai/chat`, {
+    const upstream = await fetchWithWarmupRetry(`${BACKEND_URL}/store/ai/chat`, {
       method: "POST",
       headers: upstreamHeaders(request),
       body: JSON.stringify(body),
@@ -66,7 +91,7 @@ export async function GET(request: NextRequest) {
     : "/store/ai/chat/conversations"
 
   try {
-    const upstream = await fetch(`${BACKEND_URL}${target}${query ? `?${query}` : ""}`, {
+    const upstream = await fetchWithWarmupRetry(`${BACKEND_URL}${target}${query ? `?${query}` : ""}`, {
       method: "GET",
       headers: upstreamHeaders(request),
       cache: "no-store",
