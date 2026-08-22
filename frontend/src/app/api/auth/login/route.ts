@@ -15,18 +15,9 @@ function isSameSiteRequest(request: NextRequest) {
 }
 
 async function authenticate(actor: "customer" | "seller", email: string, password: string) {
-  const headers: Record<string, string> = { "content-type": "application/json" }
-  const publishableKey =
-    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
-    process.env.MEDUSA_PUBLISHABLE_KEY
-
-  if (publishableKey) {
-    headers["x-publishable-api-key"] = publishableKey
-  }
-
   const response = await fetch(`${MEDUSA_BACKEND_URL}/auth/${actor}/emailpass`, {
     method: "POST",
-    headers,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password }),
     cache: "no-store",
   })
