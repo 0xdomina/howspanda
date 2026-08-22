@@ -50,16 +50,13 @@ const createSellerProductWorkflow = createWorkflow(
       stores,
       shippingProfiles,
     }, (data) => {
+      const salesChannelId = data.stores[0]?.default_sales_channel_id
       return {
         products: [{
           ...data.input.product,
           shipping_profile_id:
             data.shippingProfiles[0]?.id ?? data.input.product.shipping_profile_id,
-          sales_channels: [
-            {
-              id: data.stores[0].default_sales_channel_id,
-            },
-          ],
+          ...(salesChannelId ? { sales_channels: [{ id: salesChannelId }] } : {}),
         }],
       }
     })
