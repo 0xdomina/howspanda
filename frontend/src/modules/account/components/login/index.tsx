@@ -1,10 +1,13 @@
-import { login } from "@lib/data/customer"
+"use client"
+
+import { MEDUSA_BACKEND_URL } from "@lib/config"
 import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import ErrorMessage from "@modules/checkout/components/error-message"
-import { SubmitButton } from "@modules/checkout/components/submit-button"
+import Button from "@modules/common/components/button"
 import Input from "@modules/common/components/input"
 import GoogleSignIn from "@modules/account/components/google-signin"
-import { useActionState } from "react"
+import { useState } from "react"
+import type { FormEvent } from "react"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
@@ -12,7 +15,69 @@ type Props = {
 }
 
 const Login = ({ setCurrentView, countryCode }: Props) => {
-  const [message, formAction] = useActionState(login, null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+
+  const signIn = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setPending(true)
+    setMessage(null)
+
+    try {
+      const formData = new FormData(event.currentTarget)
+      const email = String(formData.get("email") || "").trim().toLowerCase()
+      const password = String(formData.get("password") || "")
+      const headers = {
+        "content-type": "application/json",
+        ...(process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+          ? {
+              "x-publishable-api-key":
+                process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY,
+            }
+          : {}),
+      }
+
+      let actor: "customer" | "seller" = "customer"
+      let response = await fetch(`${MEDUSA_BACKEND_URL}/auth/customer/emailpass`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (!response.ok) {
+        actor = "seller"
+        response = await fetch(`${MEDUSA_BACKEND_URL}/auth/seller/emailpass`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ email, password }),
+        })
+      }
+
+      const result = (await response.json().catch(() => null)) as {
+        token?: string
+        message?: string
+      } | null
+
+      if (!response.ok || !result?.token) {
+        throw new Error(result?.message || "The email or password is incorrect.")
+      }
+
+      const sessionResponse = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: result.token, actor }),
+      })
+
+      if (!sessionResponse.ok) {
+        throw new Error("We could not start your session. Please try again.")
+      }
+
+      window.location.assign(`/${countryCode}/${actor === "seller" ? "seller" : "account"}`)
+    } catch (error: any) {
+      setMessage(error?.message || "We could not sign you in. Please try again.")
+      setPending(false)
+    }
+  }
 
   return (
     <div
@@ -23,7 +88,7 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
       <p className="text-center text-base-regular text-ui-fg-base mb-8">
         Sign in to shop, sell, and deliver on How&rsquo;s u.
       </p>
-      <form className="w-full" action={formAction}>
+      <form className="w-full" onSubmit={signIn}>
         <input type="hidden" name="countryCode" value={countryCode} />
         <div className="flex flex-col w-full gap-y-2">
           <Input
@@ -45,9 +110,15 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
           />
         </div>
         <ErrorMessage error={message} data-testid="login-error-message" />
-        <SubmitButton data-testid="sign-in-button" className="w-full mt-6">
+        <Button
+          type="submit"
+          data-testid="sign-in-button"
+          className="w-full mt-6"
+          disabled={pending}
+          isLoading={pending}
+        >
           Sign in
-        </SubmitButton>
+        </Button>
       </form>
       <button
         type="button"
