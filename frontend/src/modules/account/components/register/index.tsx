@@ -93,6 +93,30 @@ const Register = ({ setCurrentView }: Props) => {
     return () => clearTimeout(t)
   }, [cooldown])
 
+  const sendCode = async () => {
+    if (cooldown > 0) return false
+    setError(null)
+    const res = await requestAuthOtp({
+      email: email.trim(),
+      purpose: "signup",
+    })
+    if (!res.ok) {
+      setError(res.error ?? "Could not send the code. Check your email and try again.")
+      return false
+    }
+    setSent(true)
+    setCooldown(RESEND_SECONDS)
+    setHint(`We sent a 6-digit code to ${email.trim()}. It expires in 15 minutes.`)
+    return true
+  }
+
+  const requestCode = () => {
+    if (cooldown > 0 || isPending) return
+    startTransition(async () => {
+      await sendCode()
+    })
+  }
+
   const continueToCode = () => {
     setError(null)
     if (!email.trim()) {
@@ -103,33 +127,21 @@ const Register = ({ setCurrentView }: Props) => {
       setError("Enter a password.")
       return
     }
-    setStep("code")
-  }
-
-  const requestCode = () => {
-    if (cooldown > 0 || isPending) return
-    setError(null)
     startTransition(async () => {
-      const res = await requestAuthOtp({
-        email: email.trim(),
-        purpose: "signup",
-      })
-      if (!res.ok) {
-        setError(res.error ?? "Could not send the code. Check your email and try again.")
-        return
-      }
-      setSent(true)
-      setCooldown(RESEND_SECONDS)
-      setHint(`We sent a 6-digit code to ${email.trim()}. It expires in 15 minutes.`)
+      // Request only after the account details are valid. If the email is
+      // already registered, the API returns a clear conflict and the user
+      // stays on this step without receiving an unnecessary OTP.
+      const delivered = await sendCode()
+      if (delivered) setStep("code")
     })
   }
 
-  // auto-send when entering the code step
+  // Code delivery is initiated by Continue above so duplicate accounts are
+  // rejected before the verification screen is shown.
   useEffect(() => {
-    if (step === "code" && !sent && !isPending) {
-      requestCode()
+    if (step !== "code") {
+      setCode("")
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
   const verifyAndCreate = () => {

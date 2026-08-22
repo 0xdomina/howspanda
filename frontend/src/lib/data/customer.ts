@@ -128,6 +128,11 @@ export async function signup(_currentState: unknown, formData: FormData) {
 
     return createdCustomer
   } catch (error: any) {
+    const status = error?.status ?? error?.response?.status
+    const message = String(error?.message ?? error ?? "")
+    if (status === 403 || /forbidden/i.test(message)) {
+      return "An account with this email already exists. Sign in instead."
+    }
     return error.toString()
   }
 }
