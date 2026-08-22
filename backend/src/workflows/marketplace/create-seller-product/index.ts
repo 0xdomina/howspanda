@@ -23,27 +23,12 @@ type WorkflowInput = {
 const createSellerProductWorkflow = createWorkflow(
   "create-seller-product",
   (input: WorkflowInput) => {
-    // make the product available in the store's default sales channel
-    const { data: stores } = useQueryGraphStep({
-      entity: "store",
-      fields: ["default_sales_channel_id", "default_location_id"],
-    })
-
-    const productData = transform({
-      input,
-      stores,
-    }, (data) => {
-      return {
-        products: [{
-          ...data.input.product,
-          sales_channels: [
-            {
-              id: data.stores[0].default_sales_channel_id,
-            },
-          ],
-        }],
-      }
-    })
+    // Keep the creation transaction independent of optional store defaults.
+    // Sales-channel assignment is not required for the product entity itself
+    // and older stores may not have a readable default channel.
+    const productData = transform({ input }, (data) => ({
+      products: [data.input.product],
+    }))
 
     const createdProducts = createProductsWorkflow.runAsStep({
       input: productData as CreateProductsWorkflowInput,
