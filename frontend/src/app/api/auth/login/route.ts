@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
   let actor: "customer" | "seller" = "customer"
   let upstream: Response
-  let result: { token?: string; message?: string } | null = null
+  let result: { token?: string; message?: string } = {}
 
   try {
     upstream = await fetch(`${BACKEND_URL}/auth/${actor}/emailpass`, {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ email, password }),
       cache: "no-store",
     })
-    result = (await upstream.json().catch(() => null)) as typeof result
+    result = ((await upstream.json().catch(() => null)) as typeof result) || {}
 
     if (!upstream.ok) {
       actor = "seller"
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({ email, password }),
         cache: "no-store",
       })
-      result = (await upstream.json().catch(() => null)) as typeof result
+      result = ((await upstream.json().catch(() => null)) as typeof result) || {}
     }
   } catch {
     return NextResponse.json({ message: "Sign-in is waking up. Please try again in a moment." }, { status: 503 })
