@@ -74,7 +74,7 @@ medusaIntegrationTestRunner({
           expect(res.status).toEqual(200)
           expect(res.data.ok).toBe(true)
           expect(res.data.conversation_id).toBeDefined()
-          expect(res.data.reply).toContain("Mock reply")
+          expect(res.data.reply).toContain("Here’s a helpful answer")
           expect(["groq", "deepseek"]).toContain(res.data.provider)
           expect(res.data.model_id).toBeDefined()
         })

@@ -169,7 +169,7 @@ medusaIntegrationTestRunner({
 
           // the assistant reply is real prose, and the deterministic fact set
           // is in `result` (never hallucinated)
-          expect(res.data.reply).toContain("Mock reply")
+          expect(res.data.reply).toContain("Here’s a helpful answer")
         })
       })
 
@@ -266,7 +266,7 @@ medusaIntegrationTestRunner({
           expect(res.data.capability).toBeNull()
           expect(res.data.result).toBeNull()
           expect(res.data.proposal).toBeNull()
-          expect(res.data.reply).toContain("Mock reply")
+          expect(res.data.reply).toContain("Here’s a helpful answer")
         })
       })
     })
