@@ -67,6 +67,16 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
         throw new Error(result?.message || "The email or password is incorrect.")
       }
 
+      const sessionResponse = await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: result.token, actor }),
+      })
+
+      if (!sessionResponse.ok) {
+        throw new Error("We could not start your session. Please try again.")
+      }
+
       window.location.assign(
         `/${countryCode}/${actor === "seller" ? "seller" : "account"}`
       )
