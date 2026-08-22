@@ -45,22 +45,35 @@ const createSellerProductWorkflow = createWorkflow(
       filters: { type: "default" },
     }).config({ name: "retrieve-default-shipping-profile" })
 
+    // Store defaults are not guaranteed to exist on older or manually-created
+    // stores. Keep product creation usable by falling back to the first active
+    // sales channel instead of sending an invalid `{ id: undefined }` link to
+    // the Medusa product workflow.
+    const { data: salesChannels } = useQueryGraphStep({
+      entity: "sales_channel",
+      fields: ["id", "is_disabled"],
+      filters: { is_disabled: false },
+    }).config({ name: "retrieve-active-sales-channel" })
+
     const productData = transform({
       input,
       stores,
       shippingProfiles,
+      salesChannels,
     }, (data) => {
+      const store = data.stores[0]
+      const shippingProfileId =
+        data.shippingProfiles[0]?.id ?? data.input.product.shipping_profile_id
+      const salesChannelId =
+        store?.default_sales_channel_id ?? data.salesChannels[0]?.id
+      const product = {
+        ...data.input.product,
+        ...(shippingProfileId ? { shipping_profile_id: shippingProfileId } : {}),
+        ...(salesChannelId ? { sales_channels: [{ id: salesChannelId }] } : {}),
+      }
+
       return {
-        products: [{
-          ...data.input.product,
-          shipping_profile_id:
-            data.shippingProfiles[0]?.id ?? data.input.product.shipping_profile_id,
-          sales_channels: [
-            {
-              id: data.stores[0].default_sales_channel_id,
-            },
-          ],
-        }],
+        products: [product],
       }
     })
 
