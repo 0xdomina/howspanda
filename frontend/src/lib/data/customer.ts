@@ -70,6 +70,8 @@ export async function signup(_currentState: unknown, formData: FormData) {
     return "Email and password are required."
   }
 
+  let stage = "email verification"
+
   try {
     // Signup is gated on a valid email-verification proof (server-side check),
     // so accounts can only be created after the OTP step succeeds.
@@ -97,6 +99,7 @@ export async function signup(_currentState: unknown, formData: FormData) {
       if (value) customerForm[key] = value
     }
 
+    stage = "account registration"
     const token = await sdk.auth.register("customer", "emailpass", {
       email,
       password: password,
@@ -104,16 +107,21 @@ export async function signup(_currentState: unknown, formData: FormData) {
 
     await setAuthToken(token as string)
 
-    const headers = {
-      ...(await getAuthHeaders()),
-    }
+    // Use the token returned by registration for the first actor-creation
+    // request. The response cookie is intentionally still written for later
+    // requests, but relying on that cookie within the same server action can
+    // produce a 403 on some Next.js runtimes before the Set-Cookie mutation
+    // is visible to the next SDK call.
+    const headers = { authorization: `Bearer ${token as string}` }
 
+    stage = "profile setup"
     const { customer: createdCustomer } = await sdk.store.customer.create(
       customerForm,
       {},
       headers
     )
 
+    stage = "sign in"
     const loginToken = await sdk.auth.login("customer", "emailpass", {
       email,
       password,
@@ -130,10 +138,19 @@ export async function signup(_currentState: unknown, formData: FormData) {
   } catch (error: any) {
     const status = error?.status ?? error?.response?.status
     const message = String(error?.message ?? error ?? "")
-    if (status === 403 || /forbidden/i.test(message)) {
+    if (
+      stage === "account registration" &&
+      (status === 403 || /forbidden/i.test(message))
+    ) {
       return "An account with this email already exists. Sign in instead."
     }
-    return error.toString()
+    if (stage === "profile setup") {
+      return "Your email was verified, but we could not finish setting up your profile. Please try again."
+    }
+    if (stage === "sign in") {
+      return "Your account was created, but we could not start your session. Please sign in to continue."
+    }
+    return error?.toString?.() ?? "We could not create your account. Please try again."
   }
 }
 
