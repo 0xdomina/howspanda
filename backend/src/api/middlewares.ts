@@ -746,6 +746,15 @@ export const PostAuthOtpAssertSchema = z.object({
   proof: z.string().min(10),
 })
 
+export const PostAuthOtpSignupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  code: z.string().regex(/^\d{6}$/, "Code is 6 digits"),
+  first_name: z.string().trim().max(100).optional(),
+  last_name: z.string().trim().max(100).optional(),
+  phone: z.string().trim().max(50).optional(),
+})
+
 export const PostWishlistReplaceSchema = z.object({
   items: z.array(z.object({
     id: z.string().min(1).max(200),
@@ -1741,6 +1750,11 @@ export default defineMiddlewares({
       matcher: "/auth/otp/assert",
       methods: ["POST"],
       middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpAssertSchema)],
+    },
+    {
+      matcher: "/auth/otp/signup",
+      methods: ["POST"],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpSignupSchema)],
     },
     {
       matcher: "/auth/email/change/request",

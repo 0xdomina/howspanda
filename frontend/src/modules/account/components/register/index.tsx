@@ -9,7 +9,7 @@ import ErrorMessage from "@modules/checkout/components/error-message"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import GoogleSignIn from "@modules/account/components/google-signin"
 import { signup } from "@lib/data/customer"
-import { requestAuthOtp, verifyAuthOtp } from "@lib/data/auth-otp"
+import { requestAuthOtp } from "@lib/data/auth-otp"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
@@ -151,20 +151,10 @@ const Register = ({ setCurrentView }: Props) => {
       return
     }
     startTransition(async () => {
-      const res = await verifyAuthOtp({
-        email: email.trim(),
-        purpose: "signup",
-        code: code.trim(),
-      })
-      if (!res.ok || !res.proof) {
-        setError(res.error ?? "Incorrect code. Check your inbox and try again.")
-        return
-      }
-
       const formData = new FormData()
       formData.set("email", email.trim())
       formData.set("password", password)
-      formData.set("proof", res.proof)
+      formData.set("code", code.trim())
       if (firstName.trim()) formData.set("first_name", firstName.trim())
       if (lastName.trim()) formData.set("last_name", lastName.trim())
       if (phone.trim()) formData.set("phone", phone.trim())

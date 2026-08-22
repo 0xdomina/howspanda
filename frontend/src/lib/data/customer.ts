@@ -2,7 +2,6 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
-import { assertSignupProof } from "@lib/data/auth-otp"
 import { HttpTypes } from "@medusajs/types"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
@@ -64,62 +63,28 @@ export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
 export async function signup(_currentState: unknown, formData: FormData) {
   const email = (formData.get("email") as string)?.trim().toLowerCase()
   const password = formData.get("password") as string
-  const proof = formData.get("proof") as string | null
+  const code = (formData.get("code") as string)?.trim()
 
-  if (!email || !password) {
-    return "Email and password are required."
+  if (!email || !password || !code) {
+    return "Email, password, and the 6-digit verification code are required."
   }
 
   let stage = "email verification"
 
   try {
-    // Signup is gated on a valid email-verification proof (server-side check),
-    // so accounts can only be created after the OTP step succeeds.
-    if (!proof) {
-      return "Please verify your email before creating an account."
-    }
-
-    const proofRes = await assertSignupProof({ email, proof })
-    if (!proofRes.ok) {
-      return (
-        proofRes.error ??
-        "Please verify your email before creating an account."
-      )
-    }
-
-    // Progressive profiling: only what the form collected (email by default).
-    const customerForm: {
-      email: string
-      first_name?: string
-      last_name?: string
-      phone?: string
-    } = { email }
+    const customerForm: Record<string, string> = { email, password, code }
     for (const key of ["first_name", "last_name", "phone"] as const) {
       const value = formData.get(key) as string | null
       if (value) customerForm[key] = value
     }
 
     stage = "account registration"
-    const token = await sdk.auth.register("customer", "emailpass", {
-      email,
-      password: password,
+    const { customer: createdCustomer } = await sdk.client.fetch<{
+      customer: HttpTypes.StoreCustomer
+    }>("/auth/otp/signup", {
+      method: "POST",
+      body: customerForm,
     })
-
-    await setAuthToken(token as string)
-
-    // Use the token returned by registration for the first actor-creation
-    // request. The response cookie is intentionally still written for later
-    // requests, but relying on that cookie within the same server action can
-    // produce a 403 on some Next.js runtimes before the Set-Cookie mutation
-    // is visible to the next SDK call.
-    const headers = { authorization: `Bearer ${token as string}` }
-
-    stage = "profile setup"
-    const { customer: createdCustomer } = await sdk.store.customer.create(
-      customerForm,
-      {},
-      headers
-    )
 
     stage = "sign in"
     const loginToken = await sdk.auth.login("customer", "emailpass", {
@@ -138,14 +103,8 @@ export async function signup(_currentState: unknown, formData: FormData) {
   } catch (error: any) {
     const status = error?.status ?? error?.response?.status
     const message = String(error?.message ?? error ?? "")
-    if (
-      stage === "account registration" &&
-      (status === 403 || /forbidden/i.test(message))
-    ) {
+    if (stage === "account registration" && (status === 409 || /already|exist|duplicate|forbidden/i.test(message))) {
       return "An account with this email already exists. Sign in instead."
-    }
-    if (stage === "profile setup") {
-      return "Your email was verified, but we could not finish setting up your profile. Please try again."
     }
     if (stage === "sign in") {
       return "Your account was created, but we could not start your session. Please sign in to continue."
