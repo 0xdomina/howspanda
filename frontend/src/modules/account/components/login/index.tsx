@@ -55,6 +55,27 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
       const formData = new FormData(event.currentTarget)
       const email = String(formData.get("email") || "").trim().toLowerCase()
       const password = String(formData.get("password") || "")
+
+      try {
+        const sameOriginResponse = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        })
+        const sameOriginResult = (await sameOriginResponse.json().catch(() => null)) as {
+          actor?: "customer" | "seller"
+        } | null
+
+        if (sameOriginResponse.ok && sameOriginResult?.actor) {
+          window.location.assign(
+            `/${countryCode}/${sameOriginResult.actor === "seller" ? "seller" : "account"}`
+          )
+          return
+        }
+      } catch {
+        // Fall through to the browser-to-backend path below.
+      }
+
       let actor: "customer" | "seller" = "customer"
       let { response, result } = await authenticate(actor, email, password)
 
