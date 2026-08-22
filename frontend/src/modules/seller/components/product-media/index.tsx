@@ -194,7 +194,7 @@ const ProductMedia = ({
       <input
         ref={videoInput}
         type="file"
-        accept="video/mp4,video/quicktime,video/webm"
+        accept="video/mp4,video/quicktime"
         className="hidden"
         data-testid="product-media-video-input"
         onChange={(event) => {

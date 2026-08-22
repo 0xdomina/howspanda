@@ -43,28 +43,40 @@ export const uploadSellerMedia = async (
       return { error: `File too large — max ${maxBytes / 1024 / 1024}MB` }
     }
 
-    const form = new FormData()
-    form.append("file", file, file.name)
-    form.append("kind", kind)
-
-    const res = await fetch(`${MEDUSA_BACKEND_URL}/sellers/uploads`, {
+    const prepare = await fetch(`${MEDUSA_BACKEND_URL}/sellers/uploads/prepare`, {
       method: "POST",
-      headers: headers as Record<string, string>,
-      body: form,
+      headers: { ...(headers as Record<string, string>), "content-type": "application/json" },
+      body: JSON.stringify({ kind, mime: file.type, size: file.size }),
     })
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
+    if (!prepare.ok) {
+      const text = await prepare.text().catch(() => "")
       return { error: friendlyUploadError(text) }
     }
 
-    const contentType = res.headers.get("content-type") || ""
+    const contentType = prepare.headers.get("content-type") || ""
     if (!contentType.toLowerCase().includes("application/json")) {
       return { error: friendlyUploadError(null) }
     }
 
-    const data = (await res.json()) as { url?: string }
-    return { url: data.url }
+    const prepared = (await prepare.json()) as { key?: string; uploadUrl?: string }
+    if (!prepared.key || !prepared.uploadUrl) return { error: friendlyUploadError(null) }
+
+    const put = await fetch(prepared.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": file.type },
+      body: file,
+    })
+    if (!put.ok) return { error: friendlyUploadError(await put.text().catch(() => "")) }
+
+    const complete = await fetch(`${MEDUSA_BACKEND_URL}/sellers/uploads/complete`, {
+      method: "POST",
+      headers: { ...(headers as Record<string, string>), "content-type": "application/json" },
+      body: JSON.stringify({ key: prepared.key, kind, size: file.size }),
+    })
+    if (!complete.ok) return { error: friendlyUploadError(await complete.text().catch(() => "")) }
+    const result = (await complete.json()) as { url?: string }
+    return { url: result.url }
   } catch (error: any) {
     return { error: friendlyUploadError(error?.message) }
   }

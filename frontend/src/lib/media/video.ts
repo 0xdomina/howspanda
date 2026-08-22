@@ -92,7 +92,7 @@ export async function encodeProductVideo(
   file: File,
   onProgress?: VideoEncodeProgress
 ): Promise<Blob> {
-  if (!/^video\/(mp4|quicktime|webm)$/i.test(file.type)) {
+  if (!/^video\/(mp4|quicktime)$/i.test(file.type)) {
     throw new Error("Choose an MP4 video.")
   }
   if (file.size > MAX_INPUT_BYTES) {

@@ -4,13 +4,21 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 const MEDIA_PREFIX = "public howsyou/"
 
 function mediaConfig() {
-  const config = {
+  const regular = {
     bucket: process.env.S3_BUCKET,
     endpoint: process.env.S3_ENDPOINT,
     region: process.env.S3_REGION || "us-east-1",
     accessKeyId: process.env.S3_ACCESS_KEY_ID,
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
   }
+  const privateStorage = {
+    bucket: process.env.PRIVATE_S3_BUCKET,
+    endpoint: process.env.PRIVATE_S3_ENDPOINT,
+    region: process.env.PRIVATE_S3_REGION || regular.region,
+    accessKeyId: process.env.PRIVATE_S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.PRIVATE_S3_SECRET_ACCESS_KEY,
+  }
+  const config = Object.values(regular).every(Boolean) ? regular : privateStorage
   return Object.values(config).every(Boolean) ? config : null
 }
 
