@@ -1,3 +1,11 @@
+"use server"
+
+// All four helpers are invoked from client components (register,
+// forgot-password). Marking the module "use server" keeps every request
+// server-side: the browser never talks to MEDUSA_BACKEND_URL directly, so
+// storefront deployments never depend on backend AUTH_CORS containing the
+// storefront origin.
+
 import { sdk } from "@lib/config"
 
 export type OtpPurpose = "signup" | "reset"

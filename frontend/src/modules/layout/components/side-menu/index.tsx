@@ -13,7 +13,6 @@ import X from "@modules/common/icons/x"
 import CountrySelect from "../country-select"
 import LanguageSelect from "../language-select"
 import SearchForm from "@modules/layout/components/search-form"
-import { retrieveFeatures } from "@lib/data/kyc"
 
 const marketplaceCategories = [
   { name: "Women's Fashion", href: "/store", subcategories: ["Dresses", "Tops & blouses", "Shoes", "Bags & accessories"] },
@@ -41,23 +40,14 @@ type SideMenuProps = {
   regions: HttpTypes.StoreRegion[] | null
   locales: Locale[] | null
   currentLocale: string | null
+  /** Resolved server-side (nav layout) so the browser never calls /store/features. */
+  mallsEnabled?: boolean
 }
 
-const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
+const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false }: SideMenuProps) => {
   const countryToggleState = useToggleState()
   const languageToggleState = useToggleState()
   const [isOpen, setIsOpen] = useState(false)
-  const [mallsEnabled, setMallsEnabled] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-    void retrieveFeatures().then((features) => {
-      if (mounted) setMallsEnabled(features.malls)
-    })
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   useEffect(() => {
     if (!isOpen) return

@@ -5,6 +5,7 @@ import { getLocale } from "@lib/data/locale-actions"
 import { listRegions } from "@lib/data/regions"
 import { retrieveCustomer } from "@lib/data/customer"
 import { retrieveSeller } from "@lib/data/seller"
+import { retrieveFeatures } from "@lib/data/kyc"
 import { StoreRegion } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import CartButton from "@modules/layout/components/cart-button"
@@ -13,12 +14,13 @@ import SearchForm from "@modules/layout/components/search-form"
 import WishlistLink from "@modules/wishlist/components/wishlist-link"
 
 export default async function Nav() {
-  const [regions, locales, currentLocale, customer, seller] = await Promise.all([
+  const [regions, locales, currentLocale, customer, seller, features] = await Promise.all([
     listRegions().then((items: StoreRegion[]) => items),
     listLocales(),
     getLocale(),
     retrieveCustomer(),
     retrieveSeller(),
+    retrieveFeatures().catch(() => ({ malls: false, nin_verification: false, product_video: true })),
   ])
 
   return (
@@ -26,7 +28,7 @@ export default async function Nav() {
       <header className="border-b border-ink-hairline">
         <nav className="figma-container flex min-h-[78px] items-center justify-between gap-6 py-4" aria-label="Main navigation">
           <div>
-            <SideMenu regions={regions} locales={locales} currentLocale={currentLocale} />
+            <SideMenu regions={regions} locales={locales} currentLocale={currentLocale} mallsEnabled={features.malls} />
           </div>
           <LocalizedClientLink href="/" className="font-display text-2xl font-bold tracking-tight text-ink" data-testid="nav-store-link">How&rsquo;s U</LocalizedClientLink>
           <div className="hidden items-center gap-8 text-sm text-ink small:flex">
