@@ -177,7 +177,7 @@ const EmailStep = ({
       </div>
       {hint && <p className="text-xs text-emerald-700">{hint}</p>}
       {error && <p className="text-sm text-rose-600">{error}</p>}
-      <p className="text-[11px] text-ink-muted">Tip: check Spam / Promotions and add no-reply@howsu.com to contacts.</p>
+      <p className="text-[11px] text-ink-muted">Tip: check Spam / Promotions if the message is not in your inbox.</p>
     </div>
   )
 }

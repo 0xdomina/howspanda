@@ -34,13 +34,10 @@ AUTH_CORS=https://hows-u.vercel.app,http://localhost:8000,http://localhost:9000
 ADMIN_CORS=https://<pandastack-backend-host>,http://localhost:9000
 # plus the secrets Pandastack already set: DATABASE_URL, JWT_SECRET, COOKIE_SECRET, KV_URL, PRIVATE_S3_*, etc.
 ```
-Brevo sender `no-reply@howsu.com` does **not** need a mailbox — Brevo only checks that the *domain* `howsu.com` is verified via DNS, not that the inbox exists. Until verified, Brevo accepts SMTP login but silently drops the mail (you’ll see no error, no inbox).
-
-To verify (2 min, once):
-Brevo → Settings → Senders & Domains → Domains → Add `howsu.com` → add the 3 TXT records (DKIM + SPF + DMARC) to your DNS (Cloudflare/vercel-dns/etc.) → Verify. Until DNS propagates, you can temporarily set `EMAIL_FROM` to the Brevo account email that is already verified (check Brevo → Senders) — OTP will show that sender name but `How's U` as display name, which we set via `BREVO_FROM_NAME`.
+You’ve now verified `domina9193@gmail.com` in Brevo — that address is the `From` for OTPs (Brevo only checks that the *sender* is verified, not that `no-reply@howsu.com` has a mailbox). `backend/.env` already has `EMAIL_FROM=domina9193@gmail.com` + `BREVO_SENDER_EMAIL=domina9193@gmail.com` (kept git-ignored). No code change needed — OTPs now arrive from `How's U <domina9193@gmail.com>` via `smtp-relay.brevo.com:2525`. Keep the address verified in Brevo → Settings → Senders.
 
 No secret was committed. `backend/.env` (with your real `BREVO_SMTP_PASS`) stays git-ignored; only `backend/.env.template` documents placeholders. `PANDASTACK_TOKEN`/`VERCEL_TOKEN` stay in root `.env` (ignored).
-After verification, Pandastack Logs will show `sendEmail:brevo messageId=<...>` on each `POST /auth/otp/request`.
+After the next Pandastack deploy, Logs will show `sendEmail:brevo messageId=<...>` on each `POST /auth/otp/request`.
 
 ## 3) UX polish shipped in this commit
 - `frontend/src/modules/account/components/register/index.tsx` now auto-sends OTP when you reach step 2, shows a 6-box animated input, resend countdown (45s), glass panel + hint “check Spam / add no-reply@howsu.com”.
