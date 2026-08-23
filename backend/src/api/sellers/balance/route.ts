@@ -14,14 +14,14 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  await requireSellerOwner(req)
+  const context = await requireSellerOwner(req)
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
     fields: ["id", "seller.id"],
     filters: {
-      id: [req.auth_context.actor_id],
+      id: [context.sellerAdminId],
     },
   })
 

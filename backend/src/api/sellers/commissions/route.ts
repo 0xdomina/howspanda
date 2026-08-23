@@ -13,7 +13,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  await requireSellerOwner(req)
+  const context = await requireSellerOwner(req)
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({
@@ -24,7 +24,7 @@ export const GET = async (
       "seller.commission_lines.*",
     ],
     filters: {
-      id: [req.auth_context.actor_id],
+      id: [context.sellerAdminId],
     },
   })
 

@@ -16,7 +16,7 @@ export const GET = async (
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const aiService: AiModuleService = req.scope.resolve(AI_MODULE)
 
-  const seller = await resolveSeller(query, req.auth_context.actor_id)
+  const seller = await resolveSeller(query, req.auth_context)
   const quota = await aiService.getQuotaStatus(seller.seller_id)
 
   res.json({ quota })

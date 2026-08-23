@@ -64,7 +64,10 @@ export const POST = async (
   req: AuthenticatedMedusaRequest<MobileProductBody>,
   res: MedusaResponse
 ) => {
-  await requireSellerPermission(req, "products")
+  // resolveSellerContext maps a customer-actor token (unified accounts) to its
+  // seller_admin row; using auth_context.actor_id directly would look up a
+  // customer id in the seller_admin table and crash the workflow.
+  const context = await requireSellerPermission(req, "products")
   const body = req.validatedBody
   const product = toFullProductShape(body)
 
@@ -98,7 +101,7 @@ export const POST = async (
   const { result } = await createSellerProductWorkflow(req.scope)
     .run({
       input: {
-        seller_admin_id: req.auth_context.actor_id,
+        seller_admin_id: context.sellerAdminId,
         product: cleanProduct as HttpTypes.AdminCreateProduct,
         stocks,
       },
@@ -113,7 +116,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  await requireSellerPermission(req, "products")
+  const context = await requireSellerPermission(req, "products")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({
@@ -129,7 +132,7 @@ export const GET = async (
       "seller.products.images.*",
     ],
     filters: {
-      id: [req.auth_context.actor_id],
+      id: [context.sellerAdminId],
     },
   })
 

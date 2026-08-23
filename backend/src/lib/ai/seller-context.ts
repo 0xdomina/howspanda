@@ -13,16 +13,33 @@ type Query = {
   graph: (config: any) => Promise<{ data: any[] }>
 }
 
+export type SellerAuthRef = {
+  actor_type?: string | null
+  actor_id?: string | null
+  auth_identity_id?: string | null
+}
+
 export async function resolveSeller(
   query: Query,
-  actorId: string
+  auth: SellerAuthRef | string
 ): Promise<SellerIdentity> {
+  // Unified accounts authenticate with a customer-actor JWT whose actor_id is
+  // a customer id, not a seller_admin id — those resolve through the linked
+  // auth identity. Legacy seller tokens may carry an empty actor_id, so they
+  // fall back to the auth identity too.
+  const authRef: SellerAuthRef =
+    typeof auth === "string" ? { actor_id: auth } : auth
+  const filters =
+    authRef.actor_type === "customer" || !authRef.actor_id
+      ? { auth_identity_id: [authRef.auth_identity_id] }
+      : { id: [authRef.actor_id] }
+
   const {
     data: [sellerAdmin],
   } = await query.graph({
     entity: "seller_admin",
     fields: ["id", "seller.id", "seller.name"],
-    filters: { id: [actorId] },
+    filters,
   })
 
   if (!sellerAdmin?.seller) {

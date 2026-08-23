@@ -18,7 +18,7 @@ export const PATCH = async (
   req: AuthenticatedMedusaRequest<PatchProductBody>,
   res: MedusaResponse
 ) => {
-  await requireSellerPermission(req, "products")
+  const context = await requireSellerPermission(req, "products")
   const body = req.validatedBody
 
   const update: {
@@ -67,7 +67,7 @@ export const PATCH = async (
 
   const { result } = await updateSellerProductWorkflow(req.scope).run({
     input: {
-      seller_admin_id: req.auth_context.actor_id,
+      seller_admin_id: context.sellerAdminId,
       product_id: req.params.id,
       update,
       variants: body.variants,

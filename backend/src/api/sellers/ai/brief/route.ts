@@ -16,7 +16,7 @@ export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) 
   await requireSellerPermission(req, "ai")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const aiService: AiModuleService = req.scope.resolve(AI_MODULE)
-  const seller = await resolveSeller(query, req.auth_context.actor_id)
+  const seller = await resolveSeller(query, req.auth_context)
   const period = PERIODS.includes(req.query?.period as any)
     ? (req.query.period as (typeof PERIODS)[number])
     : "daily"

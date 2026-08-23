@@ -24,11 +24,12 @@ const envNumber = (name: string, fallback: number) => {
 async function resolveSellerId(
   req: AuthenticatedMedusaRequest
 ): Promise<string> {
+  const context = await requireSellerPermission(req, "referrals")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
     fields: ["id", "seller.id"],
-    filters: { id: [req.auth_context.actor_id] },
+    filters: { id: [context.sellerAdminId] },
   })
   if (!sellerAdmin?.seller?.id) {
     throw new MedusaError(
