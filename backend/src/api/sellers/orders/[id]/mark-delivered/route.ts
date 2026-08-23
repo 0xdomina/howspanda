@@ -14,11 +14,12 @@ const resolveOwnedLine = async (
   req: AuthenticatedMedusaRequest,
   orderId: string
 ) => {
+  const context = await requireSellerPermission(req, "orders")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const { data: admins } = await query.graph({
     entity: "seller_admin",
     fields: ["seller.id"],
-    filters: { id: req.auth_context.actor_id },
+    filters: { id: context.sellerAdminId },
   })
   const sellerId = admins[0]?.seller?.id
   const marketplace: MarketplaceModuleService =
@@ -35,7 +36,6 @@ export const POST = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  await requireSellerPermission(req, "orders")
   const { marketplace } = await resolveOwnedLine(req, req.params.id)
   await marketplace.markOrderDelivered(req.params.id)
 

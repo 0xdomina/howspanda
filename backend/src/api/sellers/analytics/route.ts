@@ -87,7 +87,7 @@ export const GET = async (
   req: AuthenticatedMedusaRequest,
   res: MedusaResponse
 ) => {
-  await requireSellerPermission(req, "analytics")
+  const context = await requireSellerPermission(req, "analytics")
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const { data: [sellerAdmin] } = await query.graph({
@@ -102,7 +102,7 @@ export const GET = async (
       "seller.orders.id",
     ],
     filters: {
-      id: [req.auth_context.actor_id],
+      id: [context.sellerAdminId],
     },
   })
 

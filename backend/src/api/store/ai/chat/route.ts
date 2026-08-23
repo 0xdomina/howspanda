@@ -5,7 +5,7 @@ import {
 import { ILockingModule } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { z } from "@medusajs/framework/zod"
-import type { CoreMessage } from "ai"
+import type { ModelMessage } from "ai"
 import { AI_MODULE } from "../../../../modules/ai"
 import AiModuleService, {
   AiQuotaExceededError,
@@ -30,7 +30,7 @@ const CHAT_SYSTEM_ROLE = "system"
 const CHAT_USER_ROLE = "user"
 const CHAT_ASSISTANT_ROLE = "assistant"
 
-function buildHistory(rows: any[]): CoreMessage[] {
+function buildHistory(rows: any[]): ModelMessage[] {
   return rows
     .filter((m) =>
       ["system", "user", "assistant"].includes(m.role)

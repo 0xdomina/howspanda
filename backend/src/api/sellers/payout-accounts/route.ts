@@ -30,11 +30,12 @@ async function resolveSellerId(
 ): Promise<string> {
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
+  const context = await requireSellerOwner(req)
   const { data: [sellerAdmin] } = await query.graph({
     entity: "seller_admin",
     fields: ["id", "seller.id"],
     filters: {
-      id: [req.auth_context.actor_id],
+      id: [context.sellerAdminId],
     },
   })
 

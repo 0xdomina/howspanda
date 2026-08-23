@@ -47,7 +47,7 @@ export async function runAiRoute<T>(
   const aiService: AiModuleService = req.scope.resolve(AI_MODULE)
   const locking: ILockingModule = req.scope.resolve(Modules.LOCKING)
 
-  const seller = await resolveSeller(query, req.auth_context.actor_id)
+  const seller = await resolveSeller(query, req.auth_context)
 
   await locking.execute(
     `ai-quota-${seller.seller_id}`,

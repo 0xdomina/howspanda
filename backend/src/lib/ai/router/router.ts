@@ -1,5 +1,5 @@
 import { generateText } from "ai"
-import type { CoreMessage, LanguageModel } from "ai"
+import type { ModelMessage, LanguageModel } from "ai"
 import { AiUnavailableError } from "../model"
 import {
   getEnabledProviders,
@@ -93,7 +93,7 @@ export function getRoutedModel(
 
 export type RoutedChatInput = {
   /** Full conversation history, including the system message. */
-  messages: CoreMessage[]
+  messages: ModelMessage[]
   providerFilter?: string[]
   /** Conversation id — per-thread cursor/last-success state. */
   key?: string
