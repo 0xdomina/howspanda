@@ -56,7 +56,10 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
       const email = String(formData.get("email") || "").trim().toLowerCase()
       const password = String(formData.get("password") || "")
 
-      try {
+      // Same-origin only — the browser never talks to MEDUSA_BACKEND_URL directly
+      // so split-infra CORS is never hit. Retry once for PandaStack warm-up.
+      let lastError: string | null = null
+      for (let attempt = 0; attempt < 2; attempt += 1) {
         const sameOriginResponse = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -64,6 +67,7 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
         })
         const sameOriginResult = (await sameOriginResponse.json().catch(() => null)) as {
           actor?: "customer" | "seller"
+          message?: string
         } | null
 
         if (sameOriginResponse.ok && sameOriginResult?.actor) {
@@ -72,35 +76,14 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
           )
           return
         }
-      } catch {
-        // Fall through to the browser-to-backend path below.
+        lastError = sameOriginResult?.message ?? null
+        if (sameOriginResponse.status === 503) {
+          await new Promise((r) => setTimeout(r, 2500))
+          continue
+        }
+        break
       }
-
-      let actor: "customer" | "seller" = "customer"
-      let { response, result } = await authenticate(actor, email, password)
-
-      if (!response?.ok) {
-        actor = "seller"
-        ;({ response, result } = await authenticate(actor, email, password))
-      }
-
-      if (!response?.ok || !result?.token) {
-        throw new Error(result?.message || "The email or password is incorrect.")
-      }
-
-      const sessionResponse = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: result.token, actor }),
-      })
-
-      if (!sessionResponse.ok) {
-        throw new Error("We could not start your session. Please try again.")
-      }
-
-      window.location.assign(
-        `/${countryCode}/${actor === "seller" ? "seller" : "account"}`
-      )
+      throw new Error(lastError || "The email or password is incorrect.")
     } catch (error: any) {
       setMessage(error?.message || "We could not sign you in. Please try again.")
       setPending(false)
