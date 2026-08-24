@@ -99,7 +99,7 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
       <p className="text-center text-base-regular text-ui-fg-base mb-8">
         Sign in to shop, sell, and deliver on How&rsquo;s u.
       </p>
-      <form className="w-full" onSubmit={signIn}>
+      <form className="w-full" onSubmit={signIn} method="POST" noValidate>
         <input type="hidden" name="countryCode" value={countryCode} />
         <div className="flex flex-col w-full gap-y-2">
           <Input
