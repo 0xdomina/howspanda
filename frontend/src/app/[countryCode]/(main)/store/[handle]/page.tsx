@@ -215,10 +215,10 @@ export default async function StorePage({
         ) : (
           <ul className="grid grid-cols-2 gap-4 small:grid-cols-3 medium:grid-cols-4">
             {products.map((p) => (
-              <li key={p.id}>
+              <li key={p.id} className="group card-lift overflow-hidden rounded-control border border-white/60 bg-white/70 p-2 shadow-sm backdrop-blur">
                 <LocalizedClientLink
                   href={`/${countryCode}/products/${p.handle}`}
-                  className="group block"
+                  className="block"
                 >
                   {p.thumbnail ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -227,12 +227,12 @@ export default async function StorePage({
                       alt={p.title}
                       loading="lazy"
                       decoding="async"
-                      className="aspect-square w-full rounded-control border border-ink-hairline object-cover"
+                      className="aspect-square w-full rounded-small border border-ink-hairline object-cover transition group-hover:scale-[1.02]"
                     />
                   ) : (
-                    <div className="aspect-square w-full rounded-control border border-ink-hairline bg-ink/5" />
+                    <div className="aspect-square w-full rounded-small border border-ink-hairline bg-ink/5" />
                   )}
-                  <p className="mt-2 text-sm text-ink group-hover:text-ink-muted">
+                  <p className="mt-2 line-clamp-2 text-sm font-medium text-ink group-hover:text-ink">
                     {p.title}
                   </p>
                 </LocalizedClientLink>
