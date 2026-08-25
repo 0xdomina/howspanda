@@ -51,6 +51,10 @@ export const listProducts = async ({
 
   const next = {
     ...(await getCacheOptions("products")),
+    // Tag revalidation covers seller edits driven through the storefront
+    // actions; this TTL is the safety net so any entry (e.g. one created
+    // before a deploy) self-expires in at most a minute.
+    revalidate: 60,
   }
 
   // PandaStack's free runtime sleeps on idle and answers 503 while warming.
