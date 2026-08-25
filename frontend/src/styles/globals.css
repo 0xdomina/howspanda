@@ -268,6 +268,27 @@
     .card-lift:hover { transform: none; }
   }
 
+  /* Product media swipe track: smooth native scrolling, snap, drag cursor */
+  .media-track {
+    scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .media-track.media-animating {
+    scroll-behavior: auto; /* JS-driven drag uses direct scrollLeft */
+  }
+  .media-slide {
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+  .media-track img {
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .media-track { scroll-behavior: auto; }
+  }
+
   .contrast-btn {
     @apply px-4 py-2 border border-black rounded-full hover:bg-black hover:text-white transition-colors duration-200 ease-in;
   }
