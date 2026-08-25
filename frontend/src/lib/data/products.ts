@@ -51,9 +51,9 @@ export const listProducts = async ({
 
   const next = {
     ...(await getCacheOptions("products")),
-    // Tag revalidation covers seller edits driven through the storefront
-    // actions; this TTL is the safety net so any entry (e.g. one created
-    // before a deploy) self-expires in at most a minute.
+    // ISR-style: serve cached for 60s, then refresh in the background. Unlike
+    // force-cache, this guarantees stale entries actually expire — seller
+    // uploads and edits reach the homepage within a minute.
     revalidate: 60,
   }
 
@@ -77,7 +77,6 @@ export const listProducts = async ({
             },
             headers,
             next,
-            cache: "force-cache",
           }
         )
         .then(({ products, count }) => {
