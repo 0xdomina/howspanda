@@ -53,36 +53,55 @@ export const listProducts = async ({
     ...(await getCacheOptions("products")),
   }
 
-  return sdk.client
-    .fetch<{ products: HttpTypes.StoreProduct[]; count: number }>(
-      `/store/products`,
-      {
-        method: "GET",
-        query: {
-          limit,
-          offset,
-          region_id: region?.id,
-          fields:
-            "*variants.calculated_price,+variants.inventory_quantity,*variants.images,+metadata,+tags,",
-          ...queryParams,
-        },
-        headers,
-        next,
-        cache: "force-cache",
-      }
-    )
-    .then(({ products, count }) => {
-      const nextPage = count > offset + limit ? pageParam + 1 : null
+  // PandaStack's free runtime sleeps on idle and answers 503 while warming.
+  // Critical storefront reads (product pages) retry briefly so a cold start
+  // never renders a server-error page to a waiting human.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await sdk.client
+        .fetch<{ products: HttpTypes.StoreProduct[]; count: number }>(
+          `/store/products`,
+          {
+            method: "GET",
+            query: {
+              limit,
+              offset,
+              region_id: region?.id,
+              fields:
+                "*variants.calculated_price,+variants.inventory_quantity,*variants.images,+metadata,+tags,",
+              ...queryParams,
+            },
+            headers,
+            next,
+            cache: "force-cache",
+          }
+        )
+        .then(({ products, count }) => {
+          const nextPage = count > offset + limit ? pageParam + 1 : null
 
-      return {
-        response: {
-          products,
-          count,
-        },
-        nextPage: nextPage,
-        queryParams,
-      }
-    })
+          return {
+            response: {
+              products,
+              count,
+            },
+            nextPage,
+            queryParams,
+          }
+        })
+    } catch (error: any) {
+      const raw = String(error?.message ?? error ?? "")
+      const warming =
+        [502, 503, 504].includes(Number(error?.status)) ||
+        /warming|ready["']?\s*:\s*false|booting/i.test(raw)
+      if (!warming || attempt === 3) throw error
+      await new Promise((resolve) => setTimeout(resolve, 3000 * (attempt + 1)))
+    }
+  }
+  // Unreachable: the loop either returns or throws.
+  return {
+    response: { products: [], count: 0 },
+    nextPage: null,
+  }
 }
 
 /**
