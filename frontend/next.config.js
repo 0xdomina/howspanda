@@ -53,6 +53,10 @@ const nextConfig = {
   },
   images: {
     qualities: [50, 75],
+    // Storefront media is immutable (UUID keys). Hold optimized images at the
+    // edge for 30 days so buyers keep seeing them even while the API sleeps;
+    // the origin re-signs weekly underneath without busting this cache.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: "http",
