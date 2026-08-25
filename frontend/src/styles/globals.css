@@ -274,8 +274,11 @@
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
   }
+  /* While the mouse drags, kill snap + smooth so the track follows 1:1.
+     Snap re-engages on release for the animated settle. */
   .media-track.media-animating {
-    scroll-behavior: auto; /* JS-driven drag uses direct scrollLeft */
+    scroll-behavior: auto;
+    scroll-snap-type: none;
   }
   .media-slide {
     scroll-snap-align: center;
