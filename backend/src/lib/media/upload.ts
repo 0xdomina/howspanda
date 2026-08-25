@@ -72,22 +72,17 @@ function getClient(config: MediaStorageConfig) {
 }
 
 function publicUrlForKey(key: string) {
-  const encoded = key.split("/").map(encodeURIComponent).join("/")
-  // Product media must keep loading while the API sleeps (free-tier cold
-  // starts), so prefer a direct object-storage URL. Payment proofs use the
-  // signed private-media proxy and are unaffected by this path.
+  // Stored references point at the /media proxy: the bucket is private, and
+  // the proxy 302s to a week-long stable signed B2 URL with immutable caching,
+  // so images keep loading from CDN even while the API sleeps. Set
+  // MEDIA_PUBLIC_URL only if the bucket ever becomes public/CDN-fronted.
   const explicit = process.env.MEDIA_PUBLIC_URL
-  if (explicit) return `${explicit.replace(/\/$/, "")}/${encoded}`
-  const endpoint = process.env.S3_ENDPOINT
-  const bucket = process.env.S3_BUCKET
-  if (endpoint && bucket) {
-    return `${endpoint.replace(/\/$/, "")}/${bucket}/${encoded}`
-  }
   const base = (
+    explicit ||
     process.env.S3_URL ||
     `${process.env.BACKEND_URL || "https://hows-u-api-final.pandastack.app"}/media`
   ).replace(/\/$/, "")
-  return `${base}/${encoded}`
+  return `${base}/${key.split("/").map(encodeURIComponent).join("/")}`
 }
 
 function extensionFor(kind: MediaKind, mime: string) {

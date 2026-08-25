@@ -42,6 +42,19 @@ function getClient(config: NonNullable<ReturnType<typeof mediaConfig>>) {
   return client
 }
 
+// Stable, cacheable signed reads for storefront media.
+//
+// SigV4 presigned URLs embed the signing date, so signing per request would
+// churn the URL every call and defeat CDN caching — every image view would
+// wake the API. Instead each key is signed ONCE with a 7-day lifetime and the
+// exact URL is memoized until a day before expiry. Browsers and Vercel's
+// image CDN cache the same URL for days, so the backend is needed only once
+// per image per week even on a free-tier host that sleeps.
+const MEDIA_URL_TTL_SECONDS = 7 * 24 * 60 * 60
+const MEDIA_URL_REFRESH_BEFORE = 24 * 60 * 60
+
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>()
+
 export async function signMediaPath(rawPath: string): Promise<string | null> {
   const config = mediaConfig()
   if (!config) return null
@@ -53,9 +66,19 @@ export async function signMediaPath(rawPath: string): Promise<string | null> {
 
   if (!path.startsWith(MEDIA_PREFIX) || path.includes("..")) return null
 
-  return getSignedUrl(
+  const cached = signedUrlCache.get(path)
+  if (cached && cached.expiresAt - Date.now() > MEDIA_URL_REFRESH_BEFORE * 1000) {
+    return cached.url
+  }
+
+  const url = await getSignedUrl(
     getClient(config),
     new GetObjectCommand({ Bucket: config.bucket, Key: path }),
-    { expiresIn: 300 }
+    { expiresIn: MEDIA_URL_TTL_SECONDS }
   )
+  signedUrlCache.set(path, {
+    url,
+    expiresAt: Date.now() + MEDIA_URL_TTL_SECONDS * 1000,
+  })
+  return url
 }

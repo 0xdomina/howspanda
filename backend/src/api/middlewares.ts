@@ -122,7 +122,10 @@ const MEDIA_REDIRECT: MedusaRequestHandler = async (req, res, next) => {
     return
   }
 
-  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  // The signed URL is stable for ~7 days (memoized per key), so the redirect
+  // itself is safely cacheable for a week: browsers and Vercel's image CDN
+  // keep serving media while the API sleeps.
+  res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400, immutable")
   res.redirect(302, signedUrl)
 }
 // Escrow-status polls are per-order ownership reads (email-gated); throttle by
