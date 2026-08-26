@@ -52,7 +52,9 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
   const hasConfiguredFlash = products.some((product) => promotionMetadata(product).flash_sale === true)
   const selectedBanners = products.filter((product) => promotionMetadata(product).homepage_banner === true)
   const hasProducts = products.length > 0
-  const flash = (hasConfiguredFlash ? selectedFlash : products).slice(0, 6)
+  // Active-cycle picks first; between cycles (or before sellers re-flag),
+  // keep the section alive with the freshest products instead of going empty.
+  const flash = (selectedFlash.length ? selectedFlash : products).slice(0, 6)
   const banners = (selectedBanners.length ? selectedBanners : products).slice(0, 5)
   const best = products.slice(0, 6).reverse()
   const explore = products.slice(0, 8)
