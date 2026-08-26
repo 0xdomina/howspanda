@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { randomUUID } from "crypto"
 
@@ -84,4 +84,55 @@ export async function resolvePaymentProofUrl(value?: string | null): Promise<str
     }),
     { expiresIn: 300 }
   )
+}
+
+const PROOF_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+}
+const PROOF_MAX_BYTES = 10 * 1024 * 1024
+
+// Presigned direct-to-B2 upload for buyer proofs. The browser PUTs straight
+// to the private bucket, bypassing the API — so Cloudflare's managed
+// challenge on multipart POSTs to the backend never blocks a buyer.
+export async function prepareProofUpload(input: {
+  mime: string
+  size: number
+}): Promise<{ key: string; uploadUrl: string; expiresIn: number } | null> {
+  const config = privateProofConfig()
+  const extension = PROOF_IMAGE_EXTENSIONS[input.mime]
+  if (!config || !extension || input.size < 1 || input.size > PROOF_MAX_BYTES) {
+    return null
+  }
+  const key = `${config.prefix}/${randomUUID()}.${extension}`
+  const uploadUrl = await getSignedUrl(
+    getClient(config),
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      ContentType: input.mime,
+      CacheControl: "private, no-store",
+    }),
+    { expiresIn: 300 }
+  )
+  return { key, uploadUrl, expiresIn: 300 }
+}
+
+export async function completeProofUpload(input: {
+  key: string
+  expectedSize: number
+  mime: string
+}): Promise<{ uri: string } | null> {
+  const config = privateProofConfig()
+  const extension = PROOF_IMAGE_EXTENSIONS[input.mime]
+  if (!config || !extension) return null
+  if (!input.key.startsWith(config.prefix + "/") || input.key.includes("..")) return null
+
+  const head = await getClient(config).send(
+    new HeadObjectCommand({ Bucket: config.bucket, Key: input.key })
+  ).catch(() => null)
+  if (!head?.ContentLength || head.ContentLength !== input.expectedSize) return null
+
+  return { uri: `${PRIVATE_PROOF_PREFIX}${input.key}`}
 }

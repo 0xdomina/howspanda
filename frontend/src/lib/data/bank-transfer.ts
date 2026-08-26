@@ -85,9 +85,11 @@ export const submitBankProof = async (
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
-// Uploads the proof screenshot. Guest checkout has no session, so this hits
-// the public /store/uploads endpoint; the image only becomes meaningful once
-// bound to an order by submitBankProof (which verifies the email).
+// Uploads the proof screenshot via presigned direct-to-B2: the browser PUTs
+// straight to the private bucket, bypassing the API entirely — so Cloudflare's
+// managed challenge on multipart POSTs to the backend never blocks a buyer.
+// The returned `private://` URI only becomes meaningful once bound to an
+// order by submitBankProof (which verifies the email).
 export const uploadBankProofImage = async (
   file: File
 ): Promise<{ url?: string; error?: string }> => {
@@ -95,17 +97,39 @@ export const uploadBankProofImage = async (
     return { error: "File too large — max 10MB" }
   }
   try {
-    const form = new FormData()
-    form.append("file", file, file.name)
-    const res = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads`, {
+    const prepare = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads/proof-prepare`, {
       method: "POST",
-      body: form,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mime: file.type, size: file.size }),
     })
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
-      return { error: text || `Upload failed (${res.status})` }
+    if (!prepare.ok) {
+      const text = await prepare.text().catch(() => "")
+      return { error: text || `Upload prepare failed (${prepare.status})` }
     }
-    const data = (await res.json()) as { url?: string }
+    const { uploadUrl, key } = (await prepare.json()) as {
+      uploadUrl: string
+      key: string
+    }
+
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    })
+    if (!put.ok) {
+      return { error: `Upload failed (${put.status})` }
+    }
+
+    const complete = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads/proof-complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, size: file.size, mime: file.type }),
+    })
+    if (!complete.ok) {
+      const text = await complete.text().catch(() => "")
+      return { error: text || `Upload validation failed (${complete.status})` }
+    }
+    const data = (await complete.json()) as { url?: string }
     return { url: data.url }
   } catch (error: any) {
     return { error: error?.message ?? "Upload failed." }

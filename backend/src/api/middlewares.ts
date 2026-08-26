@@ -1660,9 +1660,19 @@ export default defineMiddlewares({
     },
     {
       // Bank-proof uploads are intentionally guest-compatible because the
-      // order email is checked when the proof is attached, but the raw upload
-      // endpoint still needs an IP bucket to prevent disk/B2 exhaustion.
+      // order email is checked when the proof is attached, but the presigned
+      // prepare/complete pair still needs an IP bucket to prevent B2 exhaustion.
       matcher: "/store/uploads",
+      methods: ["POST"],
+      middlewares: [UPLOAD_RATE_LIMIT],
+    },
+    {
+      matcher: "/store/uploads/proof-prepare",
+      methods: ["POST"],
+      middlewares: [UPLOAD_RATE_LIMIT],
+    },
+    {
+      matcher: "/store/uploads/proof-complete",
       methods: ["POST"],
       middlewares: [UPLOAD_RATE_LIMIT],
     },
