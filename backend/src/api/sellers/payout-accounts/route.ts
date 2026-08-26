@@ -9,7 +9,6 @@ import {
 import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import MarketplaceModuleService from "../../../modules/marketplace/service"
 import {
-  PaystackTransferError,
   createRecipient,
   isMockMode,
   resolveAccount,
@@ -20,8 +19,10 @@ import { requireSellerOwner } from "../../../lib/sellers/resolve-seller"
 
 type PostPayoutAccountBody = z.infer<typeof PostPayoutAccountSchema>
 
-// Minimal shape validation only — a bank account is verified by Paystack's
-// name resolve; a crypto address is ultimately verified by the transfer itself.
+// Manual configuration first: the seller types their account details, buyers
+// pay directly into them. Paystack verification (name resolve + transfer
+// recipient) upgrades the account when live keys are configured; any
+// Paystack failure degrades gracefully instead of blocking the seller.
 const BASE_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
@@ -84,10 +85,14 @@ export const POST = async (
   const isDefault = existingOfType.length === 0
 
   if (body.type === "bank_account") {
-    // The seller supplies the account name; Paystack's resolve still validates
-    // the account in live mode. In mock mode the typed name is authoritative
-    // (resolve would return a generic "MOCK ACCOUNT xxxx" placeholder).
+    // Manual configuration is authoritative: the seller types their account
+    // details and buyers pay directly into them. When live Paystack keys are
+    // configured, we additionally verify the name resolve and create a real
+    // transfer recipient (needed for Paystack payouts later). Any Paystack
+    // failure — bad key, network, provider outage — degrades gracefully to
+    // the manual entry instead of blocking the seller.
     let accountName = body.account_name
+    let recipientCode = `RCP_manual_${body.account_number}`
     if (!isMockMode()) {
       try {
         const resolved = await resolveAccount(
@@ -95,19 +100,21 @@ export const POST = async (
           body.bank_code
         )
         accountName = resolved.account_name
-      } catch (e) {
-        if (e instanceof PaystackTransferError) {
-          throw new MedusaError(MedusaError.Types.INVALID_DATA, e.message)
-        }
-        throw e
+      } catch {
+        // Keep the seller-typed name; verification simply didn't happen.
+      }
+      try {
+        const recipient = await createRecipient({
+          name: accountName,
+          account_number: body.account_number,
+          bank_code: body.bank_code,
+        })
+        recipientCode = recipient.recipient_code
+      } catch {
+        // Manual account stays payout-capable via manual transfer until a
+        // real recipient is created (re-saving with live keys upgrades it).
       }
     }
-
-    const { recipient_code } = await createRecipient({
-      name: accountName,
-      account_number: body.account_number,
-      bank_code: body.bank_code,
-    })
 
     const payoutAccount = await marketplace.createPayoutAccounts({
       seller_id: sellerId,
@@ -116,7 +123,7 @@ export const POST = async (
       bank_code: body.bank_code,
       account_number: body.account_number,
       account_name: accountName,
-      recipient_code,
+      recipient_code: recipientCode,
       is_default: isDefault,
       status: "verified",
     })
