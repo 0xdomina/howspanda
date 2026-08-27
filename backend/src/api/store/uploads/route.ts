@@ -63,36 +63,48 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const uploadReq = req as UploadRequest
 
   // ── Presigned direct-to-B2 flow (bypasses Cloudflare on multipart POSTs) ──
-  // ?kind=proof-prepare  → returns a presigned PUT URL for the private bucket
-  // ?kind=proof-complete → validates the object and returns the internal URI
+  // When Content-Type is application/json, this is the presigned flow.
+  // Multer only handles multipart/form-data, so JSON requests must be
+  // intercepted before multer tries to parse them.
   const ct = (req.headers["content-type"] ?? "") as string
-  const isJson = ct.includes("application/json")
-  const kind = isJson ? ((await readJsonBody(req)).kind as string ?? "") : ""
+  if (ct.includes("application/json")) {
+    const chunks: Buffer[] = []
+    for await (const chunk of req) {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk)
+    }
+    let body: Record<string, unknown> = {}
+    if (chunks.length) {
+      try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")) } catch {}
+    }
+    const kind = (body.kind ?? "") as string
 
-  if (kind === "proof-prepare") {
-    const body = (await readJsonBody(req)) as { mime?: string; size?: number }
-    if (!hasPrivatePaymentProofStorage() || !body.mime || !Number.isInteger(body.size)) {
-      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload details")
+    if (kind === "proof-prepare") {
+      const { mime, size } = body as { mime?: string; size?: number }
+      if (!hasPrivatePaymentProofStorage() || !mime || !Number.isInteger(size)) {
+        throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload details")
+      }
+      const prepared = await prepareProofUpload({ mime, size: size! })
+      if (!prepared) {
+        throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload a valid image (PNG, JPEG, or WebP) up to 10MB")
+      }
+      res.json(prepared)
+      return
     }
-    const prepared = await prepareProofUpload({ mime: body.mime, size: body.size })
-    if (!prepared) {
-      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload a valid image (PNG, JPEG, or WebP) up to 10MB")
-    }
-    res.json(prepared)
-    return
-  }
 
-  if (kind === "proof-complete") {
-    const body = (await readJsonBody(req)) as { key?: string; size?: number; mime?: string }
-    if (!body.key || !Number.isInteger(body.size) || !body.mime) {
-      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload completion details")
+    if (kind === "proof-complete") {
+      const { key, size, mime } = body as { key?: string; size?: number; mime?: string }
+      if (!key || !Number.isInteger(size) || !mime) {
+        throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload completion details")
+      }
+      const result = await completeProofUpload({ key, expectedSize: size!, mime })
+      if (!result) {
+        throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload was not completed or the file failed validation")
+      }
+      res.json({ url: result.uri })
+      return
     }
-    const result = await completeProofUpload({ key: body.key, expectedSize: body.size, mime: body.mime })
-    if (!result) {
-      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload was not completed or the file failed validation")
-    }
-    res.json({ url: result.uri })
-    return
+
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Missing kind parameter")
   }
 
   // ── Legacy multipart upload (kept for backward compatibility) ──
