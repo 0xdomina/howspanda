@@ -2,6 +2,9 @@
 
 import { sdk } from "@lib/config"
 import { MEDUSA_BACKEND_URL } from "@lib/config"
+import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3"
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { randomUUID } from "crypto"
 
 export type BankTransferBank = {
   bank_code?: string | null
@@ -84,59 +87,63 @@ export const submitBankProof = async (
 }
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
+const PROOF_EXTENSIONS: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+}
 
-// Uploads the proof screenshot via presigned direct-to-B2: the browser PUTs
-// straight to the private bucket, bypassing the API entirely — so Cloudflare's
-// managed challenge on multipart POSTs to the backend never blocks a buyer.
-// The returned `private://` URI only becomes meaningful once bound to an
-// order by submitBankProof (which verifies the email).
+function getPrivateS3Config() {
+  const bucket = process.env.PRIVATE_S3_BUCKET
+  const endpoint = process.env.PRIVATE_S3_ENDPOINT
+  const region = process.env.PRIVATE_S3_REGION || "us-east-1"
+  const accessKeyId = process.env.PRIVATE_S3_ACCESS_KEY_ID
+  const secretAccessKey = process.env.PRIVATE_S3_SECRET_ACCESS_KEY
+  const prefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
+  if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) return null
+  return new S3Client({
+    region,
+    endpoint,
+    forcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey },
+  })
+}
+
+// Uploads the proof screenshot directly to the private B2 bucket from Vercel's
+// serverless function. Bypasses the PandaStack backend entirely — no Cloudflare
+// challenge, no publishable key, no multipart. The returned `private://` URI
+// only becomes meaningful once bound to an order by submitBankProof.
 export const uploadBankProofImage = async (
   file: File
 ): Promise<{ url?: string; error?: string }> => {
   if (file.size > IMAGE_MAX_BYTES) {
     return { error: "File too large — max 10MB" }
   }
+  const ext = PROOF_EXTENSIONS[file.type]
+  if (!ext) {
+    return { error: "Only PNG, JPEG, and WebP images are accepted." }
+  }
+  const s3 = getPrivateS3Config()
+  if (!s3) {
+    return { error: "Proof storage is not configured." }
+  }
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
-    const pk = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-    if (pk) headers["x-publishable-api-key"] = pk
+    const prefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
+    const bucket = process.env.PRIVATE_S3_BUCKET!
+    const key = `${prefix}/${randomUUID()}.${ext}`
+    const buffer = Buffer.from(await file.arrayBuffer())
 
-    const prepare = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads?kind=proof-prepare`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ mime: file.type, size: file.size }),
-    })
-    if (!prepare.ok) {
-      const text = await prepare.text().catch(() => "")
-      return { error: text || `Upload prepare failed (${prepare.status})` }
-    }
-    const { uploadUrl, key } = (await prepare.json()) as {
-      uploadUrl: string
-      key: string
-    }
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: file.type,
+        CacheControl: "private, no-store",
+      })
+    )
 
-    const put = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    })
-    if (!put.ok) {
-      return { error: `Upload failed (${put.status})` }
-    }
-
-    const complete = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads?kind=proof-complete`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ key, size: file.size, mime: file.type }),
-    })
-    if (!complete.ok) {
-      const text = await complete.text().catch(() => "")
-      return { error: text || `Upload validation failed (${complete.status})` }
-    }
-    const data = (await complete.json()) as { url?: string }
-    return { url: data.url }
+    return { url: `private://${key}` }
   } catch (error: any) {
     return { error: error?.message ?? "Upload failed." }
   }
