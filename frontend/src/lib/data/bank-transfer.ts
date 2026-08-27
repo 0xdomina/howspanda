@@ -2,9 +2,7 @@
 
 import { sdk } from "@lib/config"
 import { MEDUSA_BACKEND_URL } from "@lib/config"
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3"
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
-import { randomUUID } from "crypto"
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 
 export type BankTransferBank = {
   bank_code?: string | null
@@ -130,7 +128,7 @@ export const uploadBankProofImage = async (
   try {
     const prefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
     const bucket = process.env.PRIVATE_S3_BUCKET!
-    const key = `${prefix}/${randomUUID()}.${ext}`
+    const key = `${prefix}/${crypto.randomUUID()}.${ext}`
     const buffer = Buffer.from(await file.arrayBuffer())
 
     await s3.send(
