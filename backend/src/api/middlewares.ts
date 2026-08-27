@@ -443,7 +443,7 @@ export const PostBankProofSchema = z.object({
         /^\/uploads\/proof\/[\w.-]+$/.test(value)
       ) return true
       if (
-        /^private:\/\/[a-zA-Z0-9/_-]+\.(?:png|jpe?g|webp|gif|avif)$/i.test(
+        /^private:\/\/[^\s]+\.(?:png|jpe?g|webp|gif|avif)$/i.test(
           value
         )
       ) return true
