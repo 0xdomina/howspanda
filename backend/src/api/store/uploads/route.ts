@@ -9,6 +9,8 @@ import { validateMediaMetadata } from "../../../lib/upload/metadata"
 import {
   hasPrivatePaymentProofStorage,
   uploadPrivatePaymentProof,
+  prepareProofUpload,
+  completeProofUpload,
 } from "../../../lib/bank-transfer/private-proof"
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
@@ -37,9 +39,43 @@ type UploadRequest = MedusaRequest & {
   body: { kind?: string } & Record<string, unknown>
 }
 
+const PROOF_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const uploadReq = req as UploadRequest
 
+  // ── Presigned direct-to-B2 flow (bypasses Cloudflare on multipart POSTs) ──
+  // ?kind=proof-prepare  → returns a presigned PUT URL for the private bucket
+  // ?kind=proof-complete → validates the object and returns the internal URI
+  const kind = (req.query?.kind ?? req.body?.kind ?? "") as string
+
+  if (kind === "proof-prepare") {
+    const body = (req.body ?? {}) as { mime?: string; size?: number }
+    if (!hasPrivatePaymentProofStorage() || !body.mime || !Number.isInteger(body.size)) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload details")
+    }
+    const prepared = await prepareProofUpload({ mime: body.mime, size: body.size })
+    if (!prepared) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload a valid image (PNG, JPEG, or WebP) up to 10MB")
+    }
+    res.json(prepared)
+    return
+  }
+
+  if (kind === "proof-complete") {
+    const body = (req.body ?? {}) as { key?: string; size?: number; mime?: string }
+    if (!body.key || !Number.isInteger(body.size) || !body.mime) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload completion details")
+    }
+    const result = await completeProofUpload({ key: body.key, expectedSize: body.size, mime: body.mime })
+    if (!result) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload was not completed or the file failed validation")
+    }
+    res.json({ url: result.uri })
+    return
+  }
+
+  // ── Legacy multipart upload (kept for backward compatibility) ──
   try {
     await parseMultipart(uploadReq, res)
   } catch (err: any) {

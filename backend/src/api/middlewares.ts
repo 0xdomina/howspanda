@@ -1667,16 +1667,6 @@ export default defineMiddlewares({
       middlewares: [UPLOAD_RATE_LIMIT],
     },
     {
-      matcher: "/store/uploads/proof-prepare",
-      methods: ["POST"],
-      middlewares: [UPLOAD_RATE_LIMIT],
-    },
-    {
-      matcher: "/store/uploads/proof-complete",
-      methods: ["POST"],
-      middlewares: [UPLOAD_RATE_LIMIT],
-    },
-    {
       matcher: "/store/delivery-jobs/:id/chat",
       methods: ["GET"],
       middlewares: [

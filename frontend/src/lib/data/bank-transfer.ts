@@ -97,9 +97,15 @@ export const uploadBankProofImage = async (
     return { error: "File too large — max 10MB" }
   }
   try {
-    const prepare = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads/proof-prepare`, {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    const pk = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+    if (pk) headers["x-publishable-api-key"] = pk
+
+    const prepare = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads?kind=proof-prepare`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ mime: file.type, size: file.size }),
     })
     if (!prepare.ok) {
@@ -120,9 +126,9 @@ export const uploadBankProofImage = async (
       return { error: `Upload failed (${put.status})` }
     }
 
-    const complete = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads/proof-complete`, {
+    const complete = await fetch(`${MEDUSA_BACKEND_URL}/store/uploads?kind=proof-complete`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ key, size: file.size, mime: file.type }),
     })
     if (!complete.ok) {
