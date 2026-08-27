@@ -1,7 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { MedusaError, Modules } from "@medusajs/framework/utils"
 import { randomUUID } from "crypto"
-import { mkdir, writeFile } from "fs/promises"
+import { mkdir, readFile, writeFile } from "fs/promises"
 import path from "path"
 import multer from "multer"
 import { sniffMedia } from "../../../lib/upload/sniff"
@@ -41,16 +41,36 @@ type UploadRequest = MedusaRequest & {
 
 const PROOF_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
+async function readJsonBody(req: MedusaRequest): Promise<Record<string, unknown>> {
+  // Medusa may not parse JSON on this route (multer occupies the body pipeline).
+  // Read the raw stream and parse it manually when Content-Type is JSON.
+  if (typeof req.body === "object" && req.body !== null && Object.keys(req.body).length > 0) {
+    return req.body as Record<string, unknown>
+  }
+  const chunks: Buffer[] = []
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk)
+  }
+  if (!chunks.length) return {}
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"))
+  } catch {
+    return {}
+  }
+}
+
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const uploadReq = req as UploadRequest
 
   // ── Presigned direct-to-B2 flow (bypasses Cloudflare on multipart POSTs) ──
   // ?kind=proof-prepare  → returns a presigned PUT URL for the private bucket
   // ?kind=proof-complete → validates the object and returns the internal URI
-  const kind = (req.query?.kind ?? req.body?.kind ?? "") as string
+  const ct = (req.headers["content-type"] ?? "") as string
+  const isJson = ct.includes("application/json")
+  const kind = isJson ? ((await readJsonBody(req)).kind as string ?? "") : ""
 
   if (kind === "proof-prepare") {
-    const body = (req.body ?? {}) as { mime?: string; size?: number }
+    const body = (await readJsonBody(req)) as { mime?: string; size?: number }
     if (!hasPrivatePaymentProofStorage() || !body.mime || !Number.isInteger(body.size)) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload details")
     }
@@ -63,7 +83,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
 
   if (kind === "proof-complete") {
-    const body = (req.body ?? {}) as { key?: string; size?: number; mime?: string }
+    const body = (await readJsonBody(req)) as { key?: string; size?: number; mime?: string }
     if (!body.key || !Number.isInteger(body.size) || !body.mime) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload completion details")
     }
