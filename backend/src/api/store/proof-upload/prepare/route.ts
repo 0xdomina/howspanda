@@ -2,7 +2,7 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { MedusaError } from "@medusajs/framework/utils"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
-import { randomUUID } from "crypto"
+import { randomUUID } from "node:crypto"
 
 // ── Private-proof presigned upload (bypasses Cloudflare + multer) ──
 // POST /store/proof-upload/prepare  { mime, size }
@@ -60,8 +60,9 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid upload details")
   }
 
+  const size = body.size as number
   const ext = EXT[body.mime]
-  if (!ext || body.size < 1 || body.size > IMAGE_MAX_BYTES) {
+  if (!ext || size < 1 || size > IMAGE_MAX_BYTES) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       "Upload a valid image (PNG, JPEG, or WebP) up to 10MB"

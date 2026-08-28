@@ -51,6 +51,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
 
   // Validate the key is in our prefix and has a safe extension
+  const size = body.size as number
   const prefix = proofPrefix()
   const ext = body.mime && EXT_MIME[Object.keys(EXT_MIME).find(k => EXT_MIME[k] === body.mime) ?? ""]
   if (!ext || !body.key.startsWith(prefix + "/") || body.key.includes("..")) {
@@ -66,7 +67,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload was not completed")
   }
 
-  if (!head.ContentLength || head.ContentLength < 1 || head.ContentLength > IMAGE_MAX_BYTES || head.ContentLength !== body.size) {
+  if (!head.ContentLength || head.ContentLength < 1 || head.ContentLength > IMAGE_MAX_BYTES || head.ContentLength !== size) {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload size mismatch")
   }
 
