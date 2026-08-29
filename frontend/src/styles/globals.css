@@ -6,6 +6,11 @@
 @import "tailwindcss/utilities";
 
 @layer base {
+  html,
+  body {
+    overflow-x: clip;
+  }
+
   * {
     border-color: theme("colors.ink.hairline");
   }
