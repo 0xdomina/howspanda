@@ -5,7 +5,6 @@ import CheckoutForm from "@modules/checkout/templates/checkout-form"
 import CheckoutSummary from "@modules/checkout/templates/checkout-summary"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { Metadata } from "next"
-import { notFound } from "next/navigation"
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -15,7 +14,31 @@ export default async function Checkout() {
   const cart = await retrieveCart()
 
   if (!cart) {
-    return notFound()
+    return (
+      <div
+        className="figma-container py-16"
+        data-testid="checkout-empty-state"
+      >
+        <div className="mx-auto max-w-md rounded-control border border-ink-hairline bg-white p-8 text-center shadow-float">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
+            Checkout
+          </p>
+          <h1 className="mt-3 font-display text-3xl font-medium tracking-[-0.02em] text-ink">
+            Your cart is empty
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-ink-muted">
+            Add something you love to your cart and come back here when you’re
+            ready to place your order.
+          </p>
+          <LocalizedClientLink
+            href="/store"
+            className="mt-7 inline-flex rounded-control bg-brand px-6 py-3 text-sm font-semibold text-white transition-transform duration-fast hover:-translate-y-0.5"
+          >
+            Continue shopping
+          </LocalizedClientLink>
+        </div>
+      </div>
+    )
   }
 
   const customer = await retrieveCustomer()
