@@ -97,9 +97,15 @@ const EmailStep = ({
   }
 
   useEffect(() => {
-    if (!sent) send()
+    if (sent) return
+
+    // Defer the initial request until after the first paint. This keeps the
+    // verification card responsive and avoids synchronously mutating React
+    // state while the effect is being committed.
+    const timer = window.setTimeout(() => send(), 0)
+    return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [sent])
 
   const verify = () => {
     setError(null)

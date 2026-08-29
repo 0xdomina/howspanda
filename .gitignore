@@ -22,5 +22,32 @@ out
 # Local dev media uploads (production stores media on S3/Backblaze)
 backend/uploads
 
+# Local browser QA output and one-off probes. These may contain screenshots,
+# test credentials, or deployment URLs and must never enter production history.
+/uploads
+/check-*.js
+/e2e-*.js
+/live-e2e-smoke.js
+/monitor-*.js
+/patch-products.js
+/test-*.js
+/verify-*.js
+frontend/e2e-shots
+frontend/e2e-shots-human
+frontend/check-*.js
+frontend/debug-*.js
+frontend/deep-debug.js
+frontend/e2e-*.js
+frontend/final-*.js
+frontend/probe-*.js
+frontend/reflash.js
+frontend/seed-marketplace.js
+frontend/test-*.js
+frontend/trigger-revalidate.js
+frontend/upload-real-images.js
+frontend/verify-*.js
+backend/check-db.js
+backend/list-buckets.js
+
 .vercel
 .env*.local

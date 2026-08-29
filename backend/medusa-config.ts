@@ -18,6 +18,9 @@ const isProduction = process.env.NODE_ENV === 'production'
 // that low-latency internal connection in production and keep REDIS_URL as a
 // portable fallback for local development and other hosts.
 const redisUrl = process.env.KV_URL || process.env.REDIS_URL
+const hasRedis = Boolean(
+  redisUrl?.trim() && !["disabled", "none", "off"].includes(redisUrl.trim().toLowerCase())
+)
 if (isProduction) {
   // PandaStack's free runtime can reach HTTPS/WebSocket endpoints even when
   // raw PostgreSQL TCP egress is unavailable. Neon’s node-postgres-compatible
@@ -54,6 +57,11 @@ if (isProduction) {
   if (missingPrivateStorage.length) {
     throw new Error(
       `Private payment-proof storage is required in production: ${missingPrivateStorage.join(", ")}`
+    )
+  }
+  if (!hasRedis) {
+    throw new Error(
+      "A Redis/Valkey connection is required in production: set KV_URL or REDIS_URL"
     )
   }
   if (
@@ -224,20 +232,25 @@ module.exports = defineConfig({
     {
       resolve: "./src/modules/wishlist",
     },
-    {
-      resolve: "@medusajs/medusa/event-bus-redis",
-      options: {
-        redisUrl,
-      },
-    },
-    {
-      resolve: "@medusajs/medusa/workflow-engine-redis",
-      options: {
-        redis: {
-          redisUrl,
-        },
-      },
-    },
+    ...(hasRedis
+      ? [
+          {
+            resolve: "@medusajs/medusa/event-bus-redis",
+            options: { redisUrl },
+          },
+          {
+            resolve: "@medusajs/medusa/workflow-engine-redis",
+            options: { redis: { redisUrl } },
+          },
+        ]
+      : [
+          {
+            // Event bus local is Medusa's default when no Redis event bus is
+            // registered. Use the in-process workflow engine for local QA so
+            // development does not silently attempt localhost:6379.
+            resolve: "@medusajs/workflow-engine-inmemory",
+          },
+        ]),
     {
       resolve: "@medusajs/medusa/payment",
       options: {

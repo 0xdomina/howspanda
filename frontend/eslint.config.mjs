@@ -8,6 +8,8 @@ const config = [
       "next-env.d.ts",
       ".yarn/**",
       ".git/**",
+      "e2e-shots/**",
+      "e2e-shots-human/**",
     ],
   },
   ...nextVitals,

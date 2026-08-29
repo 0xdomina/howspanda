@@ -136,14 +136,6 @@ const Register = ({ setCurrentView }: Props) => {
     })
   }
 
-  // Code delivery is initiated by Continue above so duplicate accounts are
-  // rejected before the verification screen is shown.
-  useEffect(() => {
-    if (step !== "code") {
-      setCode("")
-    }
-  }, [step])
-
   const verifyAndCreate = () => {
     setError(null)
     if (code.trim().length !== 6) {
