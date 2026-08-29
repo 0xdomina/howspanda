@@ -97,7 +97,8 @@ const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false }: Sid
         <>
           <button
             type="button"
-            aria-label="Close menu"
+            aria-label="Close menu backdrop"
+            data-testid="nav-menu-backdrop"
             onClick={closeMenu}
             className="fixed inset-0 z-[70] bg-ink/20 backdrop-blur-[2px]"
           />
@@ -114,7 +115,8 @@ const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false }: Sid
                 <button
                   type="button"
                   onClick={closeMenu}
-                  aria-label="Close menu"
+                  aria-label="Close browse menu"
+                  data-testid="nav-menu-close"
                   className="grid h-9 w-9 place-items-center rounded-full text-ink transition-colors duration-200 hover:bg-paper-tinted active:scale-[0.97]"
                 >
                   <X size={18} />
