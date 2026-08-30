@@ -78,6 +78,7 @@ export const setCartId = async (cartId: string) => {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
+    path: "/",
   })
 }
 
@@ -85,5 +86,6 @@ export const removeCartId = async () => {
   const cookies = await nextCookies()
   cookies.set("_medusa_cart_id", "", {
     maxAge: -1,
+    path: "/",
   })
 }
