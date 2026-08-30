@@ -10,8 +10,13 @@ export const metadata: Metadata = {
   title: "Checkout",
 }
 
+// Checkout must resolve the cart cookie on every request. A cached empty
+// render can otherwise win a race with the cart server action and hide a
+// freshly-added item from the payment flow.
+export const dynamic = "force-dynamic"
+
 export default async function Checkout() {
-  const cart = await retrieveCart()
+  const cart = await retrieveCart(undefined, undefined, "no-store")
 
   if (!cart) {
     return (
