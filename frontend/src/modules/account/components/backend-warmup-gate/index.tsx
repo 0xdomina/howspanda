@@ -6,6 +6,9 @@ import type { ReactNode } from "react"
 const MAX_WAIT_MS = 30_000
 const POLL_MS = 2_500
 const REQUEST_TIMEOUT_MS = 9_000
+const BACKEND_HEALTH_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+  ? `${process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL.replace(/\/$/, "")}/health`
+  : "/api/backend/health"
 
 type WarmupState = "checking" | "ready" | "error"
 
@@ -21,9 +24,10 @@ const BackendWarmupGate = ({ children }: { children: ReactNode }) => {
     )
 
     try {
-      const response = await fetch("/api/backend/health", {
+      const response = await fetch(BACKEND_HEALTH_URL, {
         cache: "no-store",
-        credentials: "same-origin",
+        credentials: "omit",
+        mode: "cors",
         signal: controller.signal,
       })
       const body = (await response.json().catch(() => null)) as {

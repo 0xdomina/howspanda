@@ -36,6 +36,9 @@ export const metadata: Metadata = {
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const initialWishlist = await loadWishlist()
+  const backendHealthUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+    ? `${process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL.replace(/\/$/, "")}/health`
+    : "/api/backend/health"
 
   return (
     <html
@@ -48,7 +51,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
           // Quietly start the backend through our same-origin health proxy so
           // the backend URL is never exposed in the page source.
           dangerouslySetInnerHTML={{
-            __html: `try{fetch("/api/backend/health",{cache:"no-store",credentials:"same-origin"}).catch(function(){})}catch(e){}`,
+            __html: `try{fetch(${JSON.stringify(backendHealthUrl)},{mode:"no-cors",cache:"no-store"}).catch(function(){})}catch(e){}`,
           }}
         />
       </body>

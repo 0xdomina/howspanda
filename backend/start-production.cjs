@@ -22,6 +22,9 @@ function sendJson(res, status, body) {
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(payload),
     "cache-control": "no-store",
+    // The health response is public and read-only. Allow the storefront to
+    // wake the service directly from a visitor's browser before auth loads.
+    "access-control-allow-origin": "*",
   })
   res.end(payload)
 }
