@@ -65,6 +65,12 @@ export const POST = async (
   }
 
   const file = uploadReq.file
+  if (!file) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Upload a clear photo of your ID card. Manual NIN submissions are not accepted."
+    )
+  }
 
   let email: string | null = null
   let phone: string | null = null
@@ -128,7 +134,7 @@ export const POST = async (
     )
   }
 
-  const document = file ? validateKycDocument(file.buffer) : undefined
+  const document = validateKycDocument(file.buffer)
   const kyc = req.scope.resolve<KycModuleService>(KYC_MODULE)
   const body: Body = parsed.data
   const result = await kyc.submitIdentity({

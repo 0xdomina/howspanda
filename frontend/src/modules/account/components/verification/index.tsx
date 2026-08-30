@@ -491,18 +491,16 @@ export const IdentityStep = ({
   kyc: KycProfileView | null
   onDone: (p: KycProfileView) => void
 }) => {
-  const [mode, setMode] = useState<"upload" | "manual">("upload")
   const [image, setImage] = useState<string | null>(null)
   const [document, setDocument] = useState<File | null>(null)
   const [stage, setStage] = useState<"idle" | "scanning" | "review">("idle")
   const [progress, setProgress] = useState<number | null>(null)
   const [doc, setDoc] = useState<ExtractedNinDoc>({})
-  const [nin, setNin] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const setDocField =
-    (key: keyof ExtractedNinDoc) =>
+    (key: Exclude<keyof ExtractedNinDoc, "id_number">) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setDoc((d) => ({ ...d, [key]: e.target.value }))
 
@@ -526,8 +524,8 @@ export const IdentityStep = ({
 
   // Everything runs in the browser: the photo is preprocessed (grayscale +
   // contrast), OCR'd with Tesseract.js (loaded on demand), and the cleaned text
-  // is parsed into fields. The user reviews/corrects, then the JSON is sent to
-  // the backend for the NIN match — no ID image ever leaves the device.
+  // is parsed into fields. The user reviews/corrects the non-identity fields,
+  // then the JSON is sent to the backend for the NIN match.
   const scan = () => {
     setError(null)
     setStage("scanning")
@@ -557,9 +555,8 @@ export const IdentityStep = ({
         setStage("review")
       } catch {
         setStage("idle")
-        setMode("manual")
         setError(
-          "OCR couldn't load right now. Enter the NIN manually below — the details on your profile are used for the match."
+          "We couldn’t read that card automatically. Please upload a clearer photo and try again."
         )
       }
     })
@@ -611,63 +608,9 @@ export const IdentityStep = ({
     })
   }
 
-  const submitManual = () => {
-    setError(null)
-    const idNumber = nin.replace(/\D/g, "")
-    if (idNumber.length !== 11) {
-      setError("NIN must be an 11-digit number.")
-      return
-    }
-    startTransition(async () => {
-      const res = await submitKycIdentity({
-        email,
-        id_type: "nin",
-        id_number: idNumber,
-        document: document ?? undefined,
-        // The match checks the card's name against the profile — in manual
-        // mode the card isn't scanned, so the profile name stands in.
-        extracted: {
-          id_number: idNumber,
-          first_name: kyc?.first_name ?? undefined,
-          last_name: kyc?.last_name ?? undefined,
-        },
-      })
-      if (res.ok && res.profile) {
-        onDone(res.profile)
-      } else {
-        setError(res.error ?? "Could not submit your identity.")
-      }
-    })
-  }
-
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setMode("upload")}
-          className={`rounded-medium px-3 py-1.5 text-sm font-medium ${
-            mode === "upload"
-              ? "bg-ink text-white"
-              : "border border-ink-strong text-ink hover:bg-ink hover:text-white"
-          }`}
-        >
-          Upload ID card
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("manual")}
-          className={`rounded-medium px-3 py-1.5 text-sm font-medium ${
-            mode === "manual"
-              ? "bg-ink text-white"
-              : "border border-ink-strong text-ink hover:bg-ink hover:text-white"
-          }`}
-        >
-          Enter NIN manually
-        </button>
-      </div>
-
-      {mode === "upload" && stage === "idle" && (
+      {stage === "idle" && (
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
             Upload a clear photo of your National ID card. We&rsquo;ll use it to
@@ -700,7 +643,7 @@ export const IdentityStep = ({
         </div>
       )}
 
-      {mode === "upload" && stage === "scanning" && (
+      {stage === "scanning" && (
         <div className="space-y-2">
           <p className="text-sm text-ink-muted">Reading the ID card…</p>
           <div className="h-2 w-full overflow-hidden rounded-full bg-ink/10">
@@ -713,22 +656,25 @@ export const IdentityStep = ({
         </div>
       )}
 
-      {mode === "upload" && stage === "review" && (
+      {stage === "review" && (
         <div className="space-y-3">
           <p className="text-sm text-ink-muted">
-            Confirm the details read off your card — fix anything the scanner
-            got wrong, then submit.
+             Confirm the details read off your card — you can correct the name
+             and date fields, but the NIN must come from the uploaded ID.
           </p>
           <div className="grid grid-cols-1 gap-3 small:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs text-ink-muted">NIN</label>
-              <input
-                value={doc.id_number ?? ""}
-                onChange={setDocField("id_number")}
-                inputMode="numeric"
-                placeholder="11-digit NIN"
-                className={inputClass}
-              />
+              <label className="mb-1 block text-xs text-ink-muted">
+                NIN (read from ID)
+              </label>
+              <div
+                className={`${inputClass} bg-ink/5 text-ink-muted`}
+                aria-label="NIN read from uploaded ID"
+              >
+                {doc.id_number
+                  ? `•••••••${doc.id_number.slice(-4)}`
+                  : "Not detected — upload a clearer ID photo"}
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-xs text-ink-muted">Date of birth (optional)</label>
@@ -784,31 +730,6 @@ export const IdentityStep = ({
               Rescan
             </button>
           </div>
-        </div>
-      )}
-
-      {mode === "manual" && (
-        <div className="space-y-3">
-          <p className="text-sm text-ink-muted">
-            Enter your National Identification Number (NIN). Manual entries
-            stay pending review; uploading a card photo enables automatic file
-            validation.
-          </p>
-          <input
-            value={nin}
-            onChange={(e) => setNin(e.target.value.replace(/[^\d]/g, "").slice(0, 11))}
-            inputMode="numeric"
-            placeholder="11-digit NIN"
-            className={inputClass}
-          />
-          <button
-            type="button"
-            disabled={nin.length !== 11 || isPending}
-            onClick={submitManual}
-            className="rounded-medium bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-50"
-          >
-            {isPending ? "Submitting…" : "Submit NIN"}
-          </button>
         </div>
       )}
 
