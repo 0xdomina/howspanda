@@ -22,7 +22,7 @@ export default async function Checkout(props: {
   const searchParams = await props.searchParams
   const checkoutCartId = await getCheckoutCartId()
   const cartId = searchParams.cart_id ?? checkoutCartId ?? (await getCartId())
-  const cart = await retrieveCart(cartId ?? undefined)
+  const cart = await retrieveCart(cartId ?? undefined, undefined, "no-store")
   const customer = await retrieveCustomer()
 
   if (!cart) {
