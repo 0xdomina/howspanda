@@ -1,4 +1,4 @@
-import React, { Suspense } from "react"
+import React from "react"
 
 import ImageGallery from "@modules/products/components/image-gallery"
 import ProductActions from "@modules/products/components/product-actions"
@@ -13,7 +13,6 @@ import { getBaseURL } from "@lib/util/env"
 import ProductReviews from "@modules/products/components/product-reviews"
 import type { ProductRatingSummary } from "@lib/data/reviews"
 
-import ProductActionsWrapper from "./product-actions-wrapper"
 
 type ProductTemplateProps = {
   product: HttpTypes.StoreProduct
@@ -100,17 +99,7 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
             </div>
 
             <div className="mt-6 border-t border-ink-hairline pt-6">
-              <Suspense
-                fallback={
-                  <ProductActions
-                    disabled={true}
-                    product={product}
-                    region={region}
-                  />
-                }
-              >
-                <ProductActionsWrapper id={product.id} region={region} />
-              </Suspense>
+              <ProductActions product={product} region={region} />
             </div>
           </div>
 
@@ -121,9 +110,9 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
         className="figma-container my-16 small:my-24"
         data-testid="related-products-container"
       >
-        <Suspense fallback={<SkeletonRelatedProducts />}>
+        <React.Suspense fallback={<SkeletonRelatedProducts />}>
           <RelatedProducts product={product} countryCode={countryCode} />
-        </Suspense>
+        </React.Suspense>
       </div>
       <ProductReviews summary={ratingSummary} />
     </>
