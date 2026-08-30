@@ -39,7 +39,7 @@ const Summary = ({ cart }: SummaryProps) => {
       <RedeemableCode cart={cart} />
       <Divider />
       <CartTotals totals={cart} />
-      <form action={prepareCheckout.bind(null, countryCode, step)}>
+      <form action={prepareCheckout.bind(null, countryCode, step, cart.id)}>
         <Button className="w-full h-10" rounded="pill">
           Go to checkout
         </Button>

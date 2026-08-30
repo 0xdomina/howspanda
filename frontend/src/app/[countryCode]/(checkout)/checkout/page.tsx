@@ -18,14 +18,12 @@ export const dynamic = "force-dynamic"
 
 export default async function Checkout() {
   const checkoutCartId = await getCheckoutCartId()
-  const cart = await retrieveCart(checkoutCartId ?? undefined)
+  const cart = await retrieveCart(checkoutCartId ?? undefined, undefined, "no-store")
+  const customer = await retrieveCustomer()
 
   if (!cart) {
     return (
-      <div
-        className="figma-container py-16"
-        data-testid="checkout-empty-state"
-      >
+      <div className="figma-container py-16" data-testid="checkout-empty-state">
         <div className="mx-auto max-w-md rounded-control border border-ink-hairline bg-white p-8 text-center shadow-float">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
             Checkout
@@ -34,7 +32,7 @@ export default async function Checkout() {
             Your cart is empty
           </h1>
           <p className="mt-3 text-sm leading-6 text-ink-muted">
-            Add something you love to your cart and come back here when you’re
+            Add something you love to your cart and come back here when you&rsquo;re
             ready to place your order.
           </p>
           <LocalizedClientLink
@@ -47,8 +45,6 @@ export default async function Checkout() {
       </div>
     )
   }
-
-  const customer = await retrieveCustomer()
 
   if (!customer) {
     return (
