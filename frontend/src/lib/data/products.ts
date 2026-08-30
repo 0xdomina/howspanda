@@ -58,9 +58,10 @@ export const listProducts = async ({
   }
 
   // PandaStack's free runtime sleeps on idle and answers 503 while warming.
-  // Critical storefront reads (product pages) retry briefly so a cold start
-  // never renders a server-error page to a waiting human.
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  // Retry once without allowing a cold start to consume the whole page
+  // function budget. The page can render its friendly empty state and the
+  // next navigation will use the warmed service.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       return await sdk.client
         .fetch<{ products: HttpTypes.StoreProduct[]; count: number }>(
@@ -96,8 +97,8 @@ export const listProducts = async ({
       const warming =
         [502, 503, 504].includes(Number(error?.status)) ||
         /warming|ready["']?\s*:\s*false|booting/i.test(raw)
-      if (!warming || attempt === 3) throw error
-      await new Promise((resolve) => setTimeout(resolve, 3000 * (attempt + 1)))
+      if (!warming || attempt === 1) throw error
+      await new Promise((resolve) => setTimeout(resolve, 750))
     }
   }
   // Unreachable: the loop either returns or throws.

@@ -21,6 +21,9 @@ export const sdk = new Medusa({
 
 const originalFetch = sdk.client.fetch.bind(sdk.client)
 
+const READ_REQUEST_TIMEOUT_MS = 4_000
+const WRITE_REQUEST_TIMEOUT_MS = 15_000
+
 sdk.client.fetch = async <T>(
   input: FetchInput,
   init?: FetchArgs
@@ -40,5 +43,20 @@ sdk.client.fetch = async <T>(
     ...init,
     headers: newHeaders,
   }
-  return originalFetch(input, init)
+
+  const controller = new AbortController()
+  const timeoutMs =
+    (init.method || "GET").toUpperCase() === "GET"
+      ? READ_REQUEST_TIMEOUT_MS
+      : WRITE_REQUEST_TIMEOUT_MS
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await originalFetch(input, {
+      ...init,
+      signal: init.signal ?? controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
 }

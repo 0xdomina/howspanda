@@ -11,6 +11,7 @@ import {
   getCacheOptions,
   getCacheTag,
   getCartId,
+  hasAuthToken,
   removeAuthToken,
   removeCartId,
   setAuthToken,
@@ -96,6 +97,8 @@ export const loginWithEmailPassword = async (
 
 export const retrieveCustomer =
   async (): Promise<HttpTypes.StoreCustomer | null> => {
+    if (!(await hasAuthToken())) return null
+
     const authHeaders = await getAuthHeaders()
 
     if (!authHeaders) return null

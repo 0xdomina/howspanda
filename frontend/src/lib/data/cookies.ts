@@ -18,6 +18,15 @@ export const getAuthHeaders = async (): Promise<
   }
 }
 
+export const hasAuthToken = async (): Promise<boolean> => {
+  try {
+    const cookies = await nextCookies()
+    return Boolean(cookies.get("_medusa_jwt")?.value)
+  } catch {
+    return false
+  }
+}
+
 export const getCacheTag = async (tag: string): Promise<string> => {
   try {
     const cookies = await nextCookies()
