@@ -189,9 +189,7 @@ export async function prepareCheckout(
   cartId: string
 ) {
   await setCheckoutCartId(cartId)
-  redirect(
-    `/${countryCode}/checkout?step=${encodeURIComponent(step)}&cart_id=${encodeURIComponent(cartId)}`
-  )
+  redirect(`/${countryCode}/checkout?step=${encodeURIComponent(step)}`)
 }
 
 export async function updateLineItem({

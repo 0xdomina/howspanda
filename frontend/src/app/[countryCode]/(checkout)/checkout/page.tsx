@@ -16,12 +16,9 @@ export const metadata: Metadata = {
 // freshly-added item from the payment flow.
 export const dynamic = "force-dynamic"
 
-export default async function Checkout(props: {
-  searchParams: Promise<{ cart_id?: string }>
-}) {
-  const searchParams = await props.searchParams
+export default async function Checkout() {
   const checkoutCartId = await getCheckoutCartId()
-  const cartId = searchParams.cart_id ?? checkoutCartId ?? (await getCartId())
+  const cartId = checkoutCartId ?? (await getCartId())
   const cart = await retrieveCart(cartId ?? undefined, undefined, "no-store")
   const customer = await retrieveCustomer()
 
