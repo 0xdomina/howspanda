@@ -12,6 +12,7 @@ import {
   getCartId,
   removeCartId,
   setCartId,
+  setCheckoutCartId,
 } from "./cookies"
 import { getRegion } from "./regions"
 import { getLocale } from "@lib/data/locale-actions"
@@ -189,7 +190,7 @@ export async function prepareCheckout(countryCode: string, step: string) {
     redirect(`/${countryCode}/cart`)
   }
 
-  await setCartId(cartId)
+  await setCheckoutCartId(cartId)
   redirect(`/${countryCode}/checkout?step=${encodeURIComponent(step)}`)
 }
 

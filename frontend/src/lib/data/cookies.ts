@@ -71,6 +71,24 @@ export const getCartId = async () => {
   return cookies.get("_medusa_cart_id")?.value
 }
 
+const CHECKOUT_CART_COOKIE = "_howsu_checkout_cart"
+
+export const getCheckoutCartId = async () => {
+  const cookies = await nextCookies()
+  return cookies.get(CHECKOUT_CART_COOKIE)?.value
+}
+
+export const setCheckoutCartId = async (cartId: string) => {
+  const cookies = await nextCookies()
+  cookies.set(CHECKOUT_CART_COOKIE, cartId, {
+    maxAge: 60 * 5,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  })
+}
+
 export const setCartId = async (cartId: string) => {
   const cookies = await nextCookies()
   cookies.set("_medusa_cart_id", cartId, {

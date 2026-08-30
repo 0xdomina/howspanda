@@ -1,4 +1,5 @@
 import { retrieveCart } from "@lib/data/cart"
+import { getCheckoutCartId } from "@lib/data/cookies"
 import { retrieveCustomer } from "@lib/data/customer"
 import PaymentWrapper from "@modules/checkout/components/payment-wrapper"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
@@ -16,7 +17,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function Checkout() {
-  const cart = await retrieveCart()
+  const checkoutCartId = await getCheckoutCartId()
+  const cart = await retrieveCart(checkoutCartId ?? undefined)
 
   if (!cart) {
     return (
