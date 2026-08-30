@@ -3,6 +3,7 @@ import ProductPreview from "@modules/products/components/product-preview"
 import AutoCarousel from "@modules/home/components/auto-carousel"
 import PromoBannerCarousel from "@modules/home/components/promo-banner-carousel"
 import FlashSaleCountdown from "@modules/home/components/flash-sale-countdown"
+import CatalogRetry from "@modules/home/components/catalog-retry"
 import { getRegion } from "@lib/data/regions"
 import { listProductsWithSort } from "@lib/data/products"
 import { getFlashSaleCycle } from "@lib/util/flash-sales"
@@ -107,6 +108,7 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
         </>
       ) : (
         <section className="figma-container py-16 small:py-24">
+          <CatalogRetry />
           <SectionTitle eyebrow="Marketplace" title="Explore How’s U" />
           <div className="mt-10"><EmptySlate message="Products from independent sellers will appear here." /></div>
           <div className="mt-8 text-center"><LocalizedClientLink href="/store" className="figma-button">Browse the marketplace</LocalizedClientLink></div>
