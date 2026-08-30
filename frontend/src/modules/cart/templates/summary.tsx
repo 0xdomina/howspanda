@@ -6,8 +6,9 @@ import CartTotals from "@modules/common/components/cart-totals"
 import Divider from "@modules/common/components/divider"
 import DiscountCode from "@modules/checkout/components/discount-code"
 import RedeemableCode from "@modules/checkout/components/redeemable-code"
-import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import { prepareCheckout } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
+import { useParams } from "next/navigation"
 
 type SummaryProps = {
   cart: HttpTypes.StoreCart & {
@@ -27,6 +28,7 @@ function getCheckoutStep(cart: HttpTypes.StoreCart) {
 
 const Summary = ({ cart }: SummaryProps) => {
   const step = getCheckoutStep(cart)
+  const countryCode = useParams().countryCode as string
 
   return (
     <div className="flex flex-col gap-y-4">
@@ -37,14 +39,11 @@ const Summary = ({ cart }: SummaryProps) => {
       <RedeemableCode cart={cart} />
       <Divider />
       <CartTotals totals={cart} />
-      <LocalizedClientLink
-        href={"/checkout?step=" + step}
-        data-testid="checkout-button"
-      >
+      <form action={prepareCheckout.bind(null, countryCode, step)}>
         <Button className="w-full h-10" rounded="pill">
           Go to checkout
         </Button>
-      </LocalizedClientLink>
+      </form>
     </div>
   )
 }

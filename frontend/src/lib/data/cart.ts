@@ -179,6 +179,20 @@ export async function addToCart({
     .catch(medusaError)
 }
 
+// Reissue the cart cookie at the site root before leaving the main layout.
+// This keeps older path-scoped cart cookies usable on the standalone checkout
+// route and makes the cart-to-checkout transition explicit.
+export async function prepareCheckout(countryCode: string, step: string) {
+  const cartId = await getCartId()
+
+  if (!cartId) {
+    redirect(`/${countryCode}/cart`)
+  }
+
+  await setCartId(cartId)
+  redirect(`/${countryCode}/checkout?step=${encodeURIComponent(step)}`)
+}
+
 export async function updateLineItem({
   lineId,
   quantity,
