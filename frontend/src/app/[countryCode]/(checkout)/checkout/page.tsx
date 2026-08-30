@@ -1,5 +1,5 @@
 import { retrieveCart } from "@lib/data/cart"
-import { getCheckoutCartId } from "@lib/data/cookies"
+import { getCartId, getCheckoutCartId } from "@lib/data/cookies"
 import { retrieveCustomer } from "@lib/data/customer"
 import PaymentWrapper from "@modules/checkout/components/payment-wrapper"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
@@ -18,7 +18,8 @@ export const dynamic = "force-dynamic"
 
 export default async function Checkout() {
   const checkoutCartId = await getCheckoutCartId()
-  const cart = await retrieveCart(checkoutCartId ?? undefined, undefined, "no-store")
+  const cartId = checkoutCartId ?? (await getCartId())
+  const cart = await retrieveCart(cartId ?? undefined, undefined, "no-store")
   const customer = await retrieveCustomer()
 
   if (!cart) {
