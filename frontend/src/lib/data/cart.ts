@@ -170,6 +170,7 @@ export async function addToCart({
       const cartCacheTag = await getCacheTag("carts")
       revalidateTag(cartCacheTag, "max")
       revalidatePath("/[countryCode]/cart", "page")
+      revalidatePath("/[countryCode]/checkout", "page")
       revalidatePath("/[countryCode]", "layout")
 
       const fulfillmentCacheTag = await getCacheTag("fulfillment")
