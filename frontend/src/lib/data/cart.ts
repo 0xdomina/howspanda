@@ -64,7 +64,7 @@ export async function getOrSetCart(countryCode: string) {
     throw new Error(`Region not found for country code: ${countryCode}`)
   }
 
-  let cart = await retrieveCart(undefined, "id,region_id")
+  let cart = await retrieveCart(undefined, "id,region_id", "no-store")
 
   const headers = {
     ...(await getAuthHeaders()),
@@ -79,7 +79,7 @@ export async function getOrSetCart(countryCode: string) {
     )
     cart = cartResp.cart
 
-    await setCartId(cart.id)
+    await setCartId(cart.id, countryCode)
 
     const cartCacheTag = await getCacheTag("carts")
     revalidateTag(cartCacheTag, "max")

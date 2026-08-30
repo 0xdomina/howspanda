@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 }
 
 export default async function Cart() {
-  const cart = await retrieveCart().catch((error) => {
+  const cart = await retrieveCart(undefined, undefined, "no-store").catch((error) => {
     console.error(error)
     return notFound()
   })

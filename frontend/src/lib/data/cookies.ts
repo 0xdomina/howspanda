@@ -89,8 +89,14 @@ export const setCheckoutCartId = async (cartId: string) => {
   })
 }
 
-export const setCartId = async (cartId: string) => {
+export const setCartId = async (cartId: string, countryCode?: string) => {
   const cookies = await nextCookies()
+  if (countryCode) {
+    cookies.set("_medusa_cart_id", "", {
+      maxAge: -1,
+      path: `/${countryCode}`,
+    })
+  }
   cookies.set("_medusa_cart_id", cartId, {
     maxAge: 60 * 60 * 24 * 7,
     httpOnly: true,
