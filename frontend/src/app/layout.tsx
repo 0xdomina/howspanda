@@ -36,7 +36,6 @@ export const metadata: Metadata = {
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const initialWishlist = await loadWishlist()
-  const backendUrl = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"
 
   return (
     <html
@@ -46,11 +45,10 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
       <body className="bg-paper font-sans text-ink antialiased">
         <WishlistProvider initialItems={initialWishlist}><main className="relative page-enter">{props.children}</main></WishlistProvider>
         <script
-          // Auto-wake: the moment any visitor lands anywhere on the platform,
-          // ping the API so a sleeping free-tier backend boots while the human
-          // reads the page — by the time they sign in or act, it is ready.
+          // Quietly start the backend through our same-origin health proxy so
+          // the backend URL is never exposed in the page source.
           dangerouslySetInnerHTML={{
-            __html: `try{fetch(${JSON.stringify(backendUrl + "/health")},{mode:"no-cors",cache:"no-store"}).catch(function(){})}catch(e){}`,
+            __html: `try{fetch("/api/backend/health",{cache:"no-store",credentials:"same-origin"}).catch(function(){})}catch(e){}`,
           }}
         />
       </body>

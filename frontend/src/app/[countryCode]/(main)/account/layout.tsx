@@ -1,5 +1,6 @@
 import { retrieveCustomer } from "@lib/data/customer"
 import { Toaster } from "@medusajs/ui"
+import BackendWarmupGate from "@modules/account/components/backend-warmup-gate"
 import AccountLayout from "@modules/account/templates/account-layout"
 
 export default async function AccountPageLayout({
@@ -13,7 +14,7 @@ export default async function AccountPageLayout({
 
   return (
     <AccountLayout customer={customer}>
-      {customer ? dashboard : login}
+      {customer ? dashboard : <BackendWarmupGate>{login}</BackendWarmupGate>}
       <Toaster />
     </AccountLayout>
   )
