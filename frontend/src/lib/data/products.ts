@@ -95,13 +95,21 @@ export const listProducts = async ({
     } catch (error: any) {
       const raw = String(error?.message ?? error ?? "")
       const warming =
+        error?.name === "AbortError" ||
         [502, 503, 504].includes(Number(error?.status)) ||
-        /warming|ready["']?\s*:\s*false|booting/i.test(raw)
-      if (!warming || attempt === 1) throw error
+        /abort|timed out|timeout|warming|ready["']?\s*:\s*false|booting/i.test(raw)
+      if (!warming) throw error
+      if (attempt === 1) {
+        return {
+          response: { products: [], count: 0 },
+          nextPage: null,
+          queryParams,
+        }
+      }
       await new Promise((resolve) => setTimeout(resolve, 750))
     }
   }
-  // Unreachable: the loop either returns or throws.
+  // Unreachable: the loop either returns or falls back after a warm-up failure.
   return {
     response: { products: [], count: 0 },
     nextPage: null,
