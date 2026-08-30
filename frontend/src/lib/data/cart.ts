@@ -49,7 +49,7 @@ export async function retrieveCart(
         fields,
       },
       headers,
-      next,
+      ...(cache === "force-cache" ? { next } : {}),
       cache,
     })
     .then(({ cart }: { cart: HttpTypes.StoreCart }) => cart)
