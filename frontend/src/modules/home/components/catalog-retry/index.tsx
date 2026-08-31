@@ -3,12 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
-const healthUrls = [
-  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
-    ? `${process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL.replace(/\/$/, "")}/health`
-    : null,
-  "/api/backend/health",
-].filter((url): url is string => Boolean(url))
+const healthUrls = ["/api/backend/health"]
 
 const CatalogRetry = () => {
   const router = useRouter()

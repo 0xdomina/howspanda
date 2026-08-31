@@ -6,9 +6,9 @@ import type { ReactNode } from "react"
 const MAX_WAIT_MS = 30_000
 const POLL_MS = 2_500
 const REQUEST_TIMEOUT_MS = 9_000
-const BACKEND_HEALTH_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
-  ? `${process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL.replace(/\/$/, "")}/health`
-  : "/api/backend/health"
+// Keep the browser on the same origin. The server-side route handles backend
+// wake-up checks without exposing CORS or deployment-specific URLs to users.
+const BACKEND_HEALTH_URL = "/api/backend/health"
 
 type WarmupState = "checking" | "ready" | "error"
 

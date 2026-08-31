@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 
-const BACKEND_URL =
+const BACKEND_URL = (
   process.env.MEDUSA_BACKEND_URL || "https://hows-u-api-final.pandastack.app"
+)
+  .replace(/\\r|\\n/g, "")
+  .trim()
+  .replace(/^['"]|['"]$/g, "")
+  .replace(/\/$/, "")
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +20,15 @@ export async function GET() {
 
   try {
     const response = await fetch(`${BACKEND_URL}/health`, {
+      headers: {
+        accept: "application/json",
+        ...(process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+          ? {
+              "x-publishable-api-key":
+                process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY,
+            }
+          : {}),
+      },
       cache: "no-store",
       signal: controller.signal,
     })
