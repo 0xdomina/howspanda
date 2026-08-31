@@ -68,14 +68,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   // intercepted before multer tries to parse them.
   const ct = (req.headers["content-type"] ?? "") as string
   if (ct.includes("application/json")) {
-    const chunks: Buffer[] = []
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk)
-    }
-    let body: Record<string, unknown> = {}
-    if (chunks.length) {
-      try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")) } catch {}
-    }
+    const body = await readJsonBody(req)
     const kind = (body.kind ?? "") as string
 
     if (kind === "proof-prepare") {
