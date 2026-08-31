@@ -29,6 +29,22 @@ const optionsAsKeymap = (
   }, {})
 }
 
+const getAddToCartMessage = (error: any) => {
+  const message = typeof error?.message === "string" ? error.message : ""
+
+  // Server actions can serialize a cold-start failure as an internal React
+  // error. Never expose framework/provider details in the storefront.
+  if (
+    /minified react|function_invocation|fetch failed|service unavailable|warming up|timed out/i.test(
+      message
+    )
+  ) {
+    return "The marketplace is waking up. Please try again in a moment."
+  }
+
+  return message || "Could not add this item right now. Please try again."
+}
+
 export default function ProductActions({
   product,
   disabled,
@@ -145,8 +161,9 @@ export default function ProductActions({
         countryCode,
         mallId: searchParams.get("mall_id") ?? undefined,
       })
+      router.refresh()
     } catch (error: any) {
-      setAddError(error?.message ?? "Could not add to cart. Please try again.")
+      setAddError(getAddToCartMessage(error))
     } finally {
       setIsAdding(false)
     }
