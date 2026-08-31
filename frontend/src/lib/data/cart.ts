@@ -58,6 +58,25 @@ export async function retrieveCart(
     .catch(() => null)
 }
 
+// Checkout runs immediately after a cart mutation. Use the SDK's direct
+// cart resource call here so the handoff is not affected by a stale data-cache
+// read or by fetch cache options being interpreted differently by the host.
+export async function retrieveCheckoutCart(cartId: string) {
+  if (!cartId) return null
+
+  const headers = {
+    ...(await getAuthHeaders()),
+  }
+
+  return await sdk.store.cart
+    .retrieve(cartId, {
+      fields:
+        "*items,*region,*items.product,*items.variant,*items.thumbnail,*items.metadata,+items.total,*promotions,+shipping_methods.name",
+    }, headers)
+    .then(({ cart }: { cart: HttpTypes.StoreCart }) => cart)
+    .catch(() => null)
+}
+
 export async function getOrSetCart(countryCode: string) {
   const region = await getRegion(countryCode)
 

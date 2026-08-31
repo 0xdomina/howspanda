@@ -1,4 +1,4 @@
-import { retrieveCart } from "@lib/data/cart"
+import { retrieveCheckoutCart } from "@lib/data/cart"
 import { getCartId, getCheckoutCartId } from "@lib/data/cookies"
 import { retrieveCustomer } from "@lib/data/customer"
 import PaymentWrapper from "@modules/checkout/components/payment-wrapper"
@@ -39,7 +39,7 @@ export default async function Checkout({ searchParams }: CheckoutProps) {
     // Checkout must read the latest cart state. The explicit ID prevents a
     // stale cookie from selecting another cart during the redirect, while
     // no-store avoids a previously cached empty response after a cart write.
-    cart = await retrieveCart(candidateId, undefined, "no-store")
+    cart = await retrieveCheckoutCart(candidateId)
     if (cart) break
   }
   const customer = await retrieveCustomer()
