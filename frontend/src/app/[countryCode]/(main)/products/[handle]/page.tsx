@@ -6,6 +6,7 @@ import ProductTemplate from "@modules/products/templates"
 import { HttpTypes } from "@medusajs/types"
 import { getBaseURL } from "@lib/util/env"
 import { retrieveProductRatingSummary } from "@lib/data/reviews"
+import ProductUnavailable from "@modules/products/components/product-unavailable"
 
 type Props = {
   params: Promise<{ countryCode: string; handle: string }>
@@ -38,7 +39,10 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const region = await getRegion(params.countryCode)
 
   if (!region) {
-    notFound()
+    return {
+      title: "How's u",
+      description: "Shop products from independent sellers on How's u.",
+    }
   }
 
   const product = await listProducts({
@@ -47,7 +51,10 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   }).then(({ response }) => response.products[0])
 
   if (!product) {
-    notFound()
+    return {
+      title: "Product | How's u",
+      description: "Discover products from independent sellers on How's u.",
+    }
   }
 
   const url = `${getBaseURL()}/${params.countryCode}/products/${handle}`
@@ -97,7 +104,7 @@ export default async function ProductPage(props: Props) {
   }).then(({ response }) => response.products[0])
 
   if (!pricedProduct) {
-    notFound()
+    return <ProductUnavailable />
   }
 
   const images = getImagesForVariant(pricedProduct, selectedVariantId)
