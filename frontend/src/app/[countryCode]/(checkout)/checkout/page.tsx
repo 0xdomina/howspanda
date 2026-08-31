@@ -36,11 +36,10 @@ export default async function Checkout({ searchParams }: CheckoutProps) {
   )
   let cart: HttpTypes.StoreCart | null = null
   for (const candidateId of cartIds) {
-    // Cart retrieval is already keyed by the cart cache tag. Using the
-    // standard read path here keeps checkout consistent with the cart page;
-    // the explicit ID still prevents a stale cookie from selecting another
-    // cart during the redirect.
-    cart = await retrieveCart(candidateId)
+    // Checkout must read the latest cart state. The explicit ID prevents a
+    // stale cookie from selecting another cart during the redirect, while
+    // no-store avoids a previously cached empty response after a cart write.
+    cart = await retrieveCart(candidateId, undefined, "no-store")
     if (cart) break
   }
   const customer = await retrieveCustomer()
