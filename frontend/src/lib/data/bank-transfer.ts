@@ -1,8 +1,6 @@
 "use server"
 
 import { sdk } from "@lib/config"
-import { MEDUSA_BACKEND_URL } from "@lib/config"
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 
 export type BankTransferBank = {
   bank_code?: string | null
@@ -91,26 +89,9 @@ const PROOF_EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
 }
 
-function getPrivateS3Config() {
-  const bucket = process.env.PRIVATE_S3_BUCKET
-  const endpoint = process.env.PRIVATE_S3_ENDPOINT
-  const region = process.env.PRIVATE_S3_REGION || "us-east-1"
-  const accessKeyId = process.env.PRIVATE_S3_ACCESS_KEY_ID
-  const secretAccessKey = process.env.PRIVATE_S3_SECRET_ACCESS_KEY
-  const prefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
-  if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) return null
-  return new S3Client({
-    region,
-    endpoint,
-    forcePathStyle: true,
-    credentials: { accessKeyId, secretAccessKey },
-  })
-}
-
 // Uploads the proof screenshot directly to the private B2 bucket from Vercel's
-// serverless function. Bypasses the PandaStack backend entirely — no Cloudflare
-// challenge, no publishable key, no multipart. The returned `private://` URI
-// only becomes meaningful once bound to an order by submitBankProof.
+// presigned upload route. The returned `private://` URI only becomes meaningful
+// once bound to an order by submitBankProof.
 export const uploadBankProofImage = async (
   file: File
 ): Promise<{ url?: string; error?: string }> => {
@@ -121,27 +102,28 @@ export const uploadBankProofImage = async (
   if (!ext) {
     return { error: "Only PNG, JPEG, and WebP images are accepted." }
   }
-  const s3 = getPrivateS3Config()
-  if (!s3) {
-    return { error: "Proof storage is not configured." }
-  }
   try {
-    const prefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
-    const bucket = process.env.PRIVATE_S3_BUCKET!
-    const key = `${prefix}/${crypto.randomUUID()}.${ext}`
-    const buffer = Buffer.from(await file.arrayBuffer())
-
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type,
-        CacheControl: "private, no-store",
-      })
+    const prepared = await sdk.client.fetch<{
+      key: string
+      uploadUrl: string
+    }>("/store/proof-upload/prepare", {
+      method: "POST",
+      body: { mime: file.type, size: file.size },
+    })
+    const uploaded = await fetch(prepared.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": file.type },
+      body: await file.arrayBuffer(),
+    })
+    if (!uploaded.ok) return { error: "Proof upload failed. Please try again." }
+    const completed = await sdk.client.fetch<{ url?: string }>(
+      "/store/proof-upload/complete",
+      {
+        method: "POST",
+        body: { key: prepared.key, size: file.size, mime: file.type },
+      }
     )
-
-    return { url: `private://${key}` }
+    return completed.url ? { url: completed.url } : { error: "Proof upload could not be verified." }
   } catch (error: any) {
     return { error: error?.message ?? "Upload failed." }
   }
