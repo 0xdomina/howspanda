@@ -435,6 +435,11 @@ export const PostBankProofSchema = z.object({
     .trim()
     .max(500)
     .refine((value) => {
+      const privatePrefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
+      const sharedPrefix = (process.env.S3_PREFIX || "public howsyou").replace(/^\/+|\/+$/g, "")
+      const proofPrefix = process.env.PRIVATE_S3_USE_MEDIA_BUCKET === "true"
+        ? `${sharedPrefix}/${privatePrefix}`
+        : privatePrefix
       // Production proofs must come from the private proof bucket. Local disk
       // paths are development-only, and public product-media URLs must never
       // be accepted for a payment proof.
@@ -442,11 +447,9 @@ export const PostBankProofSchema = z.object({
         process.env.NODE_ENV !== "production" &&
         /^\/uploads\/proof\/[\w.-]+$/.test(value)
       ) return true
-      if (
-        /^private:\/\/[^\s]+\.(?:png|jpe?g|webp|gif|avif)$/i.test(
-          value
-        )
-      ) return true
+      if (/^private:\/\/[A-Za-z0-9_ .\/-]+\.(?:png|jpe?g|webp|gif|avif)$/i.test(value)) {
+        return value.startsWith(`private://${proofPrefix}/`) && !value.includes("..")
+      }
       if (process.env.NODE_ENV === "production") return false
       if (!process.env.S3_URL) return false
       try {
