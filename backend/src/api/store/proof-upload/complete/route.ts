@@ -42,7 +42,11 @@ function getProofClient() {
 }
 
 function proofPrefix() {
-  return (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
+  const privatePrefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
+  const sharedPrefix = (process.env.S3_PREFIX || "public howsyou").replace(/^\/+|\/+$/g, "")
+  return process.env.PRIVATE_S3_USE_MEDIA_BUCKET === "true"
+    ? `${sharedPrefix}/${privatePrefix}`
+    : privatePrefix
 }
 
 function proofBucket() {

@@ -6,6 +6,8 @@ const PRIVATE_PROOF_PREFIX = "private://"
 
 function privateProofConfig() {
   const useSharedMediaBucket = process.env.PRIVATE_S3_USE_MEDIA_BUCKET === "true"
+  const privatePrefix = (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
+  const sharedPrefix = (process.env.S3_PREFIX || "public howsyou").replace(/^\/+|\/+$/g, "")
   const config = {
     bucket: useSharedMediaBucket
       ? process.env.S3_BUCKET
@@ -22,7 +24,9 @@ function privateProofConfig() {
     secretAccessKey: useSharedMediaBucket
       ? process.env.S3_SECRET_ACCESS_KEY
       : process.env.PRIVATE_S3_SECRET_ACCESS_KEY,
-    prefix: (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, ""),
+    prefix: useSharedMediaBucket
+      ? `${sharedPrefix}/${privatePrefix}`
+      : privatePrefix,
   }
   return Object.values(config).every(Boolean) ? config : null
 }
