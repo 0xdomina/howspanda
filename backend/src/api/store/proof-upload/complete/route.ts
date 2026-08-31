@@ -45,6 +45,12 @@ function proofPrefix() {
   return (process.env.PRIVATE_S3_PREFIX || "payment-proofs").replace(/^\/+|\/+$/g, "")
 }
 
+function proofBucket() {
+  return process.env.PRIVATE_S3_USE_MEDIA_BUCKET === "true"
+    ? process.env.S3_BUCKET
+    : process.env.PRIVATE_S3_BUCKET
+}
+
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const body = (req.body ?? {}) as { key?: string; size?: number; mime?: string }
   const client = getProofClient()
@@ -64,7 +70,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   let head
   try {
     head = await client.send(
-      new HeadObjectCommand({ Bucket: process.env.PRIVATE_S3_BUCKET!, Key: body.key })
+      new HeadObjectCommand({ Bucket: proofBucket()!, Key: body.key })
     )
   } catch {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload was not completed")

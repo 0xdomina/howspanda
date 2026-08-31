@@ -123,7 +123,6 @@ export async function prepareProofUpload(input: {
       Bucket: config.bucket,
       Key: key,
       ContentType: input.mime,
-      CacheControl: "private, no-store",
     }),
     { expiresIn: 300 }
   )
