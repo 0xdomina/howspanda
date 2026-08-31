@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" role="img" aria-labelledby="title desc">
+  <title id="title">How&apos;s U</title>
+  <desc id="desc">How&apos;s U marketplace logo</desc>
+  <defs>
+    <linearGradient id="how-s-u-gradient" x1="12" y1="12" x2="148" y2="148" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff6b5f"/>
+      <stop offset=".52" stop-color="#f6b84b"/>
+      <stop offset="1" stop-color="#7b61ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="144" height="144" rx="46" fill="#111111"/>
+  <rect x="18" y="18" width="124" height="124" rx="38" fill="url(#how-s-u-gradient)"/>
+  <path d="M46 47v39c0 15 12 27 27 27s27-12 27-27V47" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="13"/>
+  <path d="M50 84h46" stroke="#fff" stroke-linecap="round" stroke-width="13"/>
+  <path d="M52 101c7 7 14 10 21 10s14-3 21-10" fill="none" stroke="#111" stroke-linecap="round" stroke-width="5" opacity=".6"/>
+  <text x="190" y="105" fill="#111111" font-family="Arial, Helvetica, sans-serif" font-size="70" font-weight="700" letter-spacing="-3">How&apos;s U</text>
+</svg>

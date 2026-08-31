@@ -32,6 +32,10 @@ export const metadata: Metadata = {
       "Discover products from independent sellers and share your next find.",
     images: ["/opengraph-image.jpg"],
   },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
 }
 
 export default async function RootLayout(props: { children: React.ReactNode }) {

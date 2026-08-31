@@ -30,7 +30,9 @@ export default async function Nav() {
           <div>
             <SideMenu regions={regions} locales={locales} currentLocale={currentLocale} mallsEnabled={features.malls} />
           </div>
-          <LocalizedClientLink href="/" className="font-display text-2xl font-bold tracking-tight text-ink" data-testid="nav-store-link">How&rsquo;s U</LocalizedClientLink>
+          <LocalizedClientLink href="/" className="inline-flex items-center" data-testid="nav-store-link" aria-label="How’s U home">
+            <img src="/brand/hows-u-logo.svg" alt="How’s U" className="h-10 w-auto" />
+          </LocalizedClientLink>
           <div className="hidden items-center gap-8 text-sm text-ink small:flex">
             <LocalizedClientLink href="/" className="border-b border-ink pb-1">Home</LocalizedClientLink>
             <LocalizedClientLink href="/about" className="hover:text-brand">About</LocalizedClientLink>
