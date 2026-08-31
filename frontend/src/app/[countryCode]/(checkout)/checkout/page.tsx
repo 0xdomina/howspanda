@@ -5,6 +5,7 @@ import PaymentWrapper from "@modules/checkout/components/payment-wrapper"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
 import CheckoutSummary from "@modules/checkout/templates/checkout-summary"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import { HttpTypes } from "@medusajs/types"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -16,20 +17,28 @@ export const metadata: Metadata = {
 // freshly-added item from the payment flow.
 export const dynamic = "force-dynamic"
 
-export default async function Checkout() {
+type CheckoutProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
+
+export default async function Checkout({ searchParams }: CheckoutProps) {
+  const params = (await searchParams) ?? {}
+  const queryCartId =
+    typeof params.cart_id === "string" ? params.cart_id : undefined
   const checkoutCartId = await getCheckoutCartId()
-  const cartId = checkoutCartId ?? (await getCartId())
-  // The active cart cookie is the source of truth. The short-lived handoff
-  // cookie exists only to bridge the cart action into this route and can be
-  // stale after a previous checkout attempt.
   const activeCartId = await getCartId()
-  const cart =
-    (activeCartId
-      ? await retrieveCart(activeCartId, undefined, "no-store")
-      : null) ||
-    (cartId
-      ? await retrieveCart(cartId, undefined, "no-store")
-      : null)
+  // Prefer the ID captured by the cart page, then fall back through both
+  // cookie forms. Vercel can complete a server-action redirect before the
+  // newly-set cookie is visible on the next request, so the explicit handoff
+  // keeps the checkout cart deterministic without trusting stale cookies.
+  const cartIds = [queryCartId, checkoutCartId, activeCartId].filter(
+    (id, index, ids): id is string => Boolean(id) && ids.indexOf(id) === index
+  )
+  let cart: HttpTypes.StoreCart | null = null
+  for (const candidateId of cartIds) {
+    cart = await retrieveCart(candidateId, undefined, "no-store")
+    if (cart) break
+  }
   const customer = await retrieveCustomer()
 
   if (!cart) {
