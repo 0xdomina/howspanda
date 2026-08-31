@@ -182,13 +182,15 @@ export async function addToCart({
 }
 
 // Reissue the cart cookie at the site root before leaving the main layout.
-// This keeps older path-scoped cart cookies usable on the standalone checkout
-// route and makes the cart-to-checkout transition explicit.
+// Clear the older country-scoped cookie as well: browsers can send both
+// cookies with the same name, and the checkout route must never resolve a
+// stale or empty path-scoped value ahead of the active cart.
 export async function prepareCheckout(
   countryCode: string,
   step: string,
   cartId: string
 ) {
+  await setCartId(cartId, countryCode)
   await setCheckoutCartId(cartId)
   redirect(`/${countryCode}/checkout?step=${encodeURIComponent(step)}`)
 }
