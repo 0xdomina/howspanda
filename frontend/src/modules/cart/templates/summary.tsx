@@ -40,7 +40,7 @@ const Summary = ({ cart }: SummaryProps) => {
       <Divider />
       <CartTotals totals={cart} />
       <form action={prepareCheckout.bind(null, countryCode, step, cart.id)}>
-        <Button className="w-full h-10" rounded="pill">
+        <Button type="submit" className="w-full h-10" rounded="pill">
           Go to checkout
         </Button>
       </form>
