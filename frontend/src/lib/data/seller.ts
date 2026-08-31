@@ -6,7 +6,7 @@ import {
   loginWithEmailPassword,
   signout as customerSignout,
 } from "./customer"
-import { revalidateTag } from "next/cache"
+import { revalidateTagSafely } from "./cache"
 import { getAuthHeaders, getCacheTag } from "./cookies"
 import {
   getSellerAuthHeaders,
@@ -131,9 +131,9 @@ export async function sellerRegister(
     await setSellerAuthToken(loginToken as string)
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return null
   } catch (error: any) {
@@ -150,9 +150,9 @@ export async function sellerLogin(_currentState: unknown, formData: FormData) {
     await setSellerAuthToken(token as string)
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return null
   } catch (error: any) {
@@ -197,9 +197,9 @@ export async function upgradeCustomerToSeller(
       },
     })
 
-    revalidateTag(await getSellerCacheTag("seller"), "max")
-    revalidateTag(await getCacheTag("products"), "max")
-    revalidateTag(await getCacheTag("customers"), "max")
+    revalidateTagSafely(await getSellerCacheTag("seller"))
+    revalidateTagSafely(await getCacheTag("products"))
+    revalidateTagSafely(await getCacheTag("customers"))
     // Seller access is additive to the current customer session. Land the
     // user directly in the workspace instead of making them sign in again or
     // search for the new Manage Business entry point.
@@ -305,9 +305,9 @@ export const markOrderDelivered = async (orderId: string): Promise<string | null
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return null
   } catch (error: any) {
@@ -328,9 +328,9 @@ export const confirmBankTransfer = async (
     )
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return null
   } catch (error: any) {
@@ -352,9 +352,9 @@ export const rejectBankTransfer = async (
     )
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return null
   } catch (error: any) {
@@ -375,9 +375,9 @@ export const confirmReturnReceived = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return null
   } catch (error: any) {
@@ -426,9 +426,9 @@ export const createPayoutAccount = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -468,9 +468,9 @@ export const requestSellerPayout = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -527,9 +527,9 @@ export const createSellerReferral = async (
     )
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null, code: res.referral?.code }
   } catch (error: any) {
@@ -643,9 +643,9 @@ export const createSellerRedeemable = async (
     )
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null, code: res.redeemables?.[0]?.code }
   } catch (error: any) {
@@ -666,9 +666,9 @@ export const cancelSellerRedeemable = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -691,9 +691,9 @@ export const redeemInStore = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -877,9 +877,9 @@ export const updateSellerProduct = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return null
   } catch (error: any) {
@@ -963,9 +963,9 @@ export const createSellerProduct = async (
     }
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -1214,9 +1214,9 @@ export const addSellerTeamMember = async (body: {
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -1238,9 +1238,9 @@ export const removeSellerTeamMember = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -1274,9 +1274,9 @@ export const updateSellerStore = async (body: {
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -1300,9 +1300,9 @@ export const updateSellerTeamMemberPermissions = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
-    revalidateTag(productsTag, "max")
+    revalidateTagSafely(productsTag)
 
     return { success: true, error: null }
   } catch (error: any) {

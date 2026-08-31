@@ -1,7 +1,7 @@
 "use server"
 
 import { sdk } from "@lib/config"
-import { revalidateTag } from "next/cache"
+import { revalidateTagSafely } from "./cache"
 import { cookies as nextCookies } from "next/headers"
 import { getAuthHeaders, getCacheTag, getCartId } from "./cookies"
 
@@ -50,24 +50,24 @@ export const updateLocale = async (localeCode: string): Promise<string> => {
 
     const cartCacheTag = await getCacheTag("carts")
     if (cartCacheTag) {
-      revalidateTag(cartCacheTag, "max")
+      revalidateTagSafely(cartCacheTag)
     }
   }
 
   // Revalidate relevant caches to refresh content
   const productsCacheTag = await getCacheTag("products")
   if (productsCacheTag) {
-    revalidateTag(productsCacheTag, "max")
+    revalidateTagSafely(productsCacheTag)
   }
 
   const categoriesCacheTag = await getCacheTag("categories")
   if (categoriesCacheTag) {
-    revalidateTag(categoriesCacheTag, "max")
+    revalidateTagSafely(categoriesCacheTag)
   }
 
   const collectionsCacheTag = await getCacheTag("collections")
   if (collectionsCacheTag) {
-    revalidateTag(collectionsCacheTag, "max")
+    revalidateTagSafely(collectionsCacheTag)
   }
 
   return localeCode

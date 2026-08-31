@@ -1,7 +1,7 @@
 "use server"
 
 import { sdk } from "@lib/config"
-import { revalidateTag } from "next/cache"
+import { revalidateTagSafely } from "./cache"
 import { getAuthHeaders, getCacheTag } from "./cookies"
 import {
   getSellerAuthHeaders,
@@ -261,7 +261,7 @@ export const createSellerBroadcast = async (body: {
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
     return { success: true, error: null }
   } catch (error: any) {
     return { success: false, error: error?.message ?? error?.toString?.() ?? String(error) }

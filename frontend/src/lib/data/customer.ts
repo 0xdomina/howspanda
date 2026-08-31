@@ -3,7 +3,7 @@
 import { MEDUSA_BACKEND_URL, sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
-import { revalidateTag } from "next/cache"
+import { revalidateTagSafely } from "./cache"
 import { headers as nextHeaders } from "next/headers"
 import { redirect } from "next/navigation"
 import {
@@ -136,7 +136,7 @@ export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
     .catch(medusaError)
 
   const cacheTag = await getCacheTag("customers")
-  revalidateTag(cacheTag, "max")
+  revalidateTagSafely(cacheTag)
 
   return updateRes
 }
@@ -173,7 +173,7 @@ export async function signup(_currentState: unknown, formData: FormData) {
     await setAuthToken(loginToken as string)
 
     const customerCacheTag = await getCacheTag("customers")
-    revalidateTag(customerCacheTag, "max")
+    revalidateTagSafely(customerCacheTag)
 
     try {
       await transferCart()
@@ -224,7 +224,7 @@ export async function login(_currentState: unknown, formData: FormData) {
       // Keep the session; the account page will retry profile hydration.
     }
     const customerCacheTag = await getCacheTag("customers")
-    revalidateTag(customerCacheTag, "max")
+    revalidateTagSafely(customerCacheTag)
   } catch (customerError: any) {
     // Existing stores created before unified accounts used the seller actor.
     // Keep those accounts reachable through the one public sign-in form while
@@ -251,12 +251,12 @@ export async function signout(countryCode: string) {
   await removeSellerAuthToken()
 
   const customerCacheTag = await getCacheTag("customers")
-  revalidateTag(customerCacheTag, "max")
+  revalidateTagSafely(customerCacheTag)
 
   await removeCartId()
 
   const cartCacheTag = await getCacheTag("carts")
-  revalidateTag(cartCacheTag, "max")
+  revalidateTagSafely(cartCacheTag)
 
   redirect(`/${countryCode}/account`)
 }
@@ -273,7 +273,7 @@ export async function transferCart() {
   await sdk.store.cart.transferCart(cartId, {}, headers)
 
   const cartCacheTag = await getCacheTag("carts")
-  revalidateTag(cartCacheTag, "max")
+  revalidateTagSafely(cartCacheTag)
 }
 
 export const addCustomerAddress = async (
@@ -301,7 +301,7 @@ export const addCustomerAddress = async (
   return saveAddressThroughEdge(address)
     .then(async ({ customer }) => {
       const customerCacheTag = await getCacheTag("customers")
-      revalidateTag(customerCacheTag, "max")
+      revalidateTagSafely(customerCacheTag)
       return { success: true, error: null }
     })
     .catch((err) => {
@@ -320,7 +320,7 @@ export const deleteCustomerAddress = async (
     .deleteAddress(addressId, headers)
     .then(async () => {
       const customerCacheTag = await getCacheTag("customers")
-      revalidateTag(customerCacheTag, "max")
+      revalidateTagSafely(customerCacheTag)
       return { success: true, error: null }
     })
     .catch((err) => {
@@ -360,7 +360,7 @@ export const updateCustomerAddress = async (
   return saveAddressThroughEdge(address, addressId)
     .then(async () => {
       const customerCacheTag = await getCacheTag("customers")
-      revalidateTag(customerCacheTag, "max")
+      revalidateTagSafely(customerCacheTag)
       return { success: true, error: null }
     })
     .catch((err) => {

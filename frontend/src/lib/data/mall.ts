@@ -1,7 +1,7 @@
 "use server"
 
 import { sdk } from "@lib/config"
-import { revalidateTag } from "next/cache"
+import { revalidateTagSafely } from "./cache"
 import { getSellerAuthHeaders, getSellerCacheTag } from "./seller-cookies"
 import { getAuthHeaders } from "./cookies"
 
@@ -222,7 +222,7 @@ export const createMall = async (input: {
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -248,7 +248,7 @@ export const joinMallAsSeller = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -272,7 +272,7 @@ export const relaunchMall = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
 
     return { success: true, error: null }
   } catch (error: any) {
@@ -295,7 +295,7 @@ export const cancelMall = async (
     })
 
     const tag = await getSellerCacheTag("seller")
-    revalidateTag(tag, "max")
+    revalidateTagSafely(tag)
 
     return { success: true, error: null }
   } catch (error: any) {
