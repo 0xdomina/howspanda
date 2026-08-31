@@ -111,18 +111,35 @@ export const retrieveCustomer =
       ...(await getCacheOptions("customers")),
     }
 
-    return await sdk.client
-      .fetch<{ customer: HttpTypes.StoreCustomer }>(`/store/customers/me`, {
-        method: "GET",
-        query: {
-          fields: "*orders",
-        },
-        headers,
-        next,
-        cache: "force-cache",
-      })
-      .then(({ customer }) => customer)
-      .catch(() => null)
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await sdk.client
+          .fetch<{ customer: HttpTypes.StoreCustomer }>(`/store/customers/me`, {
+            method: "GET",
+            query: {
+              fields: "*orders",
+            },
+            headers,
+            next,
+            cache: "no-store",
+          })
+          .then(({ customer }) => customer)
+      } catch (error: any) {
+        const raw = String(error?.message ?? error ?? "")
+        const retryable =
+          error?.name === "AbortError" ||
+          [502, 503, 504].includes(Number(error?.status)) ||
+          /abort|timed out|timeout|warming|booting/i.test(raw)
+
+        if (!retryable || attempt === 1) {
+          return null
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 750))
+      }
+    }
+
+    return null
   }
 
 export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
