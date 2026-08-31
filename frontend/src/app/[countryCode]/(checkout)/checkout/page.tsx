@@ -19,7 +19,17 @@ export const dynamic = "force-dynamic"
 export default async function Checkout() {
   const checkoutCartId = await getCheckoutCartId()
   const cartId = checkoutCartId ?? (await getCartId())
-  const cart = await retrieveCart(cartId ?? undefined, undefined, "no-store")
+  // The active cart cookie is the source of truth. The short-lived handoff
+  // cookie exists only to bridge the cart action into this route and can be
+  // stale after a previous checkout attempt.
+  const activeCartId = await getCartId()
+  const cart =
+    (activeCartId
+      ? await retrieveCart(activeCartId, undefined, "no-store")
+      : null) ||
+    (cartId
+      ? await retrieveCart(cartId, undefined, "no-store")
+      : null)
   const customer = await retrieveCustomer()
 
   if (!cart) {
