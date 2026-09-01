@@ -83,6 +83,12 @@ const Shipping: React.FC<ShippingProps> = ({
 
   const isOpen = searchParams.get("step") === "delivery"
 
+  const stepHref = (step: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("step", step)
+    return `${pathname}?${params.toString()}`
+  }
+
   const _shippingMethods = availableShippingMethods?.filter(
     (sm) => sm.service_zone?.fulfillment_set?.type !== "pickup"
   )
@@ -145,11 +151,11 @@ const Shipping: React.FC<ShippingProps> = ({
   }, [availableShippingMethods])
 
   const handleEdit = () => {
-    router.push(pathname + "?step=delivery", { scroll: false })
+    router.push(stepHref("delivery"), { scroll: false })
   }
 
   const handleSubmit = () => {
-    router.push(pathname + "?step=payment", { scroll: false })
+    router.push(stepHref("payment"), { scroll: false })
   }
 
   const handleSetShippingMethod = async (

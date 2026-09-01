@@ -68,13 +68,32 @@ export async function retrieveCheckoutCart(cartId: string) {
     ...(await getAuthHeaders()),
   }
 
-  return await sdk.store.cart
-    .retrieve(cartId, {
-      fields:
-        "*items,*region,*items.product,*items.variant,*items.thumbnail,*items.metadata,+items.total,*promotions,+shipping_methods.name",
-    }, headers)
-    .then(({ cart }: { cart: HttpTypes.StoreCart }) => cart)
-    .catch(() => null)
+  const fields =
+    "*items,*region,*items.product,*items.variant,*items.thumbnail,*items.metadata,+items.total,*promotions,+shipping_methods.name"
+
+  // The cart page has just completed a write. Read the same cart resource
+  // directly and retry one transient network/cold-start failure instead of
+  // turning it into a misleading empty-checkout state.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { cart } = await sdk.client.fetch<HttpTypes.StoreCartResponse>(
+        `/store/carts/${cartId}`,
+        {
+          method: "GET",
+          query: { fields },
+          headers,
+          cache: "no-store",
+        }
+      )
+      return cart
+    } catch {
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 250))
+      }
+    }
+  }
+
+  return null
 }
 
 export async function getOrSetCart(countryCode: string) {
@@ -432,11 +451,12 @@ export async function submitPromotionForm(
 
 // TODO: Pass a POJO instead of a form entity here
 export async function setAddresses(currentState: unknown, formData: FormData) {
+  let cartId: string | undefined
   try {
     if (!formData) {
       throw new Error("No form data found when setting addresses")
     }
-    const cartId = getCartId()
+    cartId = await getCartId()
     if (!cartId) {
       throw new Error("No existing cart found when setting addresses")
     }
@@ -478,9 +498,10 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
     return e.message
   }
 
-  redirect(
-    `/${formData.get("shipping_address.country_code")}/checkout?step=delivery`
-  )
+  const countryCode = formData.get("shipping_address.country_code")
+  const params = new URLSearchParams({ step: "delivery" })
+  if (cartId) params.set("cart_id", cartId)
+  redirect(`/${countryCode}/checkout?${params.toString()}`)
 }
 
 /**

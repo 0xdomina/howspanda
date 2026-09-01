@@ -27,6 +27,12 @@ const Addresses = ({
 
   const isOpen = searchParams.get("step") === "address"
 
+  const stepHref = (step: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("step", step)
+    return `${pathname}?${params.toString()}`
+  }
+
   const { state: sameAsBilling, toggle: toggleSameAsBilling } = useToggleState(
     cart?.shipping_address && cart?.billing_address
       ? compareAddresses(cart?.shipping_address, cart?.billing_address)
@@ -34,7 +40,7 @@ const Addresses = ({
   )
 
   const handleEdit = () => {
-    router.push(pathname + "?step=address")
+    router.push(stepHref("address"))
   }
 
   const [message, formAction] = useActionState(setAddresses, null)

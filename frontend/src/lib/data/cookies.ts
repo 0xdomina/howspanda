@@ -27,6 +27,8 @@ export const hasAuthToken = async (): Promise<boolean> => {
   }
 }
 
+const CHECKOUT_CART_COOKIE = "_howsu_checkout_cart"
+
 export const getCacheTag = async (tag: string): Promise<string> => {
   try {
     const cookies = await nextCookies()
@@ -77,10 +79,13 @@ export const removeAuthToken = async () => {
 
 export const getCartId = async () => {
   const cookies = await nextCookies()
-  return cookies.get("_medusa_cart_id")?.value
+  // During the cart → checkout redirect, the short-lived handoff cookie is a
+  // safe fallback if the root cart cookie has not propagated yet.
+  return (
+    cookies.get("_medusa_cart_id")?.value ||
+    cookies.get(CHECKOUT_CART_COOKIE)?.value
+  )
 }
-
-const CHECKOUT_CART_COOKIE = "_howsu_checkout_cart"
 
 export const getCheckoutCartId = async () => {
   const cookies = await nextCookies()
@@ -118,6 +123,10 @@ export const setCartId = async (cartId: string, countryCode?: string) => {
 export const removeCartId = async () => {
   const cookies = await nextCookies()
   cookies.set("_medusa_cart_id", "", {
+    maxAge: -1,
+    path: "/",
+  })
+  cookies.set(CHECKOUT_CART_COOKIE, "", {
     maxAge: -1,
     path: "/",
   })
