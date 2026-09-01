@@ -44,12 +44,13 @@ export async function retrieveCart(
     ...(await getCacheOptions("carts")),
   }
 
+  // This Medusa deployment expects relation wildcards in the fields query to
+  // remain unescaped (for example `*items`). Passing fields through the SDK's
+  // object query serializer encodes the wildcard and can return a misleading
+  // 404. Keep this public cart read raw while still using no-store.
   return await sdk.client
-    .fetch<HttpTypes.StoreCartResponse>(`/store/carts/${id}`, {
+    .fetch<HttpTypes.StoreCartResponse>(`/store/carts/${id}?fields=${fields}`, {
       method: "GET",
-      query: {
-        fields,
-      },
       headers,
       ...(cache === "force-cache" ? { next } : {}),
       cache,
@@ -77,10 +78,9 @@ export async function retrieveCheckoutCart(cartId: string) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const { cart } = await sdk.client.fetch<HttpTypes.StoreCartResponse>(
-        `/store/carts/${cartId}`,
+        `/store/carts/${cartId}?fields=${fields}`,
         {
           method: "GET",
-          query: { fields },
           headers,
           cache: "no-store",
         }
