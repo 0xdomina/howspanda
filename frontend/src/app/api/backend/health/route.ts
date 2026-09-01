@@ -14,6 +14,11 @@ const noStoreHeaders = {
   "Cache-Control": "no-store, no-cache, max-age=0",
 }
 
+const retryHeaders = {
+  ...noStoreHeaders,
+  "Retry-After": "5",
+}
+
 export async function GET() {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 8000)
@@ -39,12 +44,12 @@ export async function GET() {
 
     return NextResponse.json(
       { ready },
-      { status: ready ? 200 : 503, headers: noStoreHeaders }
+      { status: ready ? 200 : 503, headers: ready ? noStoreHeaders : retryHeaders }
     )
   } catch {
     return NextResponse.json(
       { ready: false },
-      { status: 503, headers: noStoreHeaders }
+      { status: 503, headers: retryHeaders }
     )
   } finally {
     clearTimeout(timeout)

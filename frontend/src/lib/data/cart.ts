@@ -94,7 +94,11 @@ export async function retrieveCheckoutCart(cartId: string) {
       // state. Transient failures must remain distinguishable from that case.
       if (Number(error?.status) === 404) return null
       if (attempt === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 250))
+        const retryAfter = Number(error?.headers?.get?.("retry-after"))
+        const retryDelay = Number.isFinite(retryAfter)
+          ? Math.min(Math.max(retryAfter * 1000, 250), 5_000)
+          : 250
+        await new Promise((resolve) => setTimeout(resolve, retryDelay))
       }
     }
   }
