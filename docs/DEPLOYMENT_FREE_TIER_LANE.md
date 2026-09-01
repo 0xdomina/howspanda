@@ -88,13 +88,13 @@ error for background work.
 
 ### Backblaze B2
 
-Use separate buckets or prefixes:
-
-- public, cacheable product/store media;
-- private payment-proof images, read only through short-lived signed URLs.
-
-Never reuse the public media bucket for payment proofs. Product uploads are
-untrusted media and are sniffed server-side; SVG/HTML are not accepted.
+Use a private B2 bucket with separate prefixes for product/store media and
+payment-proof images. The beta may use the existing private media bucket when
+the B2 application key is prefix-restricted; proofs live below their own
+private prefix and are read only through short-lived signed URLs. A dedicated
+proof bucket can be enabled later without changing the order flow. Product
+uploads are untrusted media and are sniffed server-side; SVG/HTML are not
+accepted.
 
 ## Free-tier reality and capacity posture
 

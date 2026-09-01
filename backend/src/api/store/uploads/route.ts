@@ -15,9 +15,9 @@ import {
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
-// Buyer proof-of-payment upload (bank transfer screenshots). Guests upload
-// without a session, so this is deliberately image-only and public — the
-// proof becomes useful only once it is bound to an order via
+// Buyer proof-of-payment upload (bank transfer screenshots). Guests may prepare
+// an image upload without a session, but the object is stored in private B2 and
+// becomes useful only once it is bound to an order via
 // POST /store/orders/:id/bank-proof, which enforces email ownership.
 const upload = multer({
   storage: multer.memoryStorage(),
