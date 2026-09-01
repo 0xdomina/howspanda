@@ -75,6 +75,8 @@ export async function retrieveCheckoutCart(cartId: string) {
   // The cart page has just completed a write. Read the same cart resource
   // directly and retry one transient network/cold-start failure instead of
   // turning it into a misleading empty-checkout state.
+  let lastError: unknown
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const { cart } = await sdk.client.fetch<HttpTypes.StoreCartResponse>(
@@ -86,14 +88,18 @@ export async function retrieveCheckoutCart(cartId: string) {
         }
       )
       return cart
-    } catch {
+    } catch (error: any) {
+      lastError = error
+      // A real missing cart should still be handled by the normal empty
+      // state. Transient failures must remain distinguishable from that case.
+      if (Number(error?.status) === 404) return null
       if (attempt === 0) {
         await new Promise((resolve) => setTimeout(resolve, 250))
       }
     }
   }
 
-  return null
+  throw lastError ?? new Error("Checkout cart could not be loaded")
 }
 
 export async function getOrSetCart(countryCode: string) {

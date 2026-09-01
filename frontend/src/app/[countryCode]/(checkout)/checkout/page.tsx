@@ -35,14 +35,36 @@ export default async function Checkout({ searchParams }: CheckoutProps) {
     (id, index, ids): id is string => Boolean(id) && ids.indexOf(id) === index
   )
   let cart: HttpTypes.StoreCart | null = null
+  let cartReadFailed = false
   for (const candidateId of cartIds) {
     // Checkout must read the latest cart state. The explicit ID prevents a
     // stale cookie from selecting another cart during the redirect, while
     // no-store avoids a previously cached empty response after a cart write.
-    cart = await retrieveCheckoutCart(candidateId)
-    if (cart) break
+    try {
+      cart = await retrieveCheckoutCart(candidateId)
+      if (cart) break
+    } catch {
+      cartReadFailed = true
+    }
   }
   const customer = await retrieveCustomer()
+
+  if (!cart && cartReadFailed) {
+    const retryCartId = cartIds[0]
+    const retryQuery = new URLSearchParams({ step: "address" })
+    if (retryCartId) retryQuery.set("cart_id", retryCartId)
+
+    return (
+      <div className="figma-container py-16" data-testid="checkout-warmup-state">
+        <div className="mx-auto max-w-md rounded-control border border-ink-hairline bg-white p-8 text-center shadow-float">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Checkout</p>
+          <h1 className="mt-3 font-display text-3xl font-medium tracking-[-0.02em] text-ink">Your cart is still loading</h1>
+          <p className="mt-3 text-sm leading-6 text-ink-muted">We&rsquo;re reconnecting to your cart. Your items are safe.</p>
+          <LocalizedClientLink href={`/checkout?${retryQuery.toString()}`} className="mt-7 inline-flex rounded-control bg-brand px-6 py-3 text-sm font-semibold text-white transition-transform duration-fast hover:-translate-y-0.5 active:scale-[0.98]">Try again</LocalizedClientLink>
+        </div>
+      </div>
+    )
+  }
 
   if (!cart) {
     return (
