@@ -12,11 +12,14 @@ export const listProducts = async ({
   queryParams,
   countryCode,
   regionId,
+  publicCache = false,
 }: {
   pageParam?: number
   queryParams?: HttpTypes.FindParams & HttpTypes.StoreProductListParams
   countryCode?: string
   regionId?: string
+  /** Use the shared, unauthenticated storefront cache for public catalog views. */
+  publicCache?: boolean
 }): Promise<{
   response: { products: HttpTypes.StoreProduct[]; count: number }
   nextPage: number | null
@@ -45,12 +48,18 @@ export const listProducts = async ({
     }
   }
 
-  const headers = {
-    ...(await getAuthHeaders()),
-  }
+  // Product discovery is public. Keeping this lane unauthenticated allows
+  // Vercel to share one catalog cache across visitors instead of creating a
+  // separate cache entry for every session cookie.
+  const headers = publicCache ? {} : { ...(await getAuthHeaders()) }
 
   const next = {
-    ...(await getCacheOptions("products")),
+    ...(publicCache
+      ? {
+          revalidate: 120,
+          tags: [`public-products-${region.id}`],
+        }
+      : await getCacheOptions("products")),
     // ISR-style: serve cached for 60s, then refresh in the background. Unlike
     // force-cache, this guarantees stale entries actually expire — seller
     // uploads and edits reach the homepage within a minute.
@@ -78,6 +87,7 @@ export const listProducts = async ({
             },
             headers,
             next,
+            ...(publicCache ? { cache: "force-cache" as const } : {}),
           }
         )
         .then(({ products, count }) => {
@@ -125,11 +135,13 @@ export const listProductsWithSort = async ({
   queryParams,
   sortBy = "created_at",
   countryCode,
+  publicCache = false,
 }: {
   page?: number
   queryParams?: HttpTypes.FindParams & HttpTypes.StoreProductParams
   sortBy?: SortOptions
   countryCode: string
+  publicCache?: boolean
 }): Promise<{
   response: { products: HttpTypes.StoreProduct[]; count: number }
   nextPage: number | null
@@ -146,6 +158,7 @@ export const listProductsWithSort = async ({
       limit: 100,
     },
     countryCode,
+    publicCache,
   })
 
   const sortedProducts = sortProducts(products, sortBy)

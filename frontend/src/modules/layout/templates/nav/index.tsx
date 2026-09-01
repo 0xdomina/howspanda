@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import Image from "next/image"
 
 import { listLocales } from "@lib/data/locales"
 import { getLocale } from "@lib/data/locale-actions"
@@ -28,18 +29,24 @@ export default async function Nav() {
       <header className="border-b border-ink-hairline">
         <nav className="figma-container flex min-h-[78px] items-center justify-between gap-6 py-4" aria-label="Main navigation">
           <div>
-            <SideMenu regions={regions} locales={locales} currentLocale={currentLocale} mallsEnabled={features.malls} />
+            <SideMenu regions={regions} locales={locales} currentLocale={currentLocale} mallsEnabled={features.malls} isAuthenticated={Boolean(customer)} hasSeller={Boolean(seller)} />
           </div>
           <LocalizedClientLink href="/" className="inline-flex items-center" data-testid="nav-store-link" aria-label="How’s U home">
-            <img src="/brand/hows-u-logo.svg" alt="How’s U" className="h-10 w-auto" />
+            <Image src="/brand/hows-u-logo.svg" alt="How’s U" width={128} height={40} priority className="h-10 w-auto" />
           </LocalizedClientLink>
-          <div className="hidden items-center gap-8 text-sm text-ink small:flex">
+          <div className="hidden items-center gap-7 text-sm text-ink small:flex">
             <LocalizedClientLink href="/" className="border-b border-ink pb-1">Home</LocalizedClientLink>
             <LocalizedClientLink href="/about" className="hover:text-brand">About</LocalizedClientLink>
             <LocalizedClientLink href="/contact" className="hover:text-brand">Contact</LocalizedClientLink>
-            <LocalizedClientLink href={seller ? "/seller" : customer ? "/account" : "/account?mode=register"} className="hover:text-brand">
-              {seller ? "Manage Business" : customer ? "Account" : "Sign Up"}
-            </LocalizedClientLink>
+            {customer ? (
+              <LocalizedClientLink href="/account" className="hover:text-brand">Account</LocalizedClientLink>
+            ) : (
+              <>
+                <LocalizedClientLink href="/account?mode=login" className="hover:text-brand">Log in</LocalizedClientLink>
+                <LocalizedClientLink href="/account?mode=register" className="rounded-full bg-brand px-4 py-2 font-medium text-white transition duration-200 hover:-translate-y-0.5 hover:bg-[#b92f2f] active:scale-[0.98]">Sign up</LocalizedClientLink>
+              </>
+            )}
+            {seller && <LocalizedClientLink href="/seller" className="hover:text-brand">Manage Business</LocalizedClientLink>}
           </div>
           <div className="flex items-center gap-4">
             <SearchForm />

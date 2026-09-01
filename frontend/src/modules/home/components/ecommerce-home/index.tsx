@@ -4,8 +4,11 @@ import AutoCarousel from "@modules/home/components/auto-carousel"
 import PromoBannerCarousel from "@modules/home/components/promo-banner-carousel"
 import FlashSaleCountdown from "@modules/home/components/flash-sale-countdown"
 import CatalogRetry from "@modules/home/components/catalog-retry"
+import CatalogSnapshot from "@modules/home/components/catalog-snapshot"
+import OnboardingJourney from "@modules/home/components/onboarding-journey"
 import { getRegion } from "@lib/data/regions"
 import { listProductsWithSort } from "@lib/data/products"
+import { retrieveCustomer } from "@lib/data/customer"
 import { getFlashSaleCycle } from "@lib/util/flash-sales"
 import type { HttpTypes } from "@medusajs/types"
 
@@ -30,17 +33,27 @@ const EmptySlate = ({ message }: { message: string }) => (
 )
 
 export default async function EcommerceHome({ countryCode }: { countryCode: string }) {
-  const region = await getRegion(countryCode)
+  const [region, customer] = await Promise.all([
+    getRegion(countryCode),
+    retrieveCustomer(),
+  ])
   let products: HttpTypes.StoreProduct[] = []
 
   if (region) {
-    const { response } = await listProductsWithSort({
-      page: 1,
-      queryParams: { limit: 100 },
-      sortBy: "created_at",
-      countryCode,
-    })
-    products = response.products
+    try {
+      const { response } = await listProductsWithSort({
+        page: 1,
+        queryParams: { limit: 100 },
+        sortBy: "created_at",
+        countryCode,
+        publicCache: true,
+      })
+      products = response.products
+    } catch {
+      // A sleeping API should never turn the storefront into an error page.
+      // CatalogRetry will refresh once the API is ready.
+      products = []
+    }
   }
 
   const cycle = getFlashSaleCycle()
@@ -67,6 +80,26 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
 
   return (
     <div className="bg-white">
+      <section className="figma-container pt-6 small:pt-8" aria-label="Welcome to How's U">
+        <div className="soft-glass flex flex-col gap-5 rounded-[24px] p-5 small:flex-row small:items-center small:justify-between small:p-7">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">How&rsquo;s U marketplace</p>
+            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink small:text-4xl">Find your next good thing.</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">Shop from independent stores, keep your favourites close, and join in whenever you&rsquo;re ready.</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-3">
+            {customer ? (
+              <LocalizedClientLink href="/account" className="figma-button">Open your account</LocalizedClientLink>
+            ) : (
+              <>
+                <LocalizedClientLink href="/account?mode=login" className="inline-flex items-center justify-center rounded-control border border-ink-hairline bg-white/60 px-5 py-3 text-sm font-medium text-ink transition duration-200 hover:-translate-y-0.5 hover:bg-white active:scale-[0.98]">Log in</LocalizedClientLink>
+                <LocalizedClientLink href="/account?mode=register" className="figma-button">Sign up</LocalizedClientLink>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+      <OnboardingJourney />
       {hasProducts ? (
         <>
           <PromoBannerCarousel products={banners} countryCode={countryCode} />
@@ -107,12 +140,10 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
           </section>
         </>
       ) : (
-        <section className="figma-container py-16 small:py-24">
+        <>
           <CatalogRetry />
-          <SectionTitle eyebrow="Marketplace" title="Explore How’s U" />
-          <div className="mt-10"><EmptySlate message="Products from independent sellers will appear here." /></div>
-          <div className="mt-8 text-center"><LocalizedClientLink href="/store" className="figma-button">Browse the marketplace</LocalizedClientLink></div>
-        </section>
+          <CatalogSnapshot products={products} />
+        </>
       )}
     </div>
   )

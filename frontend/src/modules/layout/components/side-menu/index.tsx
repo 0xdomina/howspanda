@@ -42,9 +42,11 @@ type SideMenuProps = {
   currentLocale: string | null
   /** Resolved server-side (nav layout) so the browser never calls /store/features. */
   mallsEnabled?: boolean
+  isAuthenticated?: boolean
+  hasSeller?: boolean
 }
 
-const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false }: SideMenuProps) => {
+const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false, isAuthenticated = false, hasSeller = false }: SideMenuProps) => {
   const countryToggleState = useToggleState()
   const languageToggleState = useToggleState()
   const [isOpen, setIsOpen] = useState(false)
@@ -121,6 +123,17 @@ const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false }: Sid
                 >
                   <X size={18} />
                 </button>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {isAuthenticated ? (
+                  <LocalizedClientLink href="/account" onClick={closeMenu} className="figma-button px-5 py-3">Open account</LocalizedClientLink>
+                ) : (
+                  <>
+                    <LocalizedClientLink href="/account?mode=login" onClick={closeMenu} className="inline-flex items-center justify-center rounded-control border border-ink-hairline bg-white/60 px-5 py-3 font-medium text-ink">Log in</LocalizedClientLink>
+                    <LocalizedClientLink href="/account?mode=register" onClick={closeMenu} className="figma-button px-5 py-3">Sign up</LocalizedClientLink>
+                  </>
+                )}
+                {hasSeller && <LocalizedClientLink href="/seller" onClick={closeMenu} className="inline-flex items-center justify-center rounded-control border border-ink-hairline bg-white/60 px-5 py-3 font-medium text-ink">Manage Business</LocalizedClientLink>}
               </div>
               <SearchForm inputId="mobile-product-search" className="flex h-10 items-center gap-3 rounded-control bg-[#f5f5f5] px-4 small:hidden" />
               <details open>

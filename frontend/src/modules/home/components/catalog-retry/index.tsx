@@ -36,7 +36,10 @@ const CatalogRetry = () => {
         }
       }
 
-      if (attempts >= 12 && intervalId) {
+      // PandaStack can take around a minute to wake from free-tier sleep.
+      // Keep the refresh window open long enough for that cold start without
+      // blocking the page or showing a failure state.
+      if (attempts >= 24 && intervalId) {
         window.clearInterval(intervalId)
       }
     }
