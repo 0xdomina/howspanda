@@ -1,0 +1,5 @@
+# Local-only: Vercel runs its own yarn install, never needs the offline mirror.
+.yarn
+e2e-shots
+e2e-shots-human
+.next

@@ -1,0 +1,15 @@
+# Vercel project rootDirectory=frontend — skip repo-root-only bulk.
+# Leading slashes anchor to repo root so nested dirs (e.g.
+# frontend/src/app/api/backend) are never excluded.
+# (Secrets already covered by **/.env in .gitignore; this is only size.)
+/backend
+/uploads
+/.mimosa
+/docs
+/scripts
+/deploy
+/package
+/frontend/.yarn
+/frontend/e2e-shots
+/frontend/e2e-shots-human
+/frontend/.next
