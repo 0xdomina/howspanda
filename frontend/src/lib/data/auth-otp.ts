@@ -10,10 +10,38 @@ import { sdk } from "@lib/config"
 
 export type OtpPurpose = "signup" | "reset"
 
+export type OtpResult = {
+  ok: boolean
+  code: string | null
+  error: string | null
+  /** Backend unreachable (cold start / 5xx / timeout) — caller may offer offline flow. */
+  warming?: boolean
+}
+
+// The Medusa JS SDK throws `Error: <none>` when the backend answers with a
+// non-JSON body (Cloudflare 521 / gateway HTML). Never surface that to users.
+function toHumanError(error: any): { error: string; warming: boolean } {
+  const raw = String(error?.message ?? error ?? "")
+  const warming =
+    error?.name === "AbortError" ||
+    [502, 503, 504, 521].includes(Number(error?.status)) ||
+    /<none>|abort|timed out|timeout|warming|ready["']?\s*:\s*false|booting|fetch failed|load failed/i.test(
+      raw
+    )
+  if (warming) {
+    return {
+      error:
+        "Our servers are waking up. Please wait a moment and try again — your details are safe.",
+      warming: true,
+    }
+  }
+  return { error: raw || "Something went wrong. Please try again.", warming: false }
+}
+
 export const requestAuthOtp = async (input: {
   email: string
   purpose: OtpPurpose
-}): Promise<{ ok: boolean; code: string | null; error: string | null }> => {
+}): Promise<OtpResult> => {
   try {
     const res = await sdk.client.fetch<{ ok: boolean; code: string | null }>(
       "/auth/otp/request",
@@ -24,7 +52,8 @@ export const requestAuthOtp = async (input: {
     )
     return { ok: true, code: res.code ?? null, error: null }
   } catch (error: any) {
-    return { ok: false, code: null, error: error?.message ?? error?.toString() }
+    const { error: message, warming } = toHumanError(error)
+    return { ok: false, code: null, error: message, warming }
   }
 }
 

@@ -8,6 +8,8 @@ import Input from "@modules/common/components/input"
 import GoogleSignIn from "@modules/account/components/google-signin"
 import { useState } from "react"
 import type { FormEvent } from "react"
+import { authClient } from "@lib/auth-client"
+import { syncNeonAccount } from "@lib/data/customer"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
@@ -82,6 +84,21 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
           continue
         }
         break
+      }
+      // Medusa lane failed (wrong credentials or backend asleep). Fall back to
+      // the Neon password account, which works even during a backend outage.
+      try {
+        const { error: neonError } = await authClient.signIn.email({
+          email,
+          password,
+        })
+        if (!neonError) {
+          await syncNeonAccount()
+          window.location.assign(`/${countryCode}/account`)
+          return
+        }
+      } catch {
+        // fall through to the Medusa error message below
       }
       throw new Error(lastError || "The email or password is incorrect.")
     } catch (error: any) {

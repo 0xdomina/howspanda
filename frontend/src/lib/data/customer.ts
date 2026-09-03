@@ -192,41 +192,10 @@ export async function signup(_currentState: unknown, formData: FormData) {
     return "Email and password are required."
   }
 
-  const firstName = (formData.get("first_name") as string) || ""
-  const lastName = (formData.get("last_name") as string) || ""
-  const name = `${firstName} ${lastName}`.trim() || email
-
-  // Neon Auth first — works offline while PandaStack sleeps
-  try {
-    const h = await nextHeaders()
-    const neonRes = await auth.api.signUpEmail({
-      body: { email, password, name } as any,
-      headers: h as any,
-    })
-    // Neon session cookie is set via Better Auth handler; cart transfer best-effort
-    try { await transferCart() } catch {}
-    // Try to mirror to Medusa in background (non-blocking, best-effort)
-    if (code) {
-      const customerForm: Record<string, string> = { email, password, code }
-      for (const key of ["first_name", "last_name", "phone"] as const) {
-        const v = formData.get(key) as string | null
-        if (v) customerForm[key] = v
-      }
-      sdk.client.fetch("/auth/otp/signup", { method: "POST", body: customerForm }).catch(() => {})
-    }
-    const customerCacheTag = await getCacheTag("customers")
-    revalidateTagSafely(customerCacheTag)
-    return (neonRes as any)?.user || { email, has_account: true } as any
-  } catch (e: any) {
-    // If Neon says already exists, fall through to Medusa flow
-    const msg = String(e?.message || "")
-    if (!/already|exist|duplicate/i.test(msg)) {
-      // Try Medusa OTP flow as fallback when Neon fails for other reason
-    }
-  }
-
-  // Legacy Medusa OTP flow (requires code)
-  if (!code) return "Please add the 6-digit email code or just sign up — your Neon account was being created."
+  // NOTE: Neon (Better Auth) signup happens client-side via authClient so the
+  // session cookie is set correctly. This action handles the Medusa mirror
+  // (OTP code step) when the backend is reachable.
+  if (!code) return "Enter the 6-digit code we sent to your email."
   let stage = "email verification"
   try {
     const customerForm: Record<string, string> = { email, password, code }
@@ -261,22 +230,9 @@ export async function login(_currentState: unknown, formData: FormData) {
   const password = formData.get("password") as string
   const countryCode = (formData.get("countryCode") as string) || "ng"
 
-  // Try Neon first — instant even if PandaStack is 521
-  try {
-    const h = await nextHeaders()
-    const res = await auth.api.signInEmail({ body: { email, password } as any, headers: h as any })
-    if ((res as any)?.user) {
-      const customerCacheTag = await getCacheTag("customers")
-      revalidateTagSafely(customerCacheTag)
-      try { await transferCart() } catch {}
-      // Fire-and-forget Medusa token for commerce ops when backend wakes
-      loginWithEmailPassword("customer", email, password).then(t=>setAuthToken(t as string)).catch(()=>{})
-      return
-    }
-  } catch {
-    // fall through to Medusa
-  }
-
+  // NOTE: Neon sign-in happens client-side via authClient (correct cookies).
+  // This action is the Medusa lane; the login form tries Neon first and only
+  // falls back here when the Neon account does not exist.
   try {
     const customerToken = await loginWithEmailPassword("customer", email, password)
     await setAuthToken(customerToken as string)
@@ -302,10 +258,35 @@ export async function login(_currentState: unknown, formData: FormData) {
   try { await transferCart() } catch {}
 }
 
-export async function signout(countryCode: string) {
+// Called after a client-side Neon sign-up/sign-in (authClient sets the real
+// session cookie). Transfers any guest cart and refreshes cached identity.
+export async function syncNeonAccount() {
   try {
-    const h = await nextHeaders()
-    await auth.api.signOut({ headers: h as any })
+    await transferCart()
+  } catch {
+    // A stale or unavailable guest cart must not fail sign-up/sign-in.
+  }
+  const customerCacheTag = await getCacheTag("customers")
+  revalidateTagSafely(customerCacheTag)
+  return { ok: true }
+}
+
+export async function signout(countryCode: string) {
+  // Clear the Neon (Better Auth) session cookie directly. Its default name is
+  // `better-auth.session_token`; expiring it here logs the browser out even
+  // though the session row stays in Neon until it expires naturally.
+  try {
+    const { cookies: nextCookies } = await import("next/headers")
+    const store = await nextCookies()
+    for (const name of [
+      "better-auth.session_token",
+      "better-auth.session_data",
+      "better-auth.dont_remember",
+    ]) {
+      try {
+        store.set(name, "", { maxAge: -1, path: "/" })
+      } catch {}
+    }
   } catch {}
   await removeAuthToken()
   await removeSellerAuthToken()

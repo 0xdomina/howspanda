@@ -8,8 +8,9 @@ import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import GoogleSignIn from "@modules/account/components/google-signin"
-import { signup } from "@lib/data/customer"
+import { signup, syncNeonAccount } from "@lib/data/customer"
 import { requestAuthOtp } from "@lib/data/auth-otp"
+import { authClient } from "@lib/auth-client"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
@@ -85,6 +86,9 @@ const Register = ({ setCurrentView }: Props) => {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [cooldown, setCooldown] = useState(0)
+  // When the email-code backend is unreachable (cold start), users can still
+  // create a password account instantly — no code required.
+  const [offlineMode, setOfflineMode] = useState(false)
 
   // countdown for resend
   useEffect(() => {
@@ -132,7 +136,65 @@ const Register = ({ setCurrentView }: Props) => {
       // already registered, the API returns a clear conflict and the user
       // stays on this step without receiving an unnecessary OTP.
       const delivered = await sendCode()
-      if (delivered) setStep("code")
+      if (delivered) {
+        setOfflineMode(false)
+        setStep("code")
+      }
+    })
+  }
+
+  const continueOffline = () => {
+    setError(null)
+    if (!email.trim()) {
+      setError("Enter your email.")
+      return
+    }
+    if (!password) {
+      setError("Enter a password.")
+      return
+    }
+    startTransition(async () => {
+      const delivered = await sendCode()
+      if (delivered) {
+        setOfflineMode(false)
+        setStep("code")
+        return
+      }
+      // Email-code service unreachable (backend cold start) — offer instant
+      // password signup instead of blocking registration.
+      setOfflineMode(true)
+      setSent(false)
+      setHint(null)
+      setStep("code")
+    })
+  }
+
+  const createAccountNow = () => {
+    setError(null)
+    if (!password) {
+      setError("Enter a password.")
+      return
+    }
+    startTransition(async () => {
+      try {
+        const name =
+          `${firstName.trim()} ${lastName.trim()}`.trim() || email.trim()
+        const { error: signUpError } = await authClient.signUp.email({
+          email: email.trim(),
+          password,
+          name,
+        })
+        if (signUpError) {
+          setError(
+            signUpError.message || "We could not create your account. Please try again."
+          )
+          return
+        }
+        await syncNeonAccount()
+        router.refresh()
+      } catch (e: any) {
+        setError(e?.message || "We could not create your account. Please try again.")
+      }
     })
   }
 
@@ -227,11 +289,49 @@ const Register = ({ setCurrentView }: Props) => {
               size="large"
               className="w-full mt-6"
               isLoading={isPending}
-              onClick={continueToCode}
+              onClick={continueOffline}
               data-testid="register-continue-button"
             >
               Continue
             </Button>
+          </div>
+        ) : offlineMode ? (
+          <div className="flex flex-col gap-y-3 rounded-control border border-ink-hairline bg-white/70 p-5 shadow-sm backdrop-blur animate-[fadeIn_0.45s_ease]">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-ink">Create your account</p>
+              <span className="rounded-full bg-ink/5 px-2.5 py-1 text-xs text-ink-muted">
+                no code needed
+              </span>
+            </div>
+            <p className="text-sm text-ui-fg-subtle">
+              Our email-code service is waking up, so you can create your
+              account for{" "}
+              <span className="font-medium text-ink">{email.trim()}</span>{" "}
+              right away with just your password. You can shop, sell, and
+              deliver immediately.
+            </p>
+            <ErrorMessage error={error} data-testid="register-error" />
+            <Button
+              size="large"
+              className="w-full mt-1"
+              isLoading={isPending}
+              onClick={createAccountNow}
+              data-testid="register-button"
+            >
+              Create account now
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("credentials")
+                setError(null)
+                setOfflineMode(false)
+                setHint(null)
+              }}
+              className="text-center text-small-regular text-ui-fg-subtle underline"
+            >
+              Back — edit details
+            </button>
           </div>
         ) : (
           <div className="flex flex-col gap-y-3 rounded-control border border-ink-hairline bg-white/70 p-5 shadow-sm backdrop-blur animate-[fadeIn_0.45s_ease]">
