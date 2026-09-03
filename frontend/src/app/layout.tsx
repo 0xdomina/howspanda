@@ -3,6 +3,7 @@ import { Metadata } from "next"
 import "styles/globals.css"
 import { WishlistProvider } from "@modules/wishlist/context"
 import { loadWishlist } from "@lib/data/wishlist"
+import WarmAgent from "@modules/common/components/warm-agent"
 
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
@@ -51,6 +52,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
     >
       <body className="bg-paper font-sans text-ink antialiased">
         <WishlistProvider initialItems={initialWishlist}><main className="relative page-enter">{props.children}</main></WishlistProvider>
+        <WarmAgent />
         <script
           // Quietly start the backend through our same-origin health proxy so
           // the backend URL is never exposed in the page source.
