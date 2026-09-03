@@ -23,6 +23,8 @@ async function getRegionMap(cacheId: string) {
     regionMapUpdated < Date.now() - 3600 * 1000
   ) {
     // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
+    // Bounded: a dead backend must never hang page SSR (API routes have
+    // their own 4-8s aborts; this raw fetch needs one too).
     const { regions } = await fetch(`${BACKEND_URL}/store/regions`, {
       headers: {
         "x-publishable-api-key": PUBLISHABLE_API_KEY!,
@@ -32,6 +34,7 @@ async function getRegionMap(cacheId: string) {
         tags: [`regions-${cacheId}`],
       },
       cache: "force-cache",
+      signal: AbortSignal.timeout(4000),
     }).then(async (response) => {
       const json = await response.json()
 
