@@ -6,6 +6,7 @@ import { HttpTypes } from "@medusajs/types"
 import { revalidateTagSafely } from "./cache"
 import { headers as nextHeaders } from "next/headers"
 import { redirect } from "next/navigation"
+import { auth } from "@lib/auth"
 import {
   getAuthHeaders,
   getCacheOptions,
@@ -95,8 +96,32 @@ export const loginWithEmailPassword = async (
   return token
 }
 
+export const getNeonSession = async () => {
+  try {
+    const h = await nextHeaders()
+    const session = await auth.api.getSession({ headers: h as any })
+    return session
+  } catch {
+    return null
+  }
+}
+
 export const retrieveCustomer =
   async (): Promise<HttpTypes.StoreCustomer | null> => {
+    // Neon Auth first — works while PandaStack sleeps
+    const neonSession = await getNeonSession()
+    if (neonSession?.user) {
+      // Map Neon user to Medusa customer shape so UI can render account/cart
+      const u = neonSession.user as any
+      return {
+        id: `neon_${u.id}`,
+        email: u.email,
+        first_name: u.name?.split(" ")[0] || null,
+        last_name: u.name?.split(" ").slice(1).join(" ") || null,
+        has_account: true,
+      } as unknown as HttpTypes.StoreCustomer
+    }
+
     if (!(await hasAuthToken())) return null
 
     const authHeaders = await getAuthHeaders()
@@ -163,42 +188,62 @@ export async function signup(_currentState: unknown, formData: FormData) {
   const password = formData.get("password") as string
   const code = (formData.get("code") as string)?.trim()
 
-  if (!email || !password || !code) {
-    return "Email, password, and the 6-digit verification code are required."
+  if (!email || !password) {
+    return "Email and password are required."
   }
 
-  let stage = "email verification"
+  const firstName = (formData.get("first_name") as string) || ""
+  const lastName = (formData.get("last_name") as string) || ""
+  const name = `${firstName} ${lastName}`.trim() || email
 
+  // Neon Auth first — works offline while PandaStack sleeps
+  try {
+    const h = await nextHeaders()
+    const neonRes = await auth.api.signUpEmail({
+      body: { email, password, name } as any,
+      headers: h as any,
+    })
+    // Neon session cookie is set via Better Auth handler; cart transfer best-effort
+    try { await transferCart() } catch {}
+    // Try to mirror to Medusa in background (non-blocking, best-effort)
+    if (code) {
+      const customerForm: Record<string, string> = { email, password, code }
+      for (const key of ["first_name", "last_name", "phone"] as const) {
+        const v = formData.get(key) as string | null
+        if (v) customerForm[key] = v
+      }
+      sdk.client.fetch("/auth/otp/signup", { method: "POST", body: customerForm }).catch(() => {})
+    }
+    const customerCacheTag = await getCacheTag("customers")
+    revalidateTagSafely(customerCacheTag)
+    return (neonRes as any)?.user || { email, has_account: true } as any
+  } catch (e: any) {
+    // If Neon says already exists, fall through to Medusa flow
+    const msg = String(e?.message || "")
+    if (!/already|exist|duplicate/i.test(msg)) {
+      // Try Medusa OTP flow as fallback when Neon fails for other reason
+    }
+  }
+
+  // Legacy Medusa OTP flow (requires code)
+  if (!code) return "Please add the 6-digit email code or just sign up — your Neon account was being created."
+  let stage = "email verification"
   try {
     const customerForm: Record<string, string> = { email, password, code }
     for (const key of ["first_name", "last_name", "phone"] as const) {
       const value = formData.get(key) as string | null
       if (value) customerForm[key] = value
     }
-
     stage = "account registration"
     const { customer: createdCustomer } = await sdk.client.fetch<{
       customer: HttpTypes.StoreCustomer
-    }>("/auth/otp/signup", {
-      method: "POST",
-      body: customerForm,
-    })
-
+    }>("/auth/otp/signup", { method: "POST", body: customerForm })
     stage = "sign in"
     const loginToken = await loginWithEmailPassword("customer", email, password)
-
     await setAuthToken(loginToken as string)
-
     const customerCacheTag = await getCacheTag("customers")
     revalidateTagSafely(customerCacheTag)
-
-    try {
-      await transferCart()
-    } catch {
-      // Cart transfer is optional and must not invalidate a newly created
-      // account session.
-    }
-
+    try { await transferCart() } catch {}
     return createdCustomer
   } catch (error: any) {
     const status = error?.status ?? error?.response?.status
@@ -206,9 +251,7 @@ export async function signup(_currentState: unknown, formData: FormData) {
     if (stage === "account registration" && (status === 409 || /already|exist|duplicate|forbidden/i.test(message))) {
       return "An account with this email already exists. Sign in instead."
     }
-    if (stage === "sign in") {
-      return "Your account was created, but we could not start your session. Please sign in to continue."
-    }
+    if (stage === "sign in") return "Your account was created, but we could not start your session. Please sign in to continue."
     return error?.toString?.() ?? "We could not create your account. Please try again."
   }
 }
@@ -218,34 +261,35 @@ export async function login(_currentState: unknown, formData: FormData) {
   const password = formData.get("password") as string
   const countryCode = (formData.get("countryCode") as string) || "ng"
 
+  // Try Neon first — instant even if PandaStack is 521
   try {
-    const customerToken = await loginWithEmailPassword(
-      "customer",
-      email,
-      password
-    )
+    const h = await nextHeaders()
+    const res = await auth.api.signInEmail({ body: { email, password } as any, headers: h as any })
+    if ((res as any)?.user) {
+      const customerCacheTag = await getCacheTag("customers")
+      revalidateTagSafely(customerCacheTag)
+      try { await transferCart() } catch {}
+      // Fire-and-forget Medusa token for commerce ops when backend wakes
+      loginWithEmailPassword("customer", email, password).then(t=>setAuthToken(t as string)).catch(()=>{})
+      return
+    }
+  } catch {
+    // fall through to Medusa
+  }
+
+  try {
+    const customerToken = await loginWithEmailPassword("customer", email, password)
     await setAuthToken(customerToken as string)
-    // Some legacy seller identities can authenticate through the customer
-    // provider but do not have a customer record. Treat those as seller
-    // sessions so the single sign-in form still reaches Manage Business.
-    // A valid auth token is sufficient to establish the session. Profile
-    // hydration runs separately and must not turn a successful sign-in into
-    // a false "Forbidden" result when a store-key header is unavailable.
     try {
       await sdk.client.fetch("/store/customers/me", {
         method: "GET",
         headers: { authorization: `Bearer ${customerToken as string}` },
         cache: "no-store",
       })
-    } catch {
-      // Keep the session; the account page will retry profile hydration.
-    }
+    } catch {}
     const customerCacheTag = await getCacheTag("customers")
     revalidateTagSafely(customerCacheTag)
   } catch (customerError: any) {
-    // Existing stores created before unified accounts used the seller actor.
-    // Keep those accounts reachable through the one public sign-in form while
-    // all new upgrades continue using the customer session.
     let sellerToken: unknown
     try {
       sellerToken = await loginWithEmailPassword("seller", email, password)
@@ -255,26 +299,21 @@ export async function login(_currentState: unknown, formData: FormData) {
     await setSellerAuthToken(sellerToken as string)
     redirect(`/${countryCode}/seller`)
   }
-
-  try {
-    await transferCart()
-  } catch {
-    // A stale or unavailable guest cart must not make sign-in look failed.
-  }
+  try { await transferCart() } catch {}
 }
 
 export async function signout(countryCode: string) {
+  try {
+    const h = await nextHeaders()
+    await auth.api.signOut({ headers: h as any })
+  } catch {}
   await removeAuthToken()
   await removeSellerAuthToken()
-
   const customerCacheTag = await getCacheTag("customers")
   revalidateTagSafely(customerCacheTag)
-
   await removeCartId()
-
   const cartCacheTag = await getCacheTag("carts")
   revalidateTagSafely(cartCacheTag)
-
   redirect(`/${countryCode}/account`)
 }
 
