@@ -47,13 +47,14 @@ function getClient(config: NonNullable<ReturnType<typeof mediaConfig>>) {
 // B2 bucket stays private (no credit-card public switch). SigV4 presigned URLs
 // embed the signing date, so signing per request would churn the URL every
 // call and defeat CDN caching — every image view would wake the API. Instead
-// each key is signed ONCE with a 30-day lifetime and the exact URL is memoized
-// until 3 days before expiry. Browsers and Vercel's image CDN cache the same
-// URL for a month, so the backend is needed only once per image per month
-// even on a free-tier host that sleeps. Invalidation is via metadata edit /
-// delete / state change which generates a new key and thus a new signed URL.
-const MEDIA_URL_TTL_SECONDS = 30 * 24 * 60 * 60
-const MEDIA_URL_REFRESH_BEFORE = 3 * 24 * 60 * 60
+// each key is signed ONCE with a 7-day lifetime (the SigV4 maximum — larger
+// values make getSignedUrl THROW) and the exact URL is memoized until a day
+// before expiry. Browsers and Vercel's image CDN cache the same URL for days,
+// so the backend signs each image at most once per week even on a free-tier
+// host that sleeps. Invalidation is via metadata edit / delete / state change
+// which generates a new key and thus a new signed URL.
+const MEDIA_URL_TTL_SECONDS = 7 * 24 * 60 * 60
+const MEDIA_URL_REFRESH_BEFORE = 24 * 60 * 60
 
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>()
 

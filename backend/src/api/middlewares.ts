@@ -122,10 +122,10 @@ const MEDIA_REDIRECT: MedusaRequestHandler = async (req, res, next) => {
     return
   }
 
-  // The signed URL is stable for 30 days (memoized per key, refreshed 3d
-  // before expiry), so the redirect itself is cacheable for a month.
-  // B2 stays private — no public bucket needed.
-  res.setHeader("Cache-Control", "public, max-age=2592000, stale-while-revalidate=259200, immutable")
+  // The signed URL is stable for ~7 days (memoized per key, refreshed 1d
+  // before expiry — 7d is the SigV4 presign maximum). Cache the redirect well
+  // inside the URL lifetime; B2 stays private — no public bucket needed.
+  res.setHeader("Cache-Control", "public, max-age=259200, stale-while-revalidate=86400, immutable")
   res.redirect(302, signedUrl)
 }
 // Escrow-status polls are per-order ownership reads (email-gated); throttle by
