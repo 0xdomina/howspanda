@@ -1,5 +1,3 @@
-"use server"
-
 import { MEDUSA_BACKEND_URL } from "@lib/config"
 
 // Product media created before the Render migration stores absolute
