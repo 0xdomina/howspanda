@@ -20,23 +20,48 @@ export async function GET() {
   // Free-tier backend (0.1 CPU + cold Postgres) can take 10s+ for priced
   // queries on wake. SWR cache (s-maxage=120) means one slow success feeds
   // minutes of instant homepages; the WarmAgent retries every 20s anyway.
-  const controller = new AbortController()
-  const t = setTimeout(() => controller.abort(), 15000)
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    ...(process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+      ? { "x-publishable-api-key": process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }
+      : {}),
+  }
 
   try {
-    const r = await fetch(
-      `${BACKEND_URL}/store/products?limit=24&fields=*variants.calculated_price,*images,thumbnail,handle,title,metadata`,
-      {
-        headers: {
-          accept: "application/json",
-          ...(process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-            ? { "x-publishable-api-key": process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY }
-            : {}),
-        },
+    // Priced fields require a region_id — resolve the default region first.
+    const regionCtrl = new AbortController()
+    const regionTimer = setTimeout(() => regionCtrl.abort(), 5000)
+    let regionId = ""
+    try {
+      const rr = await fetch(`${BACKEND_URL}/store/regions`, {
+        headers,
         cache: "no-store",
-        signal: controller.signal,
-      }
-    )
+        signal: regionCtrl.signal,
+      })
+      const rj = (await rr.json().catch(() => null)) as {
+        regions?: { id: string }[]
+      } | null
+      regionId = rj?.regions?.[0]?.id ?? ""
+    } finally {
+      clearTimeout(regionTimer)
+    }
+    if (!regionId) throw new Error("no region")
+
+    const controller = new AbortController()
+    const t = setTimeout(() => controller.abort(), 15000)
+    let r: Response
+    try {
+      r = await fetch(
+        `${BACKEND_URL}/store/products?limit=24&region_id=${encodeURIComponent(regionId)}&fields=*variants.calculated_price,*images,thumbnail,handle,title,metadata`,
+        {
+          headers,
+          cache: "no-store",
+          signal: controller.signal,
+        }
+      )
+    } finally {
+      clearTimeout(t)
+    }
     if (!r.ok) throw new Error(`backend ${r.status}`)
     const data = await r.json()
     const products = Array.isArray(data?.products) ? data.products : []
@@ -49,7 +74,7 @@ export async function GET() {
       }
     )
   } catch {
-    // Backend sleeping / 521 - return empty but cacheable; client will paint
+    // Backend sleeping / error - return empty but cacheable; client will paint
     // from localStorage snapshot (catalog-snapshot) and WarmAgent will retry.
     // We do not error - homepage must never 500.
     return NextResponse.json(
@@ -62,7 +87,5 @@ export async function GET() {
         },
       }
     )
-  } finally {
-    clearTimeout(t)
   }
 }
