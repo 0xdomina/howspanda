@@ -4,10 +4,15 @@ import Medusa, { FetchArgs, FetchInput } from "@medusajs/js-sdk"
 // The browser bundle cannot read server-only env vars. Keep the public URL
 // explicit for client-side auth/store requests, while retaining the private
 // server-side name for server actions and local development.
-let MEDUSA_BACKEND_URL =
+let MEDUSA_BACKEND_URL = (
   process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL ||
   process.env.MEDUSA_BACKEND_URL ||
   "http://localhost:9000"
+)
+  .replace(/\r|\n/g, "")
+  .trim()
+  .replace(/^['"]|['"]$/g, "")
+  .replace(/\/$/, "")
 
 export { MEDUSA_BACKEND_URL }
 
