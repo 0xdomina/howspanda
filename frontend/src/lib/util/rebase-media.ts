@@ -1,9 +1,12 @@
 import { MEDUSA_BACKEND_URL } from "@lib/config"
 
 // Product media created before the Render migration stores absolute
-// PandaStack URLs (thumbnail + images). PandaStack is retired — rebase those
+// PandaStack URLs (thumbnail, images[].url, variants[].images[].url,
+// metadata.homepage_banner_image, ...). PandaStack is retired — rebase those
 // origins onto the live backend so the /media proxy (same code, same B2 keys)
 // keeps serving them. B2 presigned URLs and all other hosts pass through.
+//
+// Deep-walk: new media fields must keep working without code changes here.
 const LEGACY_MEDIA_HOSTS = [
   "https://hows-u-api-final.pandastack.app",
   "http://hows-u-api-final.pandastack.app",
@@ -23,18 +26,25 @@ export const rebaseMediaUrl = (
   return url
 }
 
-export const rebaseProductMedia = <T extends { thumbnail?: string | null; images?: { url: string }[] | null }>(
-  product: T
-): T => {
+const rebaseDeep = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    for (const host of LEGACY_MEDIA_HOSTS) {
+      if (value.startsWith(host + "/")) {
+        return MEDUSA_BACKEND_URL + value.slice(host.length)
+      }
+    }
+    return value
+  }
+  if (Array.isArray(value)) return value.map(rebaseDeep)
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) out[k] = rebaseDeep(v)
+    return out
+  }
+  return value
+}
+
+export const rebaseProductMedia = <T>(product: T): T => {
   if (!product || typeof product !== "object") return product
-  const next = { ...product } as T
-  if (typeof next.thumbnail === "string") {
-    next.thumbnail = rebaseMediaUrl(next.thumbnail) as T["thumbnail"]
-  }
-  if (Array.isArray(next.images)) {
-    next.images = next.images.map((img) =>
-      img && typeof img.url === "string" ? { ...img, url: rebaseMediaUrl(img.url) ?? img.url } : img
-    )
-  }
-  return next
+  return rebaseDeep(product) as T
 }
