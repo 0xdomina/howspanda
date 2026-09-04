@@ -31,6 +31,9 @@ export async function GET() {
     // Priced fields require a region_id — resolve the default region first.
     const regionCtrl = new AbortController()
     const regionTimer = setTimeout(() => regionCtrl.abort(), 5000)
+    // Prices are per-region (NG region carries the NGN prices; the EU region
+    // has none). Prefer the storefront default country, else first region.
+    const defaultCountry = (process.env.NEXT_PUBLIC_DEFAULT_REGION || "ng").toLowerCase()
     let regionId = ""
     try {
       const rr = await fetch(`${BACKEND_URL}/store/regions`, {
@@ -39,9 +42,13 @@ export async function GET() {
         signal: regionCtrl.signal,
       })
       const rj = (await rr.json().catch(() => null)) as {
-        regions?: { id: string }[]
+        regions?: { id: string; countries?: { iso_2?: string }[] }[]
       } | null
-      regionId = rj?.regions?.[0]?.id ?? ""
+      const regions = rj?.regions ?? []
+      regionId =
+        regions.find((r) =>
+          (r.countries ?? []).some((c) => (c.iso_2 ?? "").toLowerCase() === defaultCountry)
+        )?.id ?? regions[0]?.id ?? ""
     } finally {
       clearTimeout(regionTimer)
     }
@@ -64,7 +71,21 @@ export async function GET() {
     }
     if (!r.ok) throw new Error(`backend ${r.status}`)
     const data = await r.json()
-    const products = Array.isArray(data?.products) ? data.products : []
+    // Rebase pre-Render absolute PandaStack media URLs to the live backend.
+    const raw = Array.isArray(data?.products) ? data.products : []
+    const products = raw.map((p: any) => {
+      if (p && typeof p.thumbnail === "string") {
+        for (const host of [
+          "https://hows-u-api-final.pandastack.app",
+          "https://hows-u-api.pandastack.app",
+        ]) {
+          if (p.thumbnail.startsWith(host + "/")) {
+            return { ...p, thumbnail: BACKEND_URL + p.thumbnail.slice(host.length) }
+          }
+        }
+      }
+      return p
+    })
     return NextResponse.json(
       { products, count: products.length, source: "live" },
       {

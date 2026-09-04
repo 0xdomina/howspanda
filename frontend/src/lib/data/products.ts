@@ -1,6 +1,7 @@
 "use server"
 
 import { sdk } from "@lib/config"
+import { rebaseProductMedia } from "@lib/util/rebase-media"
 import { sortProducts } from "@lib/util/sort-products"
 import { HttpTypes } from "@medusajs/types"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
@@ -95,7 +96,9 @@ export const listProducts = async ({
 
           return {
             response: {
-              products,
+              // Pre-Render products store absolute PandaStack media URLs.
+              // Rebase to the live backend so images keep resolving.
+              products: (products ?? []).map(rebaseProductMedia),
               count,
             },
             nextPage,
