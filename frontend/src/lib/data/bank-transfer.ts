@@ -89,17 +89,21 @@ const PROOF_EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
 }
 
-// Uploads the proof screenshot directly to the private B2 bucket from Vercel's
-// presigned upload route. The returned `private://` URI only becomes meaningful
-// once bound to an order by submitBankProof.
-export const uploadBankProofImage = async (
-  file: File
-): Promise<{ url?: string; error?: string }> => {
-  if (file.size > IMAGE_MAX_BYTES) {
+// Phased proof upload so the UI can show REAL byte progress: the browser PUTs
+// straight to B2 with XMLHttpRequest (fetch has no upload-progress events).
+// 1. prepareProofUpload → { key, uploadUrl } (server action, validated)
+// 2. client XHR PUTs the file to uploadUrl with onprogress
+// 3. completeProofUpload({ key, size, mime }) → { url: "private://..." }
+// The returned `private://` URI only becomes meaningful once bound to an
+// order by submitBankProof.
+export const prepareProofUpload = async (
+  mime: string,
+  size: number
+): Promise<{ key: string; uploadUrl: string } | { error: string }> => {
+  if (size > IMAGE_MAX_BYTES) {
     return { error: "File too large — max 10MB" }
   }
-  const ext = PROOF_EXTENSIONS[file.type]
-  if (!ext) {
+  if (!PROOF_EXTENSIONS[mime]) {
     return { error: "Only PNG, JPEG, and WebP images are accepted." }
   }
   try {
@@ -108,23 +112,31 @@ export const uploadBankProofImage = async (
       uploadUrl: string
     }>("/store/proof-upload/prepare", {
       method: "POST",
-      body: { mime: file.type, size: file.size },
+      body: { mime, size },
     })
-    const uploaded = await fetch(prepared.uploadUrl, {
-      method: "PUT",
-      headers: { "content-type": file.type },
-      body: await file.arrayBuffer(),
-    })
-    if (!uploaded.ok) return { error: "Proof upload failed. Please try again." }
-    const completed = await sdk.client.fetch<{ url?: string }>(
-      "/store/proof-upload/complete",
-      {
-        method: "POST",
-        body: { key: prepared.key, size: file.size, mime: file.type },
-      }
-    )
-    return completed.url ? { url: completed.url } : { error: "Proof upload could not be verified." }
+    if (!prepared?.key || !prepared?.uploadUrl) {
+      return { error: "Upload could not start. Please try again." }
+    }
+    return prepared
   } catch (error: any) {
     return { error: error?.message ?? "Upload failed." }
+  }
+}
+
+export const completeProofUpload = async (input: {
+  key: string
+  size: number
+  mime: string
+}): Promise<{ url?: string; error?: string }> => {
+  try {
+    const completed = await sdk.client.fetch<{ url?: string }>(
+      "/store/proof-upload/complete",
+      { method: "POST", body: input }
+    )
+    return completed.url
+      ? { url: completed.url }
+      : { error: "Proof upload could not be verified." }
+  } catch (error: any) {
+    return { error: error?.message ?? "Upload verification failed." }
   }
 }

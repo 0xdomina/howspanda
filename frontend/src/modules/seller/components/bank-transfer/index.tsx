@@ -12,6 +12,13 @@ const STATUS_LABEL: Record<string, string> = {
   expired: "Recheck window closed — order cancelled",
 }
 
+const REJECT_TEMPLATES = [
+  "Wrong amount — please check the exact total and re-upload.",
+  "Reference not found in the narration — include it and re-upload.",
+  "Screenshot is unclear — please upload a clearer one.",
+  "Transfer hasn't arrived yet — it may still land before the window closes.",
+]
+
 const SellerBankTransfer = ({
   order,
   backendUrl = "",
@@ -135,6 +142,25 @@ const SellerBankTransfer = ({
 
         {(bt.status === "rejected" || rejecting) && (
           <div className="flex flex-col gap-y-2">
+            <div className="flex flex-wrap gap-1.5" aria-label="Quick rejection notes">
+              {REJECT_TEMPLATES.map((template) => (
+                <button
+                  key={template}
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => setRejectNote(template)}
+                  className={
+                    "rounded-full border px-2.5 py-1 text-xs transition active:scale-[0.97] disabled:opacity-50 " +
+                    (rejectNote === template
+                      ? "border-ink bg-ink font-medium text-white"
+                      : "border-ink-hairline bg-white text-ink-muted hover:border-ink hover:text-ink")
+                  }
+                  data-testid="reject-note-template"
+                >
+                  {template.split("—")[0].split("-")[0].trim()}
+                </button>
+              ))}
+            </div>
             <textarea
               value={rejectNote}
               onChange={(e) => setRejectNote(e.target.value)}
