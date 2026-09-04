@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { drizzle } from "drizzle-orm/neon-http"
 import { neon } from "@neondatabase/serverless"
+import { authSchema } from "./auth-schema"
 
 // Neon serverless - works on Vercel Edge/Node, branches with DB
 const sql = neon(process.env.DATABASE_URL!)
@@ -10,6 +11,7 @@ export const db = drizzle(sql)
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
+    schema: authSchema,
   }),
   emailAndPassword: {
     enabled: true,

@@ -134,7 +134,15 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
               <LocalizedClientLink href="/store" className="figma-button hidden small:inline-flex">View All</LocalizedClientLink>
             </div>
             <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-12 small:grid-cols-4 small:gap-x-7">
-              {explore.map((p) => <ProductPreview key={p.id} product={p} region={region!} />)}
+              {explore.map((p, i) => (
+                <div
+                  key={p.id}
+                  className="card-enter"
+                  style={{ animationDelay: `${Math.min(i, 7) * 45}ms` }}
+                >
+                  <ProductPreview product={p} region={region!} />
+                </div>
+              ))}
             </div>
             <div className="mt-10 text-center small:hidden"><LocalizedClientLink href="/store" className="figma-button">View All</LocalizedClientLink></div>
           </section>

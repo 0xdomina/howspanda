@@ -18,10 +18,17 @@ export default async function ProductPreview({
   const { cheapestPrice } = getProductPrice({
     product,
   })
+  const metadata = (product.metadata ?? {}) as Record<string, unknown>
+  const isFlash = metadata.flash_sale === true
 
   return (
     <div className="group card-lift rounded-control p-1">
-      <div data-testid="product-wrapper" className="rounded-control">
+      <div data-testid="product-wrapper" className="relative rounded-control">
+        {isFlash && (
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+            ⚡ Flash
+          </span>
+        )}
         <LocalizedClientLink
           href={`/products/${product.handle}`}
           className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4"

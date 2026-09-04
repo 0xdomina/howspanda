@@ -1,6 +1,7 @@
 import { retrieveCheckoutCart } from "@lib/data/cart"
 import { getCartId, getCheckoutCartId } from "@lib/data/cookies"
 import { retrieveCustomer } from "@lib/data/customer"
+import CheckoutProgress from "@modules/checkout/components/checkout-progress"
 import PaymentWrapper from "@modules/checkout/components/payment-wrapper"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
 import CheckoutSummary from "@modules/checkout/templates/checkout-summary"
@@ -127,11 +128,14 @@ export default async function Checkout({ searchParams }: CheckoutProps) {
   }
 
   return (
-    <div className="figma-container grid grid-cols-1 gap-8 py-10 small:grid-cols-[1fr_380px] small:gap-12">
-      <PaymentWrapper cart={cart}>
-        <CheckoutForm cart={cart} customer={customer} />
-      </PaymentWrapper>
-      <CheckoutSummary cart={cart} />
+    <div className="figma-container py-10">
+      <CheckoutProgress cart={cart} />
+      <div className="grid grid-cols-1 gap-8 small:grid-cols-[1fr_380px] small:gap-12">
+        <PaymentWrapper cart={cart}>
+          <CheckoutForm cart={cart} customer={customer} />
+        </PaymentWrapper>
+        <CheckoutSummary cart={cart} />
+      </div>
     </div>
   )
 }

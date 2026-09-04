@@ -6,6 +6,8 @@ import {
   listSellerProducts,
   retrieveSellerBalance,
   retrieveSellerTrustScore,
+  listPayoutAccounts,
+  listSellerOrders,
 } from "@lib/data/seller"
 import Button from "@modules/common/components/button"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
@@ -91,10 +93,37 @@ export default async function SellerDashboardPage() {
   const seller = await retrieveSeller().catch(() => null)
   const products = (await listSellerProducts().catch(() => [])) || []
   const balance = (await retrieveSellerBalance().catch(() => null)) as any
+  const payoutAccounts = (await listPayoutAccounts().catch(() => [])) || []
+  const orders = (await listSellerOrders().catch(() => [])) || []
 
   if (!seller) {
     notFound()
   }
+
+  const checklist = [
+    {
+      done: payoutAccounts.length > 0,
+      title: "Add a payout account",
+      body: "Bank or crypto — this is where your sales land.",
+      href: "/seller/money",
+      cta: "Set up payouts",
+    },
+    {
+      done: products.length > 0,
+      title: "List your first product",
+      body: "A photo, a price, a short description — you're live.",
+      href: "/seller/products/new",
+      cta: "Add a product",
+    },
+    {
+      done: orders.length > 0,
+      title: "Get your first order",
+      body: "Share your store link to bring your first buyers.",
+      href: "/seller/orders",
+      cta: "View orders",
+    },
+  ]
+  const doneCount = checklist.filter((c) => c.done).length
 
   const ngn = balance?.balances?.ngn
   const available = Number(ngn?.available ?? 0)
@@ -104,6 +133,62 @@ export default async function SellerDashboardPage() {
 
   return (
     <div data-testid="seller-dashboard-page">
+      {doneCount < checklist.length && (
+        <div className="figma-surface mb-8 p-5" data-testid="seller-checklist">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="font-display text-xl font-medium text-ink">
+              Get your store ready
+            </h2>
+            <span className="text-xs font-medium text-ink-muted">
+              {doneCount} of {checklist.length} done
+            </span>
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/5">
+            <div
+              className="h-full rounded-full bg-emerald-600 transition-[width] duration-300"
+              style={{ width: `${(doneCount / checklist.length) * 100}%` }}
+              role="progressbar"
+              aria-valuenow={doneCount}
+              aria-valuemin={0}
+              aria-valuemax={checklist.length}
+              aria-label="Store setup progress"
+            />
+          </div>
+          <ul className="mt-4 flex flex-col gap-y-3">
+            {checklist.map((item) => (
+              <li
+                key={item.title}
+                className="flex items-center justify-between gap-3"
+              >
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span
+                    className={
+                      "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold " +
+                      (item.done
+                        ? "bg-emerald-600 text-white"
+                        : "bg-ink/10 text-ink-muted")
+                    }
+                    aria-label={item.done ? "Done" : "To do"}
+                  >
+                    {item.done ? "✓" : "·"}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink">{item.title}</p>
+                    <p className="text-xs text-ink-muted">{item.body}</p>
+                  </div>
+                </div>
+                {!item.done && (
+                  <Button asChild size="small" className="shrink-0">
+                    <LocalizedClientLink href={item.href}>
+                      {item.cta}
+                    </LocalizedClientLink>
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="mb-8 grid grid-cols-1 gap-4 small:grid-cols-2">
         {canViewMoney && <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Available balance</p>

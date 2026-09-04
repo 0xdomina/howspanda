@@ -16,38 +16,56 @@ export default function PromoBannerCarousel({
   countryCode: string
 }) {
   const [active, setActive] = useState(0)
+  const [paused, setPaused] = useState(false)
   const slides = products.slice(0, 5)
 
   useEffect(() => {
-    if (slides.length <= 1) return
+    if (slides.length <= 1 || paused) return
     const timer = window.setInterval(() => {
       setActive((current) => (current + 1) % slides.length)
     }, 5000)
     return () => window.clearInterval(timer)
-  }, [slides.length])
+  }, [slides.length, paused])
 
   if (!slides.length) return null
 
   const product = slides[active] ?? slides[0]
-  const bannerImage =
-    typeof product.metadata?.homepage_banner_image === "string"
-      ? product.metadata.homepage_banner_image
-      : product.thumbnail
+  const bannerImageOf = (p: HttpTypes.StoreProduct) =>
+    typeof p.metadata?.homepage_banner_image === "string"
+      ? (p.metadata.homepage_banner_image as string)
+      : p.thumbnail
+  const bannerImage = bannerImageOf(product)
 
   return (
     <section className="figma-container pt-8 small:pt-12" aria-label="Featured products">
-      <div className="relative min-h-[360px] overflow-hidden rounded-[28px] bg-ink text-paper shadow-float small:min-h-[430px]">
-        {bannerImage && (
-          <Image
-            key={product.id}
-            src={bannerImage}
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 768px) 100vw, 1200px"
-            className="object-cover object-center opacity-75 transition-opacity duration-200"
-          />
-        )}
+      <div
+        className="relative min-h-[360px] overflow-hidden rounded-[28px] bg-ink text-paper shadow-float small:min-h-[430px]"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onFocus={() => setPaused(true)}
+        onBlur={() => setPaused(false)}
+      >
+        {slides.map((slide, index) => {
+          const src = bannerImageOf(slide)
+          if (!src) return null
+          return (
+            <Image
+              key={slide.id}
+              src={src}
+              alt={slide.title}
+              fill
+              priority={index === 0}
+              loading={index === 0 ? undefined : "lazy"}
+              fetchPriority={index === 0 ? "high" : "low"}
+              sizes="(max-width: 768px) 100vw, 1200px"
+              aria-hidden={index === active ? undefined : true}
+              className={
+                "object-cover object-center transition-opacity duration-700 " +
+                (index === active ? "opacity-75" : "opacity-0")
+              }
+            />
+          )
+        })}
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />
         <div className="relative flex min-h-[360px] flex-col justify-between p-7 small:min-h-[430px] small:p-12">
           <div className="flex items-center justify-between gap-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
