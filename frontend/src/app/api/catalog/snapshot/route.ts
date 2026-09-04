@@ -17,8 +17,11 @@ const BACKEND_URL = (
 // for 30 days on Vercel image CDN + browser.
 
 export async function GET() {
+  // Free-tier backend (0.1 CPU + cold Postgres) can take 10s+ for priced
+  // queries on wake. SWR cache (s-maxage=120) means one slow success feeds
+  // minutes of instant homepages; the WarmAgent retries every 20s anyway.
   const controller = new AbortController()
-  const t = setTimeout(() => controller.abort(), 4000)
+  const t = setTimeout(() => controller.abort(), 15000)
 
   try {
     const r = await fetch(
