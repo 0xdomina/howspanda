@@ -43,17 +43,28 @@ export async function POST(request: NextRequest) {
       signal: AbortSignal.timeout(12000),
     })
 
+  const waking = () =>
+    NextResponse.json(
+      { message: "Sign-in is waking up. Please try again in a moment." },
+      { status: 503 }
+    )
+
   try {
     upstream = await attempt(actor)
     result = ((await upstream.json().catch(() => null)) as typeof result) || {}
+
+    // Backend asleep: its 503-warming JSON is not an auth refusal. Report
+    // 503 so the form retries instead of showing "incorrect password".
+    if (upstream.status === 503) return waking()
 
     if (!upstream.ok) {
       actor = "seller"
       upstream = await attempt(actor)
       result = ((await upstream.json().catch(() => null)) as typeof result) || {}
+      if (upstream.status === 503) return waking()
     }
   } catch {
-    return NextResponse.json({ message: "Sign-in is waking up. Please try again in a moment." }, { status: 503 })
+    return waking()
   }
 
   // A 429 here is the brute-force throttle (20 tries / 15 min per email),
