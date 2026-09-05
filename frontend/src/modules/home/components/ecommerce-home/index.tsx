@@ -6,6 +6,7 @@ import FlashSaleCountdown from "@modules/home/components/flash-sale-countdown"
 import CatalogRetry from "@modules/home/components/catalog-retry"
 import CatalogSnapshot from "@modules/home/components/catalog-snapshot"
 import OnboardingJourney from "@modules/home/components/onboarding-journey"
+import { hasAnySession } from "@lib/data/cookies"
 import { getRegion } from "@lib/data/regions"
 import { listProductsWithSort } from "@lib/data/products"
 import { retrieveCustomer } from "@lib/data/customer"
@@ -33,9 +34,12 @@ const EmptySlate = ({ message }: { message: string }) => (
 )
 
 export default async function EcommerceHome({ countryCode }: { countryCode: string }) {
-  const [region, customer] = await Promise.all([
+  const [region, customer, signedIn] = await Promise.all([
     getRegion(countryCode),
     retrieveCustomer(),
+    // Cookie-only: the starter guide is for guests. Signed-in visitors are
+    // past onboarding and should never see it again.
+    hasAnySession(),
   ])
   let products: HttpTypes.StoreProduct[] = []
 
@@ -98,7 +102,7 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
             {customer ? (
-              <LocalizedClientLink href="/account" className="figma-button">Open your account</LocalizedClientLink>
+              <LocalizedClientLink href="/account" className="inline-flex items-center justify-center rounded-full border border-ink-hairline bg-white/60 px-5 py-3 text-sm font-medium text-ink transition duration-200 hover:-translate-y-0.5 hover:bg-ink hover:text-white active:scale-[0.98]">Your account →</LocalizedClientLink>
             ) : (
               <>
                 <LocalizedClientLink href="/account?mode=login" className="inline-flex items-center justify-center rounded-control border border-ink-hairline bg-white/60 px-5 py-3 text-sm font-medium text-ink transition duration-200 hover:-translate-y-0.5 hover:bg-white active:scale-[0.98]">Log in</LocalizedClientLink>
@@ -108,7 +112,7 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
           </div>
         </div>
       </section>
-      <OnboardingJourney />
+      {!signedIn && <OnboardingJourney />}
       {hasProducts ? (
         <>
           <PromoBannerCarousel products={banners} countryCode={countryCode} />

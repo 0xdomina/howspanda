@@ -6,10 +6,11 @@ import ProfileEmail from "@modules/account/components/profile-email"
 import ProfileName from "@modules/account/components/profile-name"
 import ProfilePassword from "@modules/account/components/profile-password"
 import { ProfileIdentityVerification } from "@modules/account/components/verification"
+import AddressBook from "@modules/account/components/address-book"
+import AccountWarmup from "@modules/account/components/account-warmup"
 
-import { notFound } from "next/navigation"
-import { listRegions } from "@lib/data/regions"
-import { retrieveCustomer } from "@lib/data/customer"
+import { getRegion, listRegions } from "@lib/data/regions"
+import { requireAccountCustomer } from "@lib/data/account-guard"
 import { retrieveMyKyc } from "@lib/data/kyc-server"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
@@ -18,19 +19,24 @@ export const metadata: Metadata = {
   description: "View and edit your How's u profile.",
 }
 
-export default async function Profile() {
-  const customer = await retrieveCustomer()
+export default async function Profile(props: {
+  params: Promise<{ countryCode: string }>
+}) {
+  const params = await props.params
+  const { countryCode } = params
+  const { customer } = await requireAccountCustomer()
   if (!customer) {
-    notFound()
+    return <AccountWarmup title="Waking up your profile" />
   }
 
-  const [regions, kyc] = await Promise.all([
+  const [regions, region, kyc] = await Promise.all([
     listRegions(),
+    getRegion(countryCode),
     retrieveMyKyc(customer.email, customer.phone).catch(() => null),
   ])
 
-  if (!regions) {
-    notFound()
+  if (!regions || !region) {
+    return <AccountWarmup title="Waking up your profile" />
   }
 
   return (
@@ -62,6 +68,16 @@ export default async function Profile() {
         {/* <ProfilePassword customer={customer} />
         <Divider /> */}
         <ProfileBillingAddress customer={customer} regions={regions} />
+        <Divider />
+        <div id="shipping-addresses">
+          <h2 className="text-xl-semi">Shipping addresses</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Saved addresses appear automatically at checkout.
+          </p>
+          <div className="mt-4">
+            <AddressBook customer={customer} region={region} />
+          </div>
+        </div>
       </div>
     </div>
   )

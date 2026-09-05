@@ -10,6 +10,7 @@ import { retrieveFeatures } from "@lib/data/kyc"
 import { StoreRegion } from "@medusajs/types"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import CartButton from "@modules/layout/components/cart-button"
+import NotificationBell from "@modules/layout/components/notification-bell"
 import SideMenu from "@modules/layout/components/side-menu"
 import SearchForm from "@modules/layout/components/search-form"
 import WishlistLink from "@modules/wishlist/components/wishlist-link"
@@ -49,7 +50,7 @@ export default async function Nav() {
           </div>
           <div className="flex items-center gap-4">
             <SearchForm />
-            <LocalizedClientLink href="/account" aria-label="Account" className="hidden h-8 w-8 items-center justify-center rounded-full border border-ink-hairline text-lg small:flex">♙</LocalizedClientLink>
+            <NotificationBell />
             <WishlistLink />
             <Suspense fallback={<LocalizedClientLink href="/cart" aria-label="Cart" className="grid h-8 w-8 place-items-center rounded-full border border-ink-hairline">🛒</LocalizedClientLink>}>
               <CartButton />

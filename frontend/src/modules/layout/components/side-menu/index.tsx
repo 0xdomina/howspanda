@@ -126,7 +126,7 @@ const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false, isAut
               </div>
               <div className="flex flex-wrap gap-3">
                 {isAuthenticated ? (
-                  <LocalizedClientLink href="/account" onClick={closeMenu} className="figma-button px-5 py-3">Open account</LocalizedClientLink>
+                  <LocalizedClientLink href="/account" onClick={closeMenu} className="inline-flex items-center justify-center rounded-control border border-ink-hairline bg-white/60 px-5 py-3 font-medium text-ink">My account →</LocalizedClientLink>
                 ) : (
                   <>
                     <LocalizedClientLink href="/account?mode=login" onClick={closeMenu} className="inline-flex items-center justify-center rounded-control border border-ink-hairline bg-white/60 px-5 py-3 font-medium text-ink">Log in</LocalizedClientLink>

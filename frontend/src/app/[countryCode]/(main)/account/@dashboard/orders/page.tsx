@@ -1,8 +1,9 @@
 import { Metadata } from "next"
 
 import OrderOverview from "@modules/account/components/order-overview"
-import { notFound } from "next/navigation"
+import { requireAccountCustomer } from "@lib/data/account-guard"
 import { listOrders } from "@lib/data/orders"
+import AccountWarmup from "@modules/account/components/account-warmup"
 import Divider from "@modules/common/components/divider"
 import TransferRequestForm from "@modules/account/components/transfer-request-form"
 
@@ -12,11 +13,11 @@ export const metadata: Metadata = {
 }
 
 export default async function Orders() {
-  const orders = await listOrders()
-
-  if (!orders) {
-    notFound()
+  const { customer } = await requireAccountCustomer()
+  if (!customer) {
+    return <AccountWarmup title="Waking up your orders" />
   }
+  const orders = (await listOrders().catch(() => null)) ?? []
 
   return (
     <div className="w-full" data-testid="orders-page-wrapper">

@@ -6,6 +6,9 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 
 const STORAGE_KEY = "hows-u:onboarding:v1"
 
+// Radical simplicity: three plain-language steps, big tap targets, one
+// dismiss that sticks. Logged-in visitors never see this (they're past
+// onboarding) — the parent renders it for guests only.
 export default function OnboardingJourney() {
   const [visible, setVisible] = useState(false)
 
@@ -36,31 +39,28 @@ export default function OnboardingJourney() {
       <div className="soft-glass rounded-[24px] p-5 small:p-7">
         <div className="flex flex-col gap-5 small:flex-row small:items-center small:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">A quick start</p>
-            <h2 className="mt-2 font-display text-2xl font-semibold text-ink">Make the most of your first minute</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted">
-              Browse independent stores, save finds you love, and unlock more ways to participate whenever you’re ready.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">New here? Start here</p>
+            <h2 className="mt-2 font-display text-2xl font-semibold text-ink">Three taps and you&rsquo;re shopping</h2>
           </div>
           <button type="button" onClick={dismiss} className="shrink-0 self-start text-sm text-ink-muted underline decoration-ink/20 underline-offset-4 transition-colors duration-200 hover:text-ink small:self-center">
-            Skip for now
+            Got it, hide this
           </button>
         </div>
         <div className="mt-6 grid gap-3 small:grid-cols-3">
           <LocalizedClientLink href="/store" onClick={dismiss} className="rounded-control border border-ink-hairline bg-white/50 p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-white active:scale-[0.98]">
-            <span className="text-lg" aria-hidden="true">01</span>
-            <span className="mt-2 block text-sm font-semibold text-ink">Explore products</span>
-            <span className="mt-1 block text-xs leading-5 text-ink-muted">Find something that fits your day.</span>
+            <span className="text-lg" aria-hidden="true">1️⃣</span>
+            <span className="mt-2 block text-sm font-semibold text-ink">See things you like</span>
+            <span className="mt-1 block text-xs leading-5 text-ink-muted">Tap anything to look closer.</span>
           </LocalizedClientLink>
           <LocalizedClientLink href="/wishlist" onClick={dismiss} className="rounded-control border border-ink-hairline bg-white/50 p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-white active:scale-[0.98]">
-            <span className="text-lg" aria-hidden="true">02</span>
-            <span className="mt-2 block text-sm font-semibold text-ink">Save a favourite</span>
-            <span className="mt-1 block text-xs leading-5 text-ink-muted">Keep good finds close by.</span>
+            <span className="text-lg" aria-hidden="true">2️⃣</span>
+            <span className="mt-2 block text-sm font-semibold text-ink">Keep what you love</span>
+            <span className="mt-1 block text-xs leading-5 text-ink-muted">Tap ♡ so it waits for you.</span>
           </LocalizedClientLink>
-          <LocalizedClientLink href="/account" onClick={dismiss} className="rounded-control border border-ink-hairline bg-white/50 p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-white active:scale-[0.98]">
-            <span className="text-lg" aria-hidden="true">03</span>
-            <span className="mt-2 block text-sm font-semibold text-ink">Make it yours</span>
-            <span className="mt-1 block text-xs leading-5 text-ink-muted">Open a store or explore courier tools when ready.</span>
+          <LocalizedClientLink href="/account?mode=register" onClick={dismiss} className="rounded-control border border-brand/30 bg-brand/5 p-4 transition duration-200 hover:-translate-y-0.5 hover:bg-brand/10 active:scale-[0.98]">
+            <span className="text-lg" aria-hidden="true">3️⃣</span>
+            <span className="mt-2 block text-sm font-semibold text-ink">Join free to buy</span>
+            <span className="mt-1 block text-xs leading-5 text-ink-muted">One account to buy, sell &amp; deliver.</span>
           </LocalizedClientLink>
         </div>
       </div>

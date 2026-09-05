@@ -1,9 +1,9 @@
 import { Metadata } from "next"
 
-import { retrieveCustomer } from "@lib/data/customer"
+import { requireAccountCustomer } from "@lib/data/account-guard"
 import { getPaymentRails } from "@lib/data/payment-rails"
 import { getEnabledRailKeys } from "@lib/data/payment-rails-utils"
-import { notFound } from "next/navigation"
+import AccountWarmup from "@modules/account/components/account-warmup"
 
 import WalletClient from "@modules/account/components/wallet"
 import CryptoWallet from "@modules/account/components/wallet/crypto-wallet"
@@ -20,10 +20,10 @@ export const metadata: Metadata = {
 }
 
 export default async function WalletPage() {
-  const customer = await retrieveCustomer().catch(() => null)
+  const { customer } = await requireAccountCustomer()
 
   if (!customer?.email) {
-    notFound()
+    return <AccountWarmup title="Waking up your wallet" />
   }
 
   const [wallet, accounts, withdrawals, rails, cryptoWallet] = await Promise.all([
