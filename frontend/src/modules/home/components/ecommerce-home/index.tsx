@@ -41,9 +41,13 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
 
   if (region) {
     try {
+      // Homepage only renders ~20 products (flash 6 + best 6 + explore 8).
+      // Fetching 100 priced variants used to triple SSR time and the RSC
+      // payload on a sleepy backend. 48 keeps flash/banner selection correct
+      // for a beta-size catalog; revisit with cursor pagination at scale.
       const { response } = await listProductsWithSort({
         page: 1,
-        queryParams: { limit: 100 },
+        queryParams: { limit: 48 },
         sortBy: "created_at",
         countryCode,
         publicCache: true,
@@ -81,10 +85,15 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
   return (
     <div className="bg-white">
       <section className="figma-container pt-6 small:pt-8" aria-label="Welcome to How's U">
-        <div className="soft-glass flex flex-col gap-5 rounded-[24px] p-5 small:flex-row small:items-center small:justify-between small:p-7">
-          <div>
+        <div className="soft-glass relative flex flex-col gap-5 overflow-hidden rounded-[24px] p-5 small:flex-row small:items-center small:justify-between small:p-7">
+          <div
+            className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full opacity-30 blur-3xl"
+            style={{ background: "radial-gradient(circle, #e2483d 0%, transparent 70%)" }}
+            aria-hidden="true"
+          />
+          <div className="relative">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">How&rsquo;s U marketplace</p>
-            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink small:text-4xl">Find your next good thing.</h1>
+            <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink small:text-4xl">Find your next <span className="bg-gradient-to-r from-brand to-amber-500 bg-clip-text text-transparent">good thing</span>.</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-ink-muted">Shop from independent stores, keep your favourites close, and join in whenever you&rsquo;re ready.</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">

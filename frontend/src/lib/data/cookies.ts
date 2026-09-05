@@ -27,6 +27,24 @@ export const hasAuthToken = async (): Promise<boolean> => {
   }
 }
 
+// Session recognition that never touches the backend: true when ANY session
+// cookie exists (Medusa customer/seller JWT or Neon Better Auth session).
+// Used for UI state (nav CTAs) so a sleeping backend can't flip a signed-in
+// user back to logged-out. Data fetching still validates server-side.
+export const hasAnySession = async (): Promise<boolean> => {
+  try {
+    const cookies = await nextCookies()
+    return Boolean(
+      cookies.get("_medusa_jwt")?.value ||
+        cookies.get("_medusa_seller_jwt")?.value ||
+        cookies.get("better-auth.session_token")?.value ||
+        cookies.get("__Secure-better-auth.session_token")?.value
+    )
+  } catch {
+    return false
+  }
+}
+
 const CHECKOUT_CART_COOKIE = "_howsu_checkout_cart"
 
 export const getCacheTag = async (tag: string): Promise<string> => {

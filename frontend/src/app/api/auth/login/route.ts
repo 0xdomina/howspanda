@@ -26,23 +26,24 @@ export async function POST(request: NextRequest) {
   let upstream: Response
   let result: { token?: string; message?: string } = {}
 
-  try {
-    upstream = await fetch(`${BACKEND_URL}/auth/${actor}/emailpass`, {
+  // Bounded: an unbounded backend fetch turns a sleepy backend into a Vercel
+  // function timeout (504), which the form cannot distinguish from a refusal.
+  const attempt = (a: "customer" | "seller") =>
+    fetch(`${BACKEND_URL}/auth/${a}/emailpass`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email, password }),
       cache: "no-store",
+      signal: AbortSignal.timeout(12000),
     })
+
+  try {
+    upstream = await attempt(actor)
     result = ((await upstream.json().catch(() => null)) as typeof result) || {}
 
     if (!upstream.ok) {
       actor = "seller"
-      upstream = await fetch(`${BACKEND_URL}/auth/${actor}/emailpass`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        cache: "no-store",
-      })
+      upstream = await attempt(actor)
       result = ((await upstream.json().catch(() => null)) as typeof result) || {}
     }
   } catch {

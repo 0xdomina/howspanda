@@ -4,7 +4,7 @@ import Image from "next/image"
 import { listLocales } from "@lib/data/locales"
 import { getLocale } from "@lib/data/locale-actions"
 import { listRegions } from "@lib/data/regions"
-import { retrieveCustomer } from "@lib/data/customer"
+import { hasAnySession } from "@lib/data/cookies"
 import { retrieveSeller } from "@lib/data/seller"
 import { retrieveFeatures } from "@lib/data/kyc"
 import { StoreRegion } from "@medusajs/types"
@@ -15,14 +15,16 @@ import SearchForm from "@modules/layout/components/search-form"
 import WishlistLink from "@modules/wishlist/components/wishlist-link"
 
 export default async function Nav() {
-  const [regions, locales, currentLocale, customer, seller, features] = await Promise.all([
+  const [regions, locales, currentLocale, signedIn, seller, features] = await Promise.all([
     listRegions().then((items: StoreRegion[]) => items),
     listLocales(),
     getLocale(),
-    retrieveCustomer(),
+    // Session cookies only — never blocks on (or lies during) backend sleep.
+    hasAnySession(),
     retrieveSeller(),
     retrieveFeatures().catch(() => ({ malls: false, nin_verification: false, product_video: true })),
   ])
+  const customer = signedIn
 
   return (
     <div className="glass-nav sticky top-0 z-50">
@@ -41,10 +43,7 @@ export default async function Nav() {
             {customer ? (
               <LocalizedClientLink href="/account" className="hover:text-brand">Account</LocalizedClientLink>
             ) : (
-              <>
-                <LocalizedClientLink href="/account?mode=login" className="hover:text-brand">Log in</LocalizedClientLink>
-                <LocalizedClientLink href="/account?mode=register" className="rounded-full bg-brand px-4 py-2 font-medium text-white transition duration-200 hover:-translate-y-0.5 hover:bg-[#b92f2f] active:scale-[0.98]">Sign up</LocalizedClientLink>
-              </>
+              <LocalizedClientLink href="/account?mode=login" className="rounded-full border border-ink-hairline px-4 py-2 font-medium text-ink transition duration-200 hover:-translate-y-0.5 hover:bg-ink hover:text-white active:scale-[0.98]">Log in</LocalizedClientLink>
             )}
             {seller && <LocalizedClientLink href="/seller" className="hover:text-brand">Manage Business</LocalizedClientLink>}
           </div>

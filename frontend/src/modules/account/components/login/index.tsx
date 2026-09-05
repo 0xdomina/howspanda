@@ -59,14 +59,25 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
       const password = String(formData.get("password") || "")
 
       // Same-origin only — the browser never talks to MEDUSA_BACKEND_URL directly
-      // so split-infra CORS is never hit. Retry once for PandaStack warm-up.
+      // so split-infra CORS is never hit. Retry once for backend warm-up.
+      // Crucially: a timeout (backend asleep) must NEVER surface as
+      // "incorrect password". Only a definitive 401 means wrong credentials.
       let lastError: string | null = null
+      let sawWarming = false
+      let definitive401 = false
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        const sameOriginResponse = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        })
+        let sameOriginResponse: Response
+        try {
+          sameOriginResponse = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          })
+        } catch {
+          sawWarming = true
+          await new Promise((r) => setTimeout(r, 2500))
+          continue
+        }
         const sameOriginResult = (await sameOriginResponse.json().catch(() => null)) as {
           actor?: "customer" | "seller"
           message?: string
@@ -80,9 +91,11 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
         }
         lastError = sameOriginResult?.message ?? null
         if (sameOriginResponse.status === 503) {
+          sawWarming = true
           await new Promise((r) => setTimeout(r, 2500))
           continue
         }
+        if (sameOriginResponse.status === 401) definitive401 = true
         break
       }
       // Medusa lane failed (wrong credentials or backend asleep). Fall back to
@@ -98,7 +111,10 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
           return
         }
       } catch {
-        // fall through to the Medusa error message below
+        sawWarming = true
+      }
+      if (sawWarming && !definitive401) {
+        throw new Error("Sign-in is waking up. Please try again in a moment.")
       }
       throw new Error(lastError || "The email or password is incorrect.")
     } catch (error: any) {
