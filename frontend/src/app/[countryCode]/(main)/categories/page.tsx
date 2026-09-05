@@ -10,9 +10,31 @@ export const metadata: Metadata = {
   description: "Browse products by category on How’s U.",
 }
 
+const CURATED_CATEGORIES = [
+  { id: "fashion-women", name: "Women's Fashion", description: "Dresses, tops, shoes, bags & more.", href: "/store?q=fashion" },
+  { id: "fashion-men", name: "Men's Fashion", description: "Shirts, trousers, watches & more.", href: "/store?q=men" },
+  { id: "electronics", name: "Electronics", description: "Phones, computers, audio & cameras.", href: "/store?q=electronics" },
+  { id: "home", name: "Home & Lifestyle", description: "Furniture, kitchen, decor & appliances.", href: "/store?q=home" },
+  { id: "beauty", name: "Health & Beauty", description: "Skincare, haircare, makeup & grooming.", href: "/store?q=beauty" },
+  { id: "sports", name: "Sports & Outdoor", description: "Fitness, team sports & outdoor gear.", href: "/store?q=sports" },
+  { id: "baby", name: "Baby & Toys", description: "Baby clothing, toys & games.", href: "/store?q=toys" },
+  { id: "groceries", name: "Groceries & Pets", description: "Pantry, fresh food & pet care.", href: "/store?q=grocery" },
+  { id: "wellness", name: "Wellness", description: "First aid, wellness & personal care.", href: "/store?q=wellness" },
+]
+
 export default async function CategoriesPage() {
   const categories = await listCategories().catch(() => [])
-  const rootCategories = categories.filter((category) => !category.parent_category)
+  const backendCategories = categories.filter((category) => !category.parent_category)
+  // Backend category taxonomy is optional. When stores haven't set one up,
+  // show curated aisles that search the marketplace instead of a dead end.
+  const tiles = backendCategories.length
+    ? backendCategories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description ?? "",
+        href: `/categories/${c.handle}`,
+      }))
+    : CURATED_CATEGORIES
 
   return (
     <div className="figma-container py-10 small:py-16">
@@ -28,42 +50,27 @@ export default async function CategoriesPage() {
         </p>
       </div>
 
-      {rootCategories.length ? (
-        <div className="grid grid-cols-1 gap-3 small:grid-cols-2 medium:grid-cols-3">
-          {rootCategories.map((category) => (
-            <LocalizedClientLink
-              key={category.id}
-              href={`/categories/${category.handle}`}
-              className="group rounded-control border border-ink-hairline bg-white/70 p-5 shadow-sm backdrop-blur transition-colors hover:border-ink/30 hover:bg-white"
-            >
-              <span className="flex items-center justify-between gap-4 text-base font-medium text-ink">
-                {category.name}
-                <span aria-hidden className="text-ink-muted transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </span>
-              {category.description && (
-                <span className="mt-2 block text-sm text-ui-fg-subtle">
-                  {category.description}
-                </span>
-              )}
-            </LocalizedClientLink>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-control border border-ink-hairline bg-white/70 px-5 py-10 text-center shadow-sm backdrop-blur">
-          <p className="text-base font-medium text-ink">Categories are coming soon.</p>
-          <p className="mt-2 text-sm text-ui-fg-subtle">
-            Browse the marketplace to see what stores have available now.
-          </p>
+      <div className="grid grid-cols-1 gap-3 small:grid-cols-2 medium:grid-cols-3">
+        {tiles.map((category) => (
           <LocalizedClientLink
-            href="/store"
-            className="mt-5 inline-flex rounded-control bg-ink px-5 py-3 text-sm font-medium text-white transition-opacity hover:opacity-85"
+            key={category.id}
+            href={category.href}
+            className="group rounded-control border border-ink-hairline bg-white/70 p-5 shadow-sm backdrop-blur transition-colors hover:border-ink/30 hover:bg-white"
           >
-            Browse the marketplace
+            <span className="flex items-center justify-between gap-4 text-base font-medium text-ink">
+              {category.name}
+              <span aria-hidden className="text-ink-muted transition-transform group-hover:translate-x-1">
+                →
+              </span>
+            </span>
+            {category.description && (
+              <span className="mt-2 block text-sm text-ui-fg-subtle">
+                {category.description}
+              </span>
+            )}
           </LocalizedClientLink>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   )
 }

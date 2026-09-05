@@ -13,8 +13,38 @@ type OverviewProps = {
 
 const Overview = ({ customer, orders }: OverviewProps) => {
   const displayName = getDisplayName(customer)
+  const isNew = !orders || orders.length === 0
   return (
     <div data-testid="overview-page-wrapper">
+      {isNew && (
+        <div
+          className="soft-glass mb-6 flex flex-col gap-3 rounded-[20px] p-5 small:flex-row small:items-center small:justify-between"
+          data-testid="overview-next-step"
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+              Your next step
+            </p>
+            <p className="mt-1 text-sm font-medium text-ink">
+              Your first order is 2 minutes away — pick something you like.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <LocalizedClientLink
+              href="/store"
+              className="inline-flex items-center justify-center rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:-translate-y-0.5 active:scale-[0.98]"
+            >
+              Shop the store
+            </LocalizedClientLink>
+            <LocalizedClientLink
+              href="/seller"
+              className="inline-flex items-center justify-center rounded-full border border-ink-hairline bg-white/60 px-4 py-2 text-sm font-medium text-ink transition hover:-translate-y-0.5 hover:bg-ink hover:text-white active:scale-[0.98]"
+            >
+              Open a store
+            </LocalizedClientLink>
+          </div>
+        </div>
+      )}
       <div className="hidden small:block">
         <div className="text-xl-semi flex justify-between items-center mb-4">
           <span

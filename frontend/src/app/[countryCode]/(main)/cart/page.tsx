@@ -2,7 +2,6 @@ import { retrieveCart } from "@lib/data/cart"
 import { retrieveCustomer } from "@lib/data/customer"
 import CartTemplate from "@modules/cart/templates"
 import { Metadata } from "next"
-import { notFound } from "next/navigation"
 
 export const metadata: Metadata = {
   title: "Cart",
@@ -10,12 +9,12 @@ export const metadata: Metadata = {
 }
 
 export default async function Cart() {
-  const cart = await retrieveCart(undefined, undefined, "no-store").catch((error) => {
-    console.error(error)
-    return notFound()
-  })
-
-  const customer = await retrieveCustomer()
+  // Parallel: cart and identity are independent. A backend nap resolves to
+  // an empty cart view (with retry), never an error page.
+  const [cart, customer] = await Promise.all([
+    retrieveCart(undefined, undefined, "no-store").catch(() => null),
+    retrieveCustomer().catch(() => null),
+  ])
 
   return <CartTemplate cart={cart} customer={customer} />
 }

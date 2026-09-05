@@ -21,7 +21,7 @@ export default async function PreviewPrice({ price }: { price: VariantPrice }) {
         amount={price.calculated_price_number}
         currency_code={price.currency_code}
         className={clx(
-          "text-sm font-medium",
+          "text-base font-semibold tabular-nums",
           price.price_type === "sale"
             ? "text-semantic-danger"
             : "text-ink"

@@ -20,13 +20,35 @@ export default async function ProductPreview({
   })
   const metadata = (product.metadata ?? {}) as Record<string, unknown>
   const isFlash = metadata.flash_sale === true
+  // Stock at a glance (research: scarcity + availability decide the click).
+  // inventory_quantity rides along in the list fields — no extra fetch.
+  const stock = (product.variants ?? []).reduce(
+    (sum: number, v: any) =>
+      sum + (typeof v?.inventory_quantity === "number" ? v.inventory_quantity : 0),
+    0
+  )
+  const tracksStock = (product.variants ?? []).some(
+    (v: any) => typeof v?.inventory_quantity === "number"
+  )
+  const outOfStock = tracksStock && stock <= 0
+  const lowStock = tracksStock && !outOfStock && stock <= 5
 
   return (
     <div className="group card-lift rounded-control p-1">
-      <div data-testid="product-wrapper" className="relative rounded-control">
-        {isFlash && (
+      <div
+        data-testid="product-wrapper"
+        className={
+          "relative rounded-control" + (outOfStock ? " opacity-70 saturate-50" : "")
+        }
+      >
+        {isFlash && !outOfStock && (
           <span className="absolute left-2 top-2 z-10 rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
             ⚡ Flash
+          </span>
+        )}
+        {outOfStock && (
+          <span className="absolute left-2 top-2 z-10 rounded-full bg-ink px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+            Out of stock
           </span>
         )}
         <LocalizedClientLink
@@ -40,14 +62,21 @@ export default async function ProductPreview({
             size="full"
             isFeatured={isFeatured}
           />
-          <div className="mt-4 flex items-start justify-between gap-3">
-            <Text
-              className="text-sm font-medium leading-snug text-ink transition-colors duration-200 group-hover:text-brand"
-              data-testid="product-title"
-            >
-              {product.title}
-            </Text>
-            <div className="flex items-center gap-x-2 pt-0.5">
+          <div className="mt-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Text
+                className="truncate text-sm font-medium leading-snug text-ink transition-colors duration-200 group-hover:text-brand"
+                data-testid="product-title"
+              >
+                {product.title}
+              </Text>
+              {lowStock && (
+                <p className="mt-0.5 text-xs font-medium text-amber-700">
+                  Only {stock} left
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-x-2">
               {cheapestPrice && <PreviewPrice price={cheapestPrice} />}
             </div>
           </div>
