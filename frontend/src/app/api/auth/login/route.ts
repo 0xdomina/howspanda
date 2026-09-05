@@ -50,6 +50,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Sign-in is waking up. Please try again in a moment." }, { status: 503 })
   }
 
+  // A 429 here is the brute-force throttle (20 tries / 15 min per email),
+  // NOT wrong credentials — never report it as an incorrect password.
+  if (upstream.status === 429) {
+    return NextResponse.json(
+      { message: "Too many sign-in attempts. Please wait a few minutes and try again.", rateLimited: true },
+      { status: 429 }
+    )
+  }
+
   if (!upstream.ok || !result?.token) {
     return NextResponse.json({ message: result?.message || "The email or password is incorrect." }, { status: 401 })
   }

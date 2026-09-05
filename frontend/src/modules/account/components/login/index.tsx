@@ -81,7 +81,15 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
         const sameOriginResult = (await sameOriginResponse.json().catch(() => null)) as {
           actor?: "customer" | "seller"
           message?: string
+          rateLimited?: boolean
         } | null
+
+        // Throttled (not wrong password): still try the Neon lane, which has
+        // its own budget — then report the throttle honestly if that fails too.
+        if (sameOriginResponse.status === 429) {
+          lastError = sameOriginResult?.message ?? "Too many sign-in attempts. Please wait a few minutes and try again."
+          break
+        }
 
         if (sameOriginResponse.ok && sameOriginResult?.actor) {
           // Mirror into Neon (best-effort, non-blocking) so this password
