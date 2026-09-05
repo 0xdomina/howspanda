@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 
 const BACKEND_URL = (
-  process.env.MEDUSA_BACKEND_URL || "https://hows-u-api-final.pandastack.app"
+  process.env.MEDUSA_BACKEND_URL || "https://hows-u-api.onrender.com"
 )
   .replace(/\r|\n/g, "")
   .trim()

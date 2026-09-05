@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
 
 const BACKEND_URL = (
-  process.env.MEDUSA_BACKEND_URL || "https://hows-u-api-final.pandastack.app"
+  process.env.MEDUSA_BACKEND_URL || "https://hows-u-api.onrender.com"
 )
   .replace(/\r|\n/g, "")
   .trim()
@@ -76,7 +76,7 @@ export async function GET() {
     const products = raw.map((p: any) => {
       if (p && typeof p.thumbnail === "string") {
         for (const host of [
-          "https://hows-u-api-final.pandastack.app",
+          "https://hows-u-api.onrender.com",
           "https://hows-u-api.pandastack.app",
         ]) {
           if (p.thumbnail.startsWith(host + "/")) {

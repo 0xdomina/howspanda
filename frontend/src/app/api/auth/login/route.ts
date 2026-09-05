@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 
 export const runtime = "nodejs"
 
-const BACKEND_URL = "https://hows-u-api-final.pandastack.app"
+const BACKEND_URL = (
+  process.env.MEDUSA_BACKEND_URL || "https://hows-u-api.onrender.com"
+)
+  .replace(/\r|\n/g, "")
+  .trim()
+  .replace(/^['"]|['"]$/g, "")
+  .replace(/\/$/, "")
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7
 
 export async function POST(request: NextRequest) {

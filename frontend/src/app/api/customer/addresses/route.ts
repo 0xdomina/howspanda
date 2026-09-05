@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 
 export const runtime = "nodejs"
 
-const BACKEND_URL = "https://hows-u-api-final.pandastack.app"
+const BACKEND_URL = (
+  process.env.MEDUSA_BACKEND_URL || "https://hows-u-api.onrender.com"
+)
+  .replace(/\r|\n/g, "")
+  .trim()
+  .replace(/^['"]|['"]$/g, "")
+  .replace(/\/$/, "")
 
 function validOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin")
