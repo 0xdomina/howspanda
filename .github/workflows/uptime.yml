@@ -1,0 +1,91 @@
+name: uptime
+
+# Beta ops: watch the storefront + free-tier backend. Normal free-tier sleep
+# (503 warming) is NOT an alert — only unreachable / 5xx / timeouts page us
+# via a persistent GitHub issue (email notifications on).
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    outputs:
+      backend: ${{ steps.check.outputs.backend }}
+      frontend: ${{ steps.check.outputs.frontend }}
+      detail: ${{ steps.check.outputs.detail }}
+    steps:
+      - id: check
+        run: |
+          BACKEND="https://hows-u-api.onrender.com"
+          FRONT="https://hows-u.vercel.app"
+          backend="down"
+          # 3 tries over ~2.5 min: a sleeping free service wakes in ~1 min.
+          for i in 1 2 3; do
+            code=$(curl -s -o /tmp/h.json -w "%{http_code}" --max-time 25 "$BACKEND/health" || echo "000")
+            if [ "$code" = "200" ]; then backend="up"; break; fi
+            # 503 with ready:false is normal free-tier warming, not an outage.
+            if [ "$code" = "503" ] && grep -q '"ready":false' /tmp/h.json 2>/dev/null; then backend="warming"; fi
+            sleep 45
+          done
+          fcode=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$FRONT/ng" || echo "000")
+          frontend="down"
+          if [ "$fcode" = "200" ] || [ "$fcode" = "307" ]; then frontend="up"; fi
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "detail=backend:$backend frontend:$frontend" >> "$GITHUB_OUTPUT"
+
+  alert:
+    needs: probe
+    if: needs.probe.outputs.backend == 'down' || needs.probe.outputs.frontend == 'down'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const detail = `${{ needs.probe.outputs.detail }}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              labels: "uptime", state: "open",
+            });
+            const body = `Outage probe failed at ${new Date().toISOString()}: ${detail}\n\nBackend sleeps on free tier (503 warming is normal and does NOT trigger this). This fired because the service was unreachable or 5xx after ~2.5 min of retries.`;
+            if (issues.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: "🚨 Storefront or backend down", body, labels: ["uptime"],
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issues[0].number, body: "Still failing: " + detail,
+              });
+            }
+
+  resolve:
+    needs: probe
+    if: needs.probe.outputs.backend != 'down' && needs.probe.outputs.frontend != 'down'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              labels: "uptime", state: "open",
+            });
+            for (const issue of issues) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Recovered at ${new Date().toISOString()} (${{ needs.probe.outputs.detail }}). Closing.`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number, state: "closed",
+              });
+            }
