@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-export const runtime = "edge"
+export const runtime = "nodejs"
 
 const BACKEND_URL = "https://hows-u-api-final.pandastack.app"
 

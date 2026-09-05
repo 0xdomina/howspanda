@@ -84,6 +84,14 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
         } | null
 
         if (sameOriginResponse.ok && sameOriginResult?.actor) {
+          // Mirror into Neon (best-effort, non-blocking) so this password
+          // also works during a future backend outage. Failures are ignored
+          // — the Medusa session is already established.
+          try {
+            await authClient.signUp.email({ email, password, name: email }).catch(() => null)
+          } catch {
+            // ignore — mirror is opportunistic
+          }
           window.location.assign(
             `/${countryCode}/${sameOriginResult.actor === "seller" ? "seller" : "account"}`
           )
