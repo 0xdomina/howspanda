@@ -4,6 +4,7 @@ import "styles/globals.css"
 import { WishlistProvider } from "@modules/wishlist/context"
 import { loadWishlist } from "@lib/data/wishlist"
 import WarmAgent from "@modules/common/components/warm-agent"
+import BottomTabBar from "@modules/layout/components/bottom-tab-bar"
 
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
@@ -51,7 +52,8 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
       data-mode="light"
     >
       <body className="bg-paper font-sans text-ink antialiased">
-        <WishlistProvider initialItems={initialWishlist}><main className="relative page-enter">{props.children}</main></WishlistProvider>
+        <WishlistProvider initialItems={initialWishlist}><main className="relative page-enter pb-20 small:pb-0">{props.children}</main></WishlistProvider>
+        <BottomTabBar />
         <WarmAgent />
         <script
           // Quietly start the backend through our same-origin health proxy so

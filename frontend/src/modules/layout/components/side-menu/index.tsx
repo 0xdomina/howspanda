@@ -14,26 +14,27 @@ import CountrySelect from "../country-select"
 import LanguageSelect from "../language-select"
 import SearchForm from "@modules/layout/components/search-form"
 
+// Flat aisles that search the marketplace. (The old tree had 36 subcategory
+// links that all landed on the same page as their parent — pure noise.)
 const marketplaceCategories = [
-  { name: "Women's Fashion", href: "/store", subcategories: ["Dresses", "Tops & blouses", "Shoes", "Bags & accessories"] },
-  { name: "Men's Fashion", href: "/store", subcategories: ["Shirts", "Trousers", "Shoes", "Watches & accessories"] },
-  { name: "Electronics", href: "/categories", subcategories: ["Phones & tablets", "Computers", "Audio", "Cameras"] },
-  { name: "Home & Lifestyle", href: "/categories", subcategories: ["Furniture", "Kitchen", "Home decor", "Appliances"] },
-  { name: "Medicine", href: "/categories", subcategories: ["First aid", "Wellness", "Personal care", "Medical supplies"] },
-  { name: "Sports & Outdoor", href: "/categories", subcategories: ["Fitness", "Team sports", "Outdoor gear", "Sportswear"] },
-  { name: "Baby's & Toys", href: "/categories", subcategories: ["Baby clothing", "Toys & games", "Feeding", "Nursery"] },
-  { name: "Groceries & Pets", href: "/categories", subcategories: ["Pantry", "Fresh food", "Beverages", "Pet care"] },
-  { name: "Health & Beauty", href: "/categories", subcategories: ["Skincare", "Haircare", "Makeup", "Grooming"] },
+  { name: "Women's Fashion", href: "/store?q=fashion" },
+  { name: "Men's Fashion", href: "/store?q=men" },
+  { name: "Electronics", href: "/store?q=electronics" },
+  { name: "Home & Lifestyle", href: "/store?q=home" },
+  { name: "Health & Beauty", href: "/store?q=beauty" },
+  { name: "Sports & Outdoor", href: "/store?q=sports" },
+  { name: "Baby & Toys", href: "/store?q=toys" },
+  { name: "Groceries & Pets", href: "/store?q=grocery" },
+  { name: "Wellness", href: "/store?q=wellness" },
 ]
 
+// No Wishlist / Account / Cart rows: the nav icon rail already owns those one
+// tap away — repeating them here doubles every path for zero benefit.
 const menuLinks = [
   ["Mall", "/malls"],
   ["Campaigns", "/challenges"],
   ["Jobs", "/deliver"],
   ["Buyer AI", "/ai"],
-  ["Wishlist", "/wishlist"],
-  ["Account", "/account"],
-  ["Cart", "/cart"],
 ] as const
 
 type SideMenuProps = {
@@ -136,22 +137,21 @@ const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false, isAut
                 {hasSeller && <LocalizedClientLink href="/seller" onClick={closeMenu} className="inline-flex items-center justify-center rounded-control border border-ink-hairline bg-white/60 px-5 py-3 font-medium text-ink">Manage Business</LocalizedClientLink>}
               </div>
               <SearchForm inputId="mobile-product-search" className="flex h-10 items-center gap-3 rounded-control bg-[#f5f5f5] px-4 small:hidden" />
-              <details open>
-                <summary className="cursor-pointer list-none font-display text-3xl leading-10 text-ink">Marketplace</summary>
-                <div className="mt-4 grid gap-3 border-l border-ink-hairline pl-4">
+              <div>
+                <p className="font-display text-3xl leading-10 text-ink">Marketplace</p>
+                <div className="mt-4 grid gap-1 border-l border-ink-hairline pl-4">
                   {marketplaceCategories.map((category) => (
-                    <details key={category.name}>
-                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-ink">
-                        <LocalizedClientLink href={category.href} onClick={closeMenu}>{category.name}</LocalizedClientLink>
-                        <span className="text-ink-muted">›</span>
-                      </summary>
-                      <div className="mt-2 grid gap-2 pl-3 text-sm text-ink-muted">
-                        {category.subcategories.map((subcategory) => <LocalizedClientLink key={subcategory} href={category.href} onClick={closeMenu} className="hover:text-ink">{subcategory}</LocalizedClientLink>)}
-                      </div>
-                    </details>
+                    <LocalizedClientLink
+                      key={category.name}
+                      href={category.href}
+                      onClick={closeMenu}
+                      className="py-1.5 text-base font-medium text-ink hover:text-brand"
+                    >
+                      {category.name}
+                    </LocalizedClientLink>
                   ))}
                 </div>
-              </details>
+              </div>
               <ul className="grid gap-3">
                 {menuLinks.filter(([name]) => name !== "Mall" || mallsEnabled).map(([name, href]) => <li key={name}><LocalizedClientLink href={href} onClick={closeMenu} className="font-display text-2xl leading-9 text-ink hover:text-ink-muted">{name}</LocalizedClientLink></li>)}
               </ul>
