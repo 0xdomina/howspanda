@@ -227,7 +227,8 @@ const EditProduct = ({
         </div>
 
         <ErrorMessage error={error} data-testid="edit-product-error" />
-        <SubmitButton className="mt-2" data-testid="edit-product-submit">
+          <SubmitButton className="mt-2" disabled={isPending}
+data-testid="edit-product-submit">
           {isPending ? "Saving…" : "Save changes"}
         </SubmitButton>
       </form>
