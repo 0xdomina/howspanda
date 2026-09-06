@@ -38,7 +38,13 @@ export const PATCH = async (
     update.thumbnail = body.photo
     update.images = [{ url: body.photo }]
   }
-  if (body.status !== undefined) update.status = body.status
+  // Medusa v2 has no "archived" status (draft | published | proposed |
+  // rejected) — archiving means unpublishing to draft so the product leaves
+  // the storefront. Map it here so the advertised schema value works instead
+  // of exploding inside core updateProductsWorkflow.
+  if (body.status !== undefined) {
+    update.status = body.status === "archived" ? "draft" : body.status
+  }
 
   // Product media and promotion settings live in metadata; merge so we never
   // clobber unrelated product metadata.
