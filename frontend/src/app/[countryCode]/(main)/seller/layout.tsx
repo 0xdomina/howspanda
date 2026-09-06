@@ -20,6 +20,11 @@ export default async function SellerRouteLayout({
 
   if (!seller && customer) {
     const kyc = await retrieveMyKyc(customer.email, customer.phone).catch(() => null)
+    // Password-only (Neon) accounts have no Medusa customer record yet, so
+    // the profile gate below can never pass for them. They get a one-step
+    // email-verification bridge instead of a dead-end profile loop.
+    const needsBridge =
+      typeof customer.id === "string" && customer.id.startsWith("neon_")
     // Seller access is additive to the buyer account. A complete customer
     // profile is the seller unlock; KYC remains a valid fallback for older
     // accounts that already have a completed KYC profile.
@@ -34,6 +39,7 @@ export default async function SellerRouteLayout({
         customer={customer}
         kyc={kyc}
         profileComplete={profileComplete}
+        needsBridge={needsBridge}
       />
     )
   }

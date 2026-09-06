@@ -6,6 +6,8 @@ import {
   loginWithEmailPassword,
   signout as customerSignout,
 } from "./customer"
+import { setAuthToken } from "./cookies"
+import { requestAuthOtp } from "./auth-otp"
 import { revalidateTagSafely } from "./cache"
 import { getAuthHeaders, getCacheTag } from "./cookies"
 import {
@@ -157,6 +159,60 @@ export async function sellerLogin(_currentState: unknown, formData: FormData) {
     return null
   } catch (error: any) {
     return error.toString()
+  }
+}
+
+// One-step bridge for password-only (Neon) accounts that want to sell.
+// Verifies the email with a code, creates the Medusa customer record with
+// the store password, and signs the Medusa session in — after this the
+// normal profile gate and store setup work. Returns null on success or a
+// human-readable error string.
+export async function sendSellerBridgeCode(email: string): Promise<string | null> {
+  const res = await requestAuthOtp({ email: email.trim().toLowerCase(), purpose: "signup" })
+  return res.ok ? null : (res.error ?? "We could not send the code. Please try again.")
+}
+
+export async function activateSellerIdentity(input: {
+  email: string
+  password: string
+  code: string
+  firstName: string
+  lastName: string
+  phone: string
+}): Promise<string | null> {
+  const email = input.email.trim().toLowerCase()
+  const password = input.password
+  const code = input.code.trim()
+  if (!email || !password || code.length !== 6) {
+    return "Enter your password and the 6-digit code."
+  }
+  if (!input.firstName.trim() || !input.lastName.trim() || !input.phone.trim()) {
+    return "Add your first name, last name, and phone number."
+  }
+  try {
+    const customerForm: Record<string, string> = {
+      email,
+      password,
+      code,
+      first_name: input.firstName.trim(),
+      last_name: input.lastName.trim(),
+      phone: input.phone.trim(),
+    }
+    await sdk.client.fetch("/auth/otp/signup", {
+      method: "POST",
+      body: customerForm,
+    })
+    const loginToken = await loginWithEmailPassword("customer", email, password)
+    await setAuthToken(loginToken as string)
+    const customerCacheTag = await getCacheTag("customers")
+    revalidateTagSafely(customerCacheTag)
+    return null
+  } catch (error: any) {
+    const message = String(error?.message ?? error ?? "")
+    if (/already|exist|duplicate|forbidden/i.test(message)) {
+      return "This email already has a store login. Sign out and sign back in, then try again."
+    }
+    return message || "We could not activate your store login. Please try again."
   }
 }
 

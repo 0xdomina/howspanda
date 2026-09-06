@@ -1,8 +1,13 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 
-import { upgradeCustomerToSeller } from "@lib/data/seller"
+import {
+  activateSellerIdentity,
+  sendSellerBridgeCode,
+  upgradeCustomerToSeller,
+} from "@lib/data/seller"
 import type { KycProfileView } from "@lib/data/kyc"
 import Input from "@modules/common/components/input"
 import ErrorMessage from "@modules/checkout/components/error-message"
@@ -12,16 +17,109 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 type SellerSetupTemplateProps = {
   customer: {
     first_name?: string | null
+    last_name?: string | null
     email?: string | null
   }
   kyc: KycProfileView | null
   profileComplete?: boolean
+  needsBridge?: boolean
+}
+
+// Password-only accounts verify their email once to activate the store
+// login (creates the Medusa customer + session). After that the normal
+// profile gate and store setup apply.
+function SellerBridgeForm({ customer }: { customer: SellerSetupTemplateProps["customer"] }) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [password, setPassword] = useState("")
+  const [firstName, setFirstName] = useState(customer.first_name ?? "")
+  const [lastName, setLastName] = useState(customer.last_name ?? "")
+  const [phone, setPhone] = useState("")
+  const [code, setCode] = useState("")
+
+  const sendCode = () =>
+    startTransition(async () => {
+      setError(null)
+      const err = await sendSellerBridgeCode(customer.email ?? "")
+      if (err) {
+        setError(err)
+        return
+      }
+      setSent(true)
+    })
+
+  const activate = () =>
+    startTransition(async () => {
+      setError(null)
+      const err = await activateSellerIdentity({
+        email: customer.email ?? "",
+        password,
+        code,
+        firstName,
+        lastName,
+        phone,
+      })
+      if (err) {
+        setError(err)
+        return
+      }
+      router.refresh()
+    })
+
+  return (
+    <div className="mt-8 rounded-control border border-ink-hairline bg-paper-tinted p-5" data-testid="seller-bridge-form">
+      <h2 className="font-display text-xl font-medium text-ink">One quick step to unlock selling</h2>
+      <p className="mt-2 text-sm leading-6 text-ink-muted">
+        Your password account is ready. Verify your email below and we&rsquo;ll
+        activate your store login — then you can set up your store right away.
+      </p>
+      <div className="mt-4 grid gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="First name" name="bridge_first_name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
+          <Input label="Last name" name="bridge_last_name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
+        </div>
+        <Input label="Phone number" name="bridge_phone" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" />
+        <Input label="Choose a store password" name="bridge_password" value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="new-password" />
+        {!sent ? (
+          <button
+            type="button"
+            onClick={sendCode}
+            disabled={isPending}
+            className="figma-button mt-1 inline-flex w-fit disabled:opacity-50"
+            data-testid="seller-bridge-send-code"
+          >
+            {isPending ? "Sending…" : "Send verification code"}
+          </button>
+        ) : (
+          <>
+            <p className="text-sm text-ink-muted">
+              We sent a 6-digit code to {customer.email}. It expires in 15 minutes.
+            </p>
+            <Input label="6-digit code" name="bridge_code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" />
+            <button
+              type="button"
+              onClick={activate}
+              disabled={isPending || code.length !== 6}
+              className="figma-button mt-1 inline-flex w-fit disabled:opacity-50"
+              data-testid="seller-bridge-activate"
+            >
+              {isPending ? "Activating…" : "Verify & continue"}
+            </button>
+          </>
+        )}
+      </div>
+      <ErrorMessage error={error} data-testid="seller-bridge-error" />
+    </div>
+  )
 }
 
 export default function SellerSetupTemplate({
   customer,
   kyc,
   profileComplete = false,
+  needsBridge = false,
 }: SellerSetupTemplateProps) {
   const [message, formAction] = useActionState(upgradeCustomerToSeller, null)
   const canSell =
@@ -39,7 +137,9 @@ export default function SellerSetupTemplate({
         <p className="mt-4 max-w-lg text-base-regular leading-7 text-ink-muted">
           {customer.first_name ? `Hi ${customer.first_name}. ` : ""}Your How’s U account can shop, sell, and deliver. Complete your profile once, then set up a store whenever you are ready.
         </p>
-        {!canSell ? (
+        {needsBridge && !canSell ? (
+          <SellerBridgeForm customer={customer} />
+        ) : !canSell ? (
           <div className="mt-8 rounded-control border border-ink-hairline bg-paper-tinted p-5">
             <h2 className="font-display text-xl font-medium text-ink">Complete your profile to unlock selling</h2>
             <p className="mt-2 text-sm leading-6 text-ink-muted">Add your name, phone number, and address in Profile. You can create your store as soon as your profile is complete.</p>
