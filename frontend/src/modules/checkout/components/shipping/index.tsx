@@ -413,10 +413,10 @@ const Shipping: React.FC<ShippingProps> = ({
               className="mt"
               onClick={handleSubmit}
               isLoading={isLoading}
-              disabled={!cart.shipping_methods?.[0]}
+              disabled={!cart.shipping_methods?.[0] || isLoading}
               data-testid="submit-delivery-option-button"
             >
-              Continue to payment
+              {isLoading ? "Saving delivery choice…" : "Continue to payment"}
             </Button>
           </div>
         </>
