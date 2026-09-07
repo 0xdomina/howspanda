@@ -286,6 +286,24 @@ export default function BankTransferCard({
         note: note || undefined,
       })
       if (!res.success) {
+        // Retry-after-success (double-tap on a slow connection): the first
+        // tap already submitted. Re-read the true state — if it now shows
+        // submitted/confirmed, celebrate instead of erroring.
+        if (/conflict|already|duplicate/i.test(res.error ?? "")) {
+          const fresh = await retrieveBankTransfer(orderId, email)
+          const status =
+            !("success" in fresh) && fresh.transfers?.[0]
+              ? fresh.transfers[0].status
+              : null
+          if (status === "submitted" || status === "confirmed") {
+            clearUpload()
+            setAmount("")
+            setNote("")
+            setOk("Proof submitted — the store will confirm shortly.")
+            load()
+            return
+          }
+        }
         setSubmitError(res.error)
         return
       }

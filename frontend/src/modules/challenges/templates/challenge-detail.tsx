@@ -89,6 +89,10 @@ const RewardRow = ({
       const res = await claimChallengeReward(slug, reward.id)
       if (res.success && res.reward) {
         onClaimed(res.reward, "Reward credited to your wallet.")
+      } else if (/conflict|already|duplicate/i.test(res.error ?? "")) {
+        // Retry-after-success (double-tap on a slow connection): the first
+        // tap already claimed it. Mark claimed instead of scaring the user.
+        onClaimed({ ...reward, status: "claimed" }, "Already claimed — enjoy!")
       } else {
         onClaimed(reward, res.error ?? "Could not claim this reward.")
       }

@@ -21,18 +21,14 @@ export type EscrowStatus = {
   lines: EscrowLine[]
 }
 
+import { toHumanError } from "@lib/util/human-error"
+
 export type BuyerActionResult = {
   success: boolean
   error: string | null
 }
 
-const toError = (err: any): string => {
-  try {
-    return err?.message ?? err?.toString() ?? "Something went wrong."
-  } catch {
-    return "Something went wrong."
-  }
-}
+const toError = (err: any): string => toHumanError(err)
 
 export const retrieveOrderEscrow = async (
   orderId: string,

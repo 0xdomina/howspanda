@@ -43,6 +43,16 @@ const SellerBankTransfer = ({
     startTransition(async () => {
       const error = await action()
       if (error) {
+        // Retry-after-success (double-tap on a slow connection): the first
+        // tap already recorded it. Refresh into the true state instead of
+        // showing Medusa's cryptic conflict text.
+        if (/no pending|already|duplicate|conflict/i.test(error)) {
+          setOk("Already recorded — view refreshed.")
+          setRejecting(false)
+          setRejectNote("")
+          router.refresh()
+          return
+        }
         setMessage(error)
       } else {
         setOk(successText)
