@@ -35,7 +35,18 @@ export type BankTransferResponse =
 
 const toError = (err: any): string => {
   try {
-    return err?.message ?? err?.toString() ?? "Something went wrong."
+    const raw = String(err?.message ?? err?.toString?.() ?? err ?? "")
+    // Never leak SDK internals ("<none>") or backend-sleep noise to buyers.
+    if (
+      !raw ||
+      /<none>|abort|timed out|timeout|warming|ready["']?\s*:\s*false|booting|fetch failed|load failed/i.test(
+        raw
+      ) ||
+      [502, 503, 504].includes(Number((err as any)?.status))
+    ) {
+      return "The store is waking up. Please wait a moment and try again."
+    }
+    return raw
   } catch {
     return "Something went wrong."
   }
