@@ -47,6 +47,29 @@ export const POST = async (
 
   const sellerData = req.validatedBody
 
+  // Idempotent replay: slow networks make users tap twice, and a timed-out
+  // first attempt may already have created the store. If this identity
+  // already owns a store, return it instead of exploding on unique
+  // constraints (which Medusa renders as an unactionable 409).
+  if (req.auth_context?.auth_identity_id) {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: [existingAdmin] } = await query.graph({
+      entity: "seller_admin",
+      fields: ["id", "seller.id", "seller.name", "seller.handle"],
+      filters: { auth_identity_id: req.auth_context.auth_identity_id },
+    })
+    const existingSeller = (existingAdmin as any)?.seller
+    if (existingSeller?.id) {
+      return res.json({
+        seller: {
+          id: existingSeller.id,
+          name: existingSeller.name,
+          handle: existingSeller.handle,
+        },
+      })
+    }
+  }
+
   // Creating a store is a ladder-gated action. Customer accounts use their
   // actual profile as the source of truth: once the account has a name, phone,
   // and a complete address, seller access is unlocked without requiring a

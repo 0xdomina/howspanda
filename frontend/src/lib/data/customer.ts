@@ -217,8 +217,24 @@ export async function signup(_currentState: unknown, formData: FormData) {
   } catch (error: any) {
     const status = error?.status ?? error?.response?.status
     const message = String(error?.message ?? error ?? "")
-    if (stage === "account registration" && (status === 409 || /already|exist|duplicate|forbidden/i.test(message))) {
-      return "An account with this email already exists. Sign in instead."
+    if (stage === "account registration" && (status === 409 || /already|exist|duplicate|forbidden|conflict/i.test(message))) {
+      // Most likely cause: a double-tap / retry after the first attempt
+      // already created the account (Medusa renders all conflicts as 409).
+      // Recover by signing straight in instead of showing a dead-end error.
+      try {
+        const loginToken = await loginWithEmailPassword("customer", email, password)
+        await setAuthToken(loginToken as string)
+        const customerCacheTag = await getCacheTag("customers")
+        revalidateTagSafely(customerCacheTag)
+        try {
+          await transferCart()
+        } catch {
+          // Cart transfer is optional and must not invalidate the session.
+        }
+        return { email, has_account: true } as any
+      } catch {
+        return "An account with this email already exists. Sign in instead."
+      }
     }
     if (stage === "sign in") return "Your account was created, but we could not start your session. Please sign in to continue."
     return error?.toString?.() ?? "We could not create your account. Please try again."

@@ -370,7 +370,7 @@ const Register = ({ setCurrentView }: Props) => {
               size="large"
               className="w-full mt-1"
               isLoading={isPending}
-              disabled={code.trim().length !== 6}
+              disabled={code.trim().length !== 6 || isPending}
               onClick={verifyAndCreate}
               data-testid="register-button"
             >

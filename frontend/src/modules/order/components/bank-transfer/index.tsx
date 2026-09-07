@@ -521,7 +521,7 @@ export default function BankTransferCard({
                 <Button
                   size="base"
                   isLoading={isPending}
-                  disabled={!proofUrl}
+                  disabled={!proofUrl || isPending}
                   onClick={handleSubmit}
                   data-testid="bank-proof-submit"
                 >

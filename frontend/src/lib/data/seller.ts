@@ -208,9 +208,20 @@ export async function activateSellerIdentity(input: {
     revalidateTagSafely(customerCacheTag)
     return null
   } catch (error: any) {
+    const status = error?.status ?? error?.response?.status
     const message = String(error?.message ?? error ?? "")
-    if (/already|exist|duplicate|forbidden/i.test(message)) {
-      return "This email already has a store login. Sign out and sign back in, then try again."
+    if (status === 409 || /already|exist|duplicate|forbidden|conflict/i.test(message)) {
+      // Double-tap / retry after the account was already created: recover by
+      // signing straight in so the seller gate re-evaluates to unlocked.
+      try {
+        const loginToken = await loginWithEmailPassword("customer", email, password)
+        await setAuthToken(loginToken as string)
+        const customerCacheTag = await getCacheTag("customers")
+        revalidateTagSafely(customerCacheTag)
+        return null
+      } catch {
+        return "This email already has a store login. Sign out and sign back in, then try again."
+      }
     }
     return message || "We could not activate your store login. Please try again."
   }
@@ -266,7 +277,22 @@ export async function upgradeCustomerToSeller(
     if (typeof error?.digest === "string" && error.digest.startsWith("NEXT_REDIRECT")) {
       throw error
     }
-    return error?.message ?? error?.toString?.() ?? String(error)
+    const status = error?.status ?? error?.response?.status
+    const message = String(error?.message ?? error?.toString?.() ?? String(error))
+    // Retry-after-success (double-tap on a slow connection): the store
+    // already exists — verify and land there instead of showing an error.
+    if (status === 409 || /already|exist|duplicate|forbidden|conflict/i.test(message)) {
+      try {
+        const existing = await retrieveSeller()
+        if (existing) {
+          revalidateTagSafely(await getSellerCacheTag("seller"))
+          redirect("/seller")
+        }
+      } catch {
+        // Fall through to the human-readable error below.
+      }
+    }
+    return message
   }
 }
 
