@@ -172,6 +172,36 @@ export async function sendSellerBridgeCode(email: string): Promise<string | null
   return res.ok ? null : (res.error ?? "We could not send the code. Please try again.")
 }
 
+// Login-first bridge: most password-only users ALREADY have a Medusa account
+// (normal signup), so their account password signs them straight in — no OTP
+// dance. Only genuinely new emails fall through to needing a code.
+export async function bridgeLoginOrSendCode(input: {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  phone: string
+}): Promise<{ ok: true } | { needCode: true } | { error: string }> {
+  const email = input.email.trim().toLowerCase()
+  if (!email || !input.password) {
+    return { error: "Enter your account password to continue." }
+  }
+  try {
+    const loginToken = await loginWithEmailPassword("customer", email, input.password)
+    await setAuthToken(loginToken as string)
+    const customerCacheTag = await getCacheTag("customers")
+    revalidateTagSafely(customerCacheTag)
+    return { ok: true }
+  } catch {
+    // Not a Medusa session yet — fall through to email verification.
+  }
+  const err = await sendSellerBridgeCode(email)
+  if (err) {
+    return { error: err }
+  }
+  return { needCode: true }
+}
+
 export async function activateSellerIdentity(input: {
   email: string
   password: string

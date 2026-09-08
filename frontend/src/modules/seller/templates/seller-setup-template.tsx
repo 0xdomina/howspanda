@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 
 import {
   activateSellerIdentity,
-  sendSellerBridgeCode,
+  bridgeLoginOrSendCode,
   upgradeCustomerToSeller,
 } from "@lib/data/seller"
 import type { KycProfileView } from "@lib/data/kyc"
@@ -42,9 +42,21 @@ function SellerBridgeForm({ customer }: { customer: SellerSetupTemplateProps["cu
   const sendCode = () =>
     startTransition(async () => {
       setError(null)
-      const err = await sendSellerBridgeCode(customer.email ?? "")
-      if (err) {
-        setError(err)
+      // Login-first: most users already have a store login from signup, so
+      // the account password alone unlocks selling — no code needed.
+      const res = await bridgeLoginOrSendCode({
+        email: customer.email ?? "",
+        password,
+        firstName,
+        lastName,
+        phone,
+      })
+      if ("ok" in res) {
+        router.refresh()
+        return
+      }
+      if ("error" in res) {
+        setError(res.error)
         return
       }
       setSent(true)
@@ -72,8 +84,9 @@ function SellerBridgeForm({ customer }: { customer: SellerSetupTemplateProps["cu
     <div className="mt-8 rounded-control border border-ink-hairline bg-paper-tinted p-5" data-testid="seller-bridge-form">
       <h2 className="font-display text-xl font-medium text-ink">One quick step to unlock selling</h2>
       <p className="mt-2 text-sm leading-6 text-ink-muted">
-        Your password account is ready. Verify your email below and we&rsquo;ll
-        activate your store login — then you can set up your store right away.
+        Enter your account password for {customer.email} — in most cases
+        that&rsquo;s all it takes. If your store login isn&rsquo;t set up yet,
+        we&rsquo;ll send a quick email code instead.
       </p>
       <div className="mt-4 grid gap-3">
         <div className="grid grid-cols-2 gap-3">
@@ -81,16 +94,16 @@ function SellerBridgeForm({ customer }: { customer: SellerSetupTemplateProps["cu
           <Input label="Last name" name="bridge_last_name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
         </div>
         <Input label="Phone number" name="bridge_phone" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" autoComplete="tel" />
-        <Input label="Choose a store password" name="bridge_password" value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="new-password" />
+        <Input label="Your account password" name="bridge_password" value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" />
         {!sent ? (
           <button
             type="button"
             onClick={sendCode}
-            disabled={isPending}
+            disabled={isPending || !password}
             className="figma-button mt-1 inline-flex w-fit disabled:opacity-50"
             data-testid="seller-bridge-send-code"
           >
-            {isPending ? "Sending…" : "Send verification code"}
+            {isPending ? "Checking…" : "Continue"}
           </button>
         ) : (
           <>
