@@ -111,6 +111,7 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
             size="large"
             className="w-full mt-4"
             isLoading={isPending}
+            disabled={isPending}
             onClick={send}
             data-testid="send-reset-code-button"
           >
@@ -145,7 +146,7 @@ const ForgotPassword = ({ setCurrentView }: Props) => {
               size="large"
               className="w-full mt-4"
               isLoading={isPending}
-              disabled={code.trim().length === 0 || password.length < 8}
+              disabled={code.trim().length === 0 || password.length < 8 || isPending}
               onClick={reset}
               data-testid="reset-password-button"
             >

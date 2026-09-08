@@ -103,8 +103,9 @@ const EditAddress: React.FC<EditAddressProps> = ({
             Edit
           </button>
           <button
-            className="text-small-regular text-ui-fg-base flex items-center gap-x-2"
+            className="text-small-regular text-ui-fg-base flex items-center gap-x-2 disabled:opacity-50"
             onClick={removeAddress}
+            disabled={removing}
             data-testid="address-delete-button"
           >
             {removing ? <Spinner /> : <Trash />}

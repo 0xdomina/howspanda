@@ -289,6 +289,7 @@ const Register = ({ setCurrentView }: Props) => {
               size="large"
               className="w-full mt-6"
               isLoading={isPending}
+              disabled={isPending}
               onClick={continueOffline}
               data-testid="register-continue-button"
             >
@@ -315,6 +316,7 @@ const Register = ({ setCurrentView }: Props) => {
               size="large"
               className="w-full mt-1"
               isLoading={isPending}
+              disabled={isPending}
               onClick={createAccountNow}
               data-testid="register-button"
             >
