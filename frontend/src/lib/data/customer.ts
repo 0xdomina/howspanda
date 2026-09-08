@@ -4,7 +4,7 @@ import { MEDUSA_BACKEND_URL, sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
 import { revalidateTagSafely } from "./cache"
-import { headers as nextHeaders } from "next/headers"
+import { cookies as nextCookies, headers as nextHeaders } from "next/headers"
 import { redirect } from "next/navigation"
 import { auth } from "@lib/auth"
 import {
@@ -274,19 +274,22 @@ export async function login(_currentState: unknown, formData: FormData) {
   try { await transferCart() } catch {}
 }
 
-// Best-effort Medusa session for Neon-signed-in users: same credentials,
-// capped wait so a sleeping backend never blocks the redirect. Commerce
-// mostly works on email/guest lanes; this just upgrades the session when
-// the backend is reachable.
-export async function fetchMedusaToken(email: string, password: string) {
+// Bridges a Neon session into a first-party Medusa JWT (backend verifies the
+// session token server-side, finds-or-creates the customer, mints the token).
+// Silent best-effort: a sleeping backend just means "try again on next load".
+export async function bridgeNeonSession(): Promise<{ ok: boolean }> {
   try {
-    const t = await Promise.race([
-      loginWithEmailPassword("customer", email, password),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 10000)
-      ),
-    ])
-    await setAuthToken(t as string)
+    const cookies = await nextCookies()
+    const sessionToken =
+      cookies.get("__Secure-better-auth.session_token")?.value ||
+      cookies.get("better-auth.session_token")?.value
+    if (!sessionToken) return { ok: false }
+    const res = await sdk.client.fetch<{ token?: string }>(
+      `/store/auth/neon`,
+      { method: "POST", body: { sessionToken }, cache: "no-store" }
+    )
+    if (!res?.token) return { ok: false }
+    await setAuthToken(res.token)
     return { ok: true }
   } catch {
     return { ok: false }
@@ -294,8 +297,14 @@ export async function fetchMedusaToken(email: string, password: string) {
 }
 
 // Called after a client-side Neon sign-up/sign-in (authClient sets the real
-// session cookie). Transfers any guest cart and refreshes cached identity.
+// session cookie). Unifies the identity (Medusa JWT), transfers any guest
+// cart, and refreshes cached identity.
 export async function syncNeonAccount() {
+  try {
+    await bridgeNeonSession()
+  } catch {
+    // Backend asleep: Neon session alone still signs the user in.
+  }
   try {
     await transferCart()
   } catch {

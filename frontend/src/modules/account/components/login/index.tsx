@@ -9,7 +9,7 @@ import GoogleSignIn from "@modules/account/components/google-signin"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { authClient } from "@lib/auth-client"
-import { fetchMedusaToken, syncNeonAccount } from "@lib/data/customer"
+import { syncNeonAccount } from "@lib/data/customer"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
@@ -67,8 +67,9 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
           password,
         })
         if (!neonError) {
+          // syncNeonAccount unifies the identity (Medusa JWT via bridge)
+          // before landing, so every downstream flow just works.
           await syncNeonAccount()
-          await fetchMedusaToken(email, password)
           window.location.assign(`/${countryCode}/account`)
           return
         }

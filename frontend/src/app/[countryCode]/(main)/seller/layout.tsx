@@ -1,5 +1,5 @@
 import { retrieveSeller } from "@lib/data/seller"
-import { retrieveCustomer } from "@lib/data/customer"
+import { bridgeNeonSession, retrieveCustomer } from "@lib/data/customer"
 import { retrieveMyKyc } from "@lib/data/kyc-server"
 import SellerLayout from "@modules/seller/templates/seller-layout"
 import SellerSetupTemplate from "@modules/seller/templates/seller-setup-template"
@@ -12,17 +12,32 @@ export default async function SellerRouteLayout({
   children: React.ReactNode
   params: Promise<{ countryCode: string }>
 }) {
-  const [{ countryCode }, seller, customer] = await Promise.all([
+  const [{ countryCode }, seller, initialCustomer] = await Promise.all([
     params,
     retrieveSeller().catch(() => null),
     retrieveCustomer().catch(() => null),
   ])
+  let customer = initialCustomer
 
   if (!seller && customer) {
+    // Automatic unification: a password-only (Neon) session is bridged into
+    // a full Medusa session on the spot — no forms, no OTP, no new password.
+    // Falls through to the manual bridge form only if the backend is asleep.
+    if (
+      typeof customer.id === "string" &&
+      customer.id.startsWith("neon_")
+    ) {
+      const bridged = await bridgeNeonSession().catch(() => ({ ok: false }))
+      if (bridged.ok) {
+        const fresh = await retrieveCustomer().catch(() => null)
+        if (fresh && !String(fresh.id ?? "").startsWith("neon_")) {
+          customer = fresh
+        }
+      }
+    }
     const kyc = await retrieveMyKyc(customer.email, customer.phone).catch(() => null)
-    // Password-only (Neon) accounts have no Medusa customer record yet, so
-    // the profile gate below can never pass for them. They get a one-step
-    // email-verification bridge instead of a dead-end profile loop.
+    // Any still-unbridged password account gets the one-step email-verify
+    // form instead of a dead-end profile loop.
     const needsBridge =
       typeof customer.id === "string" && customer.id.startsWith("neon_")
     // Seller access is additive to the buyer account. A complete customer

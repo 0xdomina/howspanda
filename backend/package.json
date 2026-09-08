@@ -36,6 +36,7 @@
     "@medusajs/file-s3": "2.19.0",
     "@medusajs/framework": "2.19.0",
     "@medusajs/medusa": "2.19.0",
+    "@medusajs/utils": "^2.19.0",
     "@neondatabase/serverless": "^1.1.0",
     "ai": "^7.0.66",
     "multer": "^2.2.0",

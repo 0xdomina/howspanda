@@ -761,6 +761,12 @@ export const PostAuthOtpSignupSchema = z.object({
   phone: z.string().trim().max(50).optional(),
 })
 
+// Password-to-commerce bridge: the session token IS the credential (verified
+// against the Neon session table with expiry enforced server-side).
+export const PostNeonBridgeSchema = z.object({
+  sessionToken: z.string().min(10).max(500),
+})
+
 export const PostWishlistReplaceSchema = z.object({
   items: z.array(z.object({
     id: z.string().min(1).max(200),
@@ -1771,6 +1777,11 @@ export default defineMiddlewares({
       matcher: "/auth/otp/signup",
       methods: ["POST"],
       middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostAuthOtpSignupSchema)],
+    },
+    {
+      matcher: "/store/auth/neon",
+      methods: ["POST"],
+      middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostNeonBridgeSchema)],
     },
     {
       matcher: "/auth/email/change/request",
