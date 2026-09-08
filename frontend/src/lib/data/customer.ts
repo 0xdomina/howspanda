@@ -274,6 +274,25 @@ export async function login(_currentState: unknown, formData: FormData) {
   try { await transferCart() } catch {}
 }
 
+// Best-effort Medusa session for Neon-signed-in users: same credentials,
+// capped wait so a sleeping backend never blocks the redirect. Commerce
+// mostly works on email/guest lanes; this just upgrades the session when
+// the backend is reachable.
+export async function fetchMedusaToken(email: string, password: string) {
+  try {
+    const t = await Promise.race([
+      loginWithEmailPassword("customer", email, password),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 10000)
+      ),
+    ])
+    await setAuthToken(t as string)
+    return { ok: true }
+  } catch {
+    return { ok: false }
+  }
+}
+
 // Called after a client-side Neon sign-up/sign-in (authClient sets the real
 // session cookie). Transfers any guest cart and refreshes cached identity.
 export async function syncNeonAccount() {

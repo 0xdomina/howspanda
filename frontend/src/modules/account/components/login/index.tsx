@@ -9,7 +9,7 @@ import GoogleSignIn from "@modules/account/components/google-signin"
 import { useState } from "react"
 import type { FormEvent } from "react"
 import { authClient } from "@lib/auth-client"
-import { syncNeonAccount } from "@lib/data/customer"
+import { fetchMedusaToken, syncNeonAccount } from "@lib/data/customer"
 
 type Props = {
   setCurrentView: (view: LOGIN_VIEW) => void
@@ -57,6 +57,24 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
       const formData = new FormData(event.currentTarget)
       const email = String(formData.get("email") || "").trim().toLowerCase()
       const password = String(formData.get("password") || "")
+
+      // Neon first: password check + session without touching the backend,
+      // so sign-in stays instant even while it sleeps. A background Medusa
+      // token upgrade follows (capped) for commerce ops.
+      try {
+        const { error: neonError } = await authClient.signIn.email({
+          email,
+          password,
+        })
+        if (!neonError) {
+          await syncNeonAccount()
+          await fetchMedusaToken(email, password)
+          window.location.assign(`/${countryCode}/account`)
+          return
+        }
+      } catch {
+        // fall through to the Medusa lane below
+      }
 
       // Same-origin only — the browser never talks to MEDUSA_BACKEND_URL directly
       // so split-infra CORS is never hit. Retry once for backend warm-up.
@@ -114,21 +132,8 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
         if (sameOriginResponse.status === 401) definitive401 = true
         break
       }
-      // Medusa lane failed (wrong credentials or backend asleep). Fall back to
-      // the Neon password account, which works even during a backend outage.
-      try {
-        const { error: neonError } = await authClient.signIn.email({
-          email,
-          password,
-        })
-        if (!neonError) {
-          await syncNeonAccount()
-          window.location.assign(`/${countryCode}/account`)
-          return
-        }
-      } catch {
-        sawWarming = true
-      }
+      // Neon was already tried first (fast lane) — reaching here means no
+      // Neon account matched. Report warming vs wrong-password honestly.
       if (sawWarming && !definitive401) {
         throw new Error("Sign-in is waking up. Please try again in a moment.")
       }
