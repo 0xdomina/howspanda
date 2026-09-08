@@ -18,10 +18,14 @@ import { randomUUID } from "crypto"
 // serves brand-new and years-old accounts alike, so all existing data is
 // covered the first time each user touches a Medusa-gated flow.
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
-  const { sessionToken } = (req.validatedBody ?? req.body ?? {}) as {
+  const { sessionToken: rawToken } = (req.validatedBody ?? req.body ?? {}) as {
     sessionToken?: string
   }
-  if (!sessionToken || typeof sessionToken !== "string" || sessionToken.length < 10) {
+  // Better Auth signs the cookie as `token.signature`; the session table
+  // holds the raw token (first segment). Accept either form.
+  const sessionToken =
+    typeof rawToken === "string" ? rawToken.split(".")[0] : ""
+  if (!sessionToken || sessionToken.length < 10) {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid session")
   }
   if (!process.env.DATABASE_URL) {
