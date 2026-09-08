@@ -90,11 +90,17 @@ export const metadata: Metadata = {
 }
 
 export default async function SellerDashboardPage() {
-  const seller = await retrieveSeller().catch(() => null)
-  const products = (await listSellerProducts().catch(() => [])) || []
-  const balance = (await retrieveSellerBalance().catch(() => null)) as any
-  const payoutAccounts = (await listPayoutAccounts().catch(() => [])) || []
-  const orders = (await listSellerOrders().catch(() => [])) || []
+  const [seller, productsRaw, balance, payoutAccountsRaw, ordersRaw] =
+    await Promise.all([
+      retrieveSeller().catch(() => null),
+      listSellerProducts().catch(() => []),
+      retrieveSellerBalance().catch(() => null),
+      listPayoutAccounts().catch(() => []),
+      listSellerOrders().catch(() => []),
+    ])
+  const products = productsRaw || []
+  const payoutAccounts = payoutAccountsRaw || []
+  const orders = ordersRaw || []
 
   if (!seller) {
     notFound()

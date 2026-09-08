@@ -13,8 +13,11 @@ export const metadata: Metadata = {
 }
 
 export default async function SellerProductsPage() {
-  const seller = await retrieveSeller().catch(() => null)
-  const products = (await listSellerProducts().catch(() => [])) || []
+  const [seller, products] = await Promise.all([
+    retrieveSeller().catch(() => null),
+    listSellerProducts().catch(() => []),
+  ])
+  const productList = products || []
 
   if (!seller || !sellerHasPermission(seller, "products")) {
     notFound()
@@ -33,7 +36,7 @@ export default async function SellerProductsPage() {
         </Button>
       </div>
 
-      {products.length === 0 ? (
+      {productList.length === 0 ? (
         <div className="text-center py-16 border border-dashed rounded-large">
           <p className="text-ink-muted">No products yet.</p>
           <p className="text-sm text-ink-muted mt-1">
@@ -42,7 +45,7 @@ export default async function SellerProductsPage() {
         </div>
       ) : (
         <ul className="overflow-hidden rounded-control border border-ink-hairline bg-white divide-y divide-ink-hairline">
-          {products.map((product: any) => {
+          {productList.map((product: any) => {
             const cheapest =
               product.variants
                 ?.map((v: any) => v.prices?.[0]?.amount ?? 0)
