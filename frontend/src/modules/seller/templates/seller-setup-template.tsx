@@ -1,8 +1,9 @@
 "use client"
 
-import { useActionState, useState, useTransition } from "react"
+import { useActionState, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
+import { bridgeNeonSession } from "@lib/data/customer"
 import {
   activateSellerIdentity,
   bridgeLoginOrSendCode,
@@ -128,6 +129,51 @@ function SellerBridgeForm({ customer }: { customer: SellerSetupTemplateProps["cu
   )
 }
 
+// Automatic unification first: the server action runs in action context
+// (allowed to set cookies — unlike the layout, which can only read them).
+// Falls back to the manual email-code form only if the backend is asleep.
+function SellerBridgeAuto({ customer }: { customer: SellerSetupTemplateProps["customer"] }) {
+  const router = useRouter()
+  const [failed, setFailed] = useState(false)
+  const tried = useRef(false)
+
+  useEffect(() => {
+    if (tried.current) return
+    tried.current = true
+    let cancelled = false
+    bridgeNeonSession()
+      .then((res) => {
+        if (cancelled) return
+        if (res.ok) router.refresh()
+        else setFailed(true)
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
+  if (!failed) {
+    return (
+      <div
+        className="mt-8 rounded-control border border-ink-hairline bg-paper-tinted p-5"
+        aria-live="polite"
+        data-testid="seller-bridge-auto"
+      >
+        <div className="flex items-center gap-3">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-ink/15 border-t-ink" aria-hidden="true" />
+          <p className="text-sm text-ink">
+            Setting up your store login — one moment…
+          </p>
+        </div>
+      </div>
+    )
+  }
+  return <SellerBridgeForm customer={customer} />
+}
+
 export default function SellerSetupTemplate({
   customer,
   kyc,
@@ -151,7 +197,7 @@ export default function SellerSetupTemplate({
           {customer.first_name ? `Hi ${customer.first_name}. ` : ""}Your How’s U account can shop, sell, and deliver. Complete your profile once, then set up a store whenever you are ready.
         </p>
         {needsBridge && !canSell ? (
-          <SellerBridgeForm customer={customer} />
+          <SellerBridgeAuto customer={customer} />
         ) : !canSell ? (
           <div className="mt-8 rounded-control border border-ink-hairline bg-paper-tinted p-5">
             <h2 className="font-display text-xl font-medium text-ink">Complete your profile to unlock selling</h2>
