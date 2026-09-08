@@ -80,6 +80,12 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     }
     authIdentityId = registration.authIdentity.id
   }
+  if (!authIdentityId) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "We could not set up your store login. Please try again."
+    )
+  }
 
   // 4. Ensure the customer record, linked to the identity.
   if (!customer) {
