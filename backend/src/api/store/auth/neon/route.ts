@@ -1,11 +1,11 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import {
   ContainerRegistrationKeys,
+  generateJwtToken,
   MedusaError,
   Modules,
 } from "@medusajs/framework/utils"
 import { createCustomerAccountWorkflow } from "@medusajs/medusa/core-flows"
-import { generateJwtToken } from "@medusajs/utils"
 import { neon } from "@neondatabase/serverless"
 import { randomUUID } from "crypto"
 
