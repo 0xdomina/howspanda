@@ -11,3 +11,11 @@ export const revalidateTagSafely = (tag?: string | null) => {
   if (!tag?.trim()) return
   revalidateTag(tag, "max")
 }
+
+// Shared catalog tag, used by every PUBLIC product listing (homepage,
+// store, search) instead of per-visitor tags. Mutations revalidate this one
+// tag so a new product appears for everyone immediately — per-visitor tags
+// meant only the acting seller's own cache ever busted, leaving stale
+// listings pinned for days whenever background revalidation hit a sleeping
+// backend.
+export const PUBLIC_PRODUCTS_TAG = "public-products"

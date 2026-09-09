@@ -1,6 +1,7 @@
 "use server"
 
 import { sdk } from "@lib/config"
+import { PUBLIC_PRODUCTS_TAG } from "@lib/data/cache"
 import { rebaseProductMedia } from "@lib/util/rebase-media"
 import { sortProducts } from "@lib/util/sort-products"
 import { HttpTypes } from "@medusajs/types"
@@ -58,7 +59,7 @@ export const listProducts = async ({
     ...(publicCache
       ? {
           revalidate: 120,
-          tags: [`public-products-${region.id}`],
+          tags: [PUBLIC_PRODUCTS_TAG, `public-products-${region.id}`],
         }
       : await getCacheOptions("products")),
     // ISR-style: serve cached for 60s, then refresh in the background. Unlike

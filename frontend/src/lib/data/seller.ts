@@ -8,7 +8,7 @@ import {
 } from "./customer"
 import { setAuthToken } from "./cookies"
 import { requestAuthOtp } from "./auth-otp"
-import { revalidateTagSafely } from "./cache"
+import { PUBLIC_PRODUCTS_TAG, revalidateTagSafely } from "./cache"
 import { getAuthHeaders, getCacheTag } from "./cookies"
 import {
   getSellerAuthHeaders,
@@ -992,6 +992,9 @@ export const updateSellerProduct = async (
     revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
     revalidateTagSafely(productsTag)
+    // Bust the SHARED catalog too, so edits appear for every visitor
+    // immediately — not just in the seller's own cache entry.
+    revalidateTagSafely(PUBLIC_PRODUCTS_TAG)
 
     return null
   } catch (error: any) {
@@ -1078,6 +1081,9 @@ export const createSellerProduct = async (
     revalidateTagSafely(tag)
     const productsTag = await getCacheTag("products")
     revalidateTagSafely(productsTag)
+    // Bust the SHARED catalog too, so the new product appears for every
+    // visitor immediately — not just in the seller's own cache entry.
+    revalidateTagSafely(PUBLIC_PRODUCTS_TAG)
 
     return { success: true, error: null }
   } catch (error: any) {

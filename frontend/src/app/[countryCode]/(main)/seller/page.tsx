@@ -251,16 +251,24 @@ export default async function SellerDashboardPage() {
         <div className="flex flex-col gap-4">
           <div className="figma-surface p-5">
             <h3 className="font-display text-xl font-medium text-ink mb-2">
-              Next steps
+              Your products ({products.length})
             </h3>
             <p className="text-sm text-ink-muted mb-4">
-              Deliver orders quickly and reply to reviews to grow your trust score.
+              Edit prices, photos, and flash-sale flags any time. Changes go
+              live for every shopper immediately.
             </p>
-            <Button asChild>
-              <LocalizedClientLink href="/seller/products/new">
-                Add another product
-              </LocalizedClientLink>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <LocalizedClientLink href="/seller/products">
+                  Manage products
+                </LocalizedClientLink>
+              </Button>
+              <Button asChild variant="surface">
+                <LocalizedClientLink href="/seller/products/new">
+                  Add another
+                </LocalizedClientLink>
+              </Button>
+            </div>
           </div>
         </div>
       )}

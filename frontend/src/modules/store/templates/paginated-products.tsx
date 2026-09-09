@@ -67,6 +67,9 @@ export default async function PaginatedProducts({
     queryParams,
     sortBy,
     countryCode,
+    // Shared catalog cache: one entry for all visitors, busted by the
+    // public tag on every seller mutation (see createSellerProduct).
+    publicCache: true,
   })
 
   const totalPages = Math.ceil(count / PRODUCT_LIMIT)
