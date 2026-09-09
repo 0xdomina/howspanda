@@ -11,6 +11,8 @@ import {
 import { encodeProductImage } from "@lib/media/image"
 import { uploadSellerMedia } from "@lib/data/seller-media"
 import RedeemableCard from "@modules/redeemables/components/redeemable-card"
+import ShareButton from "@modules/common/components/share-button"
+import { getBaseURL } from "@lib/util/env"
 
 const money = (amount: number | string | null | undefined) => {
   const value = Number(amount ?? 0)
@@ -358,6 +360,140 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
   )
 }
 
+// Tap a row to see the card exactly as the buyer receives it, with a share
+// action (native sheet, falls back to copy). Screenshotting the open card
+// gives sellers a ready-made visual to post anywhere.
+const RedeemableRow = ({
+  item: r,
+  isOwner,
+  onCancel,
+  cancelPending,
+}: {
+  item: SellerRedeemable
+  isOwner: boolean
+  onCancel: (id: string) => void
+  cancelPending: boolean
+}) => {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const shareText = `${typeLabel(r.type)} · ${r.title ?? ""} — code ${r.code}. Redeem it on How's U.`
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(r.code)
+    } catch {
+      const ta = document.createElement("textarea")
+      ta.value = r.code
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand("copy")
+      ta.remove()
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <li className="py-3">
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="min-w-0 flex-1 text-left"
+          data-testid={`redeemable-row-${r.id}`}
+        >
+          <p className="truncate text-sm font-medium text-ink">
+            {typeLabel(r.type)} · {r.title}
+            <span aria-hidden="true" className="ml-1 text-ink-muted">{open ? "▾" : "▸"}</span>
+          </p>
+          <p className="truncate text-xs text-ink-muted">
+            <span className="font-mono">{r.code}</span>
+            {r.type === "gift_card" && r.balance != null
+              ? ` · ${money(r.balance)} left`
+              : r.face_value != null
+                ? ` · ${money(r.face_value)}`
+                : r.discount_type === "percent"
+                  ? ` · ${r.discount_value}% off`
+                  : ` · ${money(r.discount_value)} off`}
+            {r.issued_to_email ? ` · ${r.issued_to_email}` : ""}
+            {r.expires_at
+              ? ` · expires ${new Date(r.expires_at).toLocaleDateString()}`
+              : ""}
+          </p>
+        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs ${
+              r.status === "active"
+                ? "bg-emerald-600/10 text-emerald-700"
+                : "bg-ink/10 text-ink"
+            }`}
+          >
+            {r.status ?? "unknown"}
+          </span>
+          {isOwner && r.status === "active" && (
+            <button
+              type="button"
+              disabled={cancelPending}
+              onClick={() => onCancel(r.id)}
+              className="text-xs text-rose-600 hover:underline disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+      {open && (
+        <div className="mt-3 animate-[fadeIn_0.3s_ease]" data-testid={`redeemable-detail-${r.id}`}>
+          <RedeemableCard
+            type={r.type}
+            title={r.title}
+            message={r.message}
+            design={r.design_variant}
+            image={r.background_image}
+            accentColor={r.accent_color}
+            faceValue={r.face_value}
+            balance={r.balance}
+            discountType={r.discount_type}
+            discountValue={r.discount_value}
+            code={r.code}
+            eventName={r.event_name}
+            venueName={r.venue_name}
+            venueAddress={r.venue_address}
+            eventStartsAt={r.event_starts_at}
+            eventEndsAt={r.event_ends_at}
+            expiresAt={r.expires_at}
+            mode="owned"
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <ShareButton
+              entity="redeemable"
+              entityId={r.id}
+              label={`Share ${r.title ?? "code"}`}
+              payload={{
+                url: `${getBaseURL()}/store`,
+                text: shareText,
+                title: `${r.title ?? "Gift"} — How's U`,
+              }}
+            />
+            <button
+              type="button"
+              onClick={copyCode}
+              className="rounded-control border border-ink-hairline px-3 py-2 text-xs font-medium text-ink transition hover:bg-ink hover:text-white active:scale-[0.98]"
+            >
+              {copied ? "Code copied ✓" : "Copy code"}
+            </button>
+            <span className="text-[11px] text-ink-muted">
+              Screenshot the card above to post it anywhere.
+            </span>
+          </div>
+        </div>
+      )}
+    </li>
+  )
+}
+
 const RedeemablesClient = ({
   redeemables,
   isOwner,
@@ -484,48 +620,7 @@ const RedeemablesClient = ({
         ) : (
           <ul className="divide-y divide-ink-hairline">
             {filtered.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink">
-                    {typeLabel(r.type)} · {r.title}
-                  </p>
-                  <p className="truncate text-xs text-ink-muted">
-                    <span className="font-mono">{r.code}</span>
-                    {r.type === "gift_card" && r.balance != null
-                      ? ` · ${money(r.balance)} left`
-                      : r.face_value != null
-                        ? ` · ${money(r.face_value)}`
-                        : r.discount_type === "percent"
-                          ? ` · ${r.discount_value}% off`
-                          : ` · ${money(r.discount_value)} off`}
-                    {r.issued_to_email ? ` · ${r.issued_to_email}` : ""}
-                    {r.expires_at
-                      ? ` · expires ${new Date(r.expires_at).toLocaleDateString()}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      r.status === "active"
-                        ? "bg-emerald-600/10 text-emerald-700"
-                        : "bg-ink/10 text-ink"
-                    }`}
-                  >
-                    {r.status ?? "unknown"}
-                  </span>
-                  {isOwner && r.status === "active" && (
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => cancel(r.id)}
-                      className="text-xs text-rose-600 hover:underline disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              </li>
+              <RedeemableRow key={r.id} item={r} isOwner={isOwner} onCancel={cancel} cancelPending={isPending} />
             ))}
           </ul>
         )}
