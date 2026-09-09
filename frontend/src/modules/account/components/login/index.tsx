@@ -67,9 +67,11 @@ const Login = ({ setCurrentView, countryCode }: Props) => {
           password,
         })
         if (!neonError) {
-          // syncNeonAccount unifies the identity (Medusa JWT via bridge)
-          // before landing, so every downstream flow just works.
-          await syncNeonAccount()
+          // Redirect NOW on the Neon session (already authenticated).
+          // Unification (Medusa JWT, cart transfer) continues in the
+          // background; account pages auto-retry into full state. Awaiting
+          // it here made logins hang ~30s whenever the backend slept.
+          syncNeonAccount().catch(() => {})
           window.location.assign(`/${countryCode}/account`)
           return
         }

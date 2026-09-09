@@ -190,7 +190,7 @@ const Register = ({ setCurrentView }: Props) => {
           )
           return
         }
-        await syncNeonAccount()
+        syncNeonAccount().catch(() => {})
         router.refresh()
       } catch (e: any) {
         setError(e?.message || "We could not create your account. Please try again.")
