@@ -1,6 +1,7 @@
-import { retrieveSeller } from "@lib/data/seller"
+import { retrieveSellerState } from "@lib/data/seller"
 import { retrieveCustomer } from "@lib/data/customer"
 import { retrieveMyKyc } from "@lib/data/kyc-server"
+import AccountWarmup from "@modules/account/components/account-warmup"
 import SellerLayout from "@modules/seller/templates/seller-layout"
 import SellerSetupTemplate from "@modules/seller/templates/seller-setup-template"
 import { redirect } from "next/navigation"
@@ -12,12 +13,24 @@ export default async function SellerRouteLayout({
   children: React.ReactNode
   params: Promise<{ countryCode: string }>
 }) {
-  const [{ countryCode }, seller, initialCustomer] = await Promise.all([
+  const [{ countryCode }, sellerState, initialCustomer] = await Promise.all([
     params,
-    retrieveSeller().catch(() => null),
+    retrieveSellerState(),
     retrieveCustomer().catch(() => null),
   ])
+  const seller = sellerState.seller
   let customer = initialCustomer
+
+  // Store status unknown (backend nap, not a "no"): NEVER show the
+  // create-store flow — store owners would see "open a store" for a store
+  // they already own. Retry state instead; it resolves itself on wake.
+  if (sellerState.status === "unknown" && customer) {
+    return (
+      <div className="figma-container py-10">
+        <AccountWarmup title="Checking your store" />
+      </div>
+    )
+  }
 
   if (!seller && customer) {
     // Password-only (Neon) accounts unify on the client (SellerBridgeAuto

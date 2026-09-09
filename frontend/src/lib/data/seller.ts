@@ -77,20 +77,42 @@ const hasAuth = (headers: AuthHeaders): headers is { authorization: string } =>
   "authorization" in headers
 
 export const retrieveSeller = async (): Promise<SellerAdmin | null> => {
+  const state = await retrieveSellerState()
+  return state.seller
+}
+
+// Three-state seller resolution so the UI never mistakes a napping backend
+// for "no store": 'seller' (owns a store), 'none' (confirmed no store),
+// 'unknown' (no token, or the check itself failed — retry, don't redirect).
+export const retrieveSellerState = async (): Promise<
+  | { status: "seller"; seller: SellerAdmin }
+  | { status: "none"; seller: null }
+  | { status: "unknown"; seller: null }
+> => {
   try {
     const headers = await getSellerAuthHeaders()
 
-    if (!hasAuth(headers)) return null
+    if (!hasAuth(headers)) return { status: "none", seller: null }
 
-    return await sdk.client
-      .fetch<{ seller_admin: SellerAdmin }>("/sellers/me", {
-        method: "GET",
-        headers,
-      })
-      .then(({ seller_admin }) => seller_admin)
-      .catch(() => null)
+    try {
+      const seller_admin = await sdk.client
+        .fetch<{ seller_admin: SellerAdmin }>("/sellers/me", {
+          method: "GET",
+          headers,
+        })
+        .then(({ seller_admin }) => seller_admin)
+      if (!seller_admin) return { status: "none", seller: null }
+      return { status: "seller", seller: seller_admin }
+    } catch (error: any) {
+      const status = Number(error?.status ?? error?.response?.status)
+      // 404/401 = confirmed: this identity administers no store.
+      if (status === 404 || status === 401) return { status: "none", seller: null }
+      // Anything else (timeout, 5xx, abort) = unknown. Never show the
+      // create-store flow for this; the caller renders a retry state.
+      return { status: "unknown", seller: null }
+    }
   } catch {
-    return null
+    return { status: "unknown", seller: null }
   }
 }
 

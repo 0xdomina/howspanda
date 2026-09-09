@@ -137,8 +137,27 @@ export default async function SellerDashboardPage() {
   const canViewProducts = sellerHasPermission(seller, "products")
   const canViewAi = sellerHasPermission(seller, "ai")
 
+  const storeHandle = seller.seller?.handle as string | undefined
+
   return (
     <div data-testid="seller-dashboard-page">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+            {seller.seller?.name ?? "Your store"}
+          </p>
+          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">
+            Store overview
+          </h1>
+        </div>
+        {storeHandle && (
+          <Button asChild variant="surface" data-testid="view-my-shop">
+            <LocalizedClientLink href={`/store/${storeHandle}`}>
+              View my shop →
+            </LocalizedClientLink>
+          </Button>
+        )}
+      </div>
       {doneCount < checklist.length && (
         <div className="figma-surface mb-8 p-5" data-testid="seller-checklist">
           <div className="flex items-baseline justify-between gap-4">
