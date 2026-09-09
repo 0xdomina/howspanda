@@ -77,11 +77,20 @@ function publicUrlForKey(key: string) {
   // so images keep loading from CDN even while the API sleeps. Set
   // MEDIA_PUBLIC_URL only if the bucket ever becomes public/CDN-fronted.
   const explicit = process.env.MEDIA_PUBLIC_URL
-  const base = (
+  let base = (
     explicit ||
     process.env.S3_URL ||
     `${process.env.BACKEND_URL || "https://hows-u-api-final.pandastack.app"}/media`
   ).replace(/\/$/, "")
+  // S3_URL is sometimes configured as a bare host (no /media path), which
+  // used to emit proxy-less URLs that 404 everywhere. Guard it here.
+  try {
+    if (!explicit && new URL(base).pathname.replace(/\/$/, "") === "") {
+      base += "/media"
+    }
+  } catch {
+    // Leave unusual bases untouched; validation happens downstream.
+  }
   return `${base}/${key.split("/").map(encodeURIComponent).join("/")}`
 }
 
