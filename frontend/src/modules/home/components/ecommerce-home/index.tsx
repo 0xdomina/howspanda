@@ -67,12 +67,32 @@ export default async function EcommerceHome({ countryCode }: { countryCode: stri
   const cycle = getFlashSaleCycle()
   const promotionMetadata = (product: HttpTypes.StoreProduct) =>
     (product.metadata ?? {}) as Record<string, unknown>
+  // Homepage banners live 72h from the moment they are switched on
+  // (homepage_banner_at), then drop off automatically — statuses for stores.
+  // Banners flagged before timestamps existed get one 72h window from the
+  // product's last update instead of vanishing instantly.
+  const BANNER_TTL_MS = 72 * 60 * 60 * 1000
+  const now = Date.now()
+  const bannerStartedAt = (product: HttpTypes.StoreProduct): number | null => {
+    const metadata = promotionMetadata(product)
+    if (metadata.homepage_banner !== true) return null
+    const since =
+      typeof metadata.homepage_banner_at === "string"
+        ? Date.parse(metadata.homepage_banner_at as string)
+        : NaN
+    if (Number.isFinite(since)) return since
+    const fallback = product.updated_at ? Date.parse(product.updated_at) : NaN
+    return Number.isFinite(fallback) ? fallback : null
+  }
   const selectedFlash = products.filter((product) => {
     const metadata = promotionMetadata(product)
     return metadata.flash_sale === true && Number(metadata.flash_sale_cycle) === cycle.id
   })
   const hasConfiguredFlash = products.some((product) => promotionMetadata(product).flash_sale === true)
-  const selectedBanners = products.filter((product) => promotionMetadata(product).homepage_banner === true)
+  const selectedBanners = products.filter((product) => {
+    const startedAt = bannerStartedAt(product)
+    return startedAt !== null && now - startedAt < BANNER_TTL_MS
+  })
   const hasProducts = products.length > 0
   // Active-cycle picks first; between cycles (or before sellers re-flag),
   // keep the section alive with the freshest products instead of going empty.

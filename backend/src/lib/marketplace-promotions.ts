@@ -1,5 +1,36 @@
 export const FLASH_SALE_DURATION_MS = 3 * 24 * 60 * 60 * 1000
 
+// Homepage banners auto-expire like a status post: 72h after being switched
+// on, the storefront stops featuring them — no manual clearing, and every
+// new banner gets its own window.
+export const HOMEPAGE_BANNER_TTL_MS = 72 * 60 * 60 * 1000
+
+export function homepageBannerStartedAt(
+  metadata: Record<string, unknown> | null | undefined,
+  fallbackStart?: string | null
+): number | null {
+  const meta = (metadata ?? {}) as Record<string, unknown>
+  if (meta.homepage_banner !== true) return null
+  const since =
+    typeof meta.homepage_banner_at === "string"
+      ? Date.parse(meta.homepage_banner_at)
+      : NaN
+  if (Number.isFinite(since)) return since
+  // Grandfathered banners (flagged before timestamps existed) start their
+  // 72h window at the product's last update instead of vanishing instantly.
+  const fallback = fallbackStart ? Date.parse(fallbackStart) : NaN
+  return Number.isFinite(fallback) ? fallback : null
+}
+
+export function isHomepageBannerLive(
+  metadata: Record<string, unknown> | null | undefined,
+  fallbackStart?: string | null,
+  now = Date.now()
+): boolean {
+  const startedAt = homepageBannerStartedAt(metadata, fallbackStart)
+  return startedAt !== null && now - startedAt < HOMEPAGE_BANNER_TTL_MS
+}
+
 // A stable epoch keeps the cycle predictable across server restarts. Products
 // added with flash-sale enabled are assigned to the current cycle.
 export const FLASH_SALE_EPOCH_MS = Date.UTC(2026, 0, 1)
@@ -41,7 +72,15 @@ export const applyPromotionMetadata = (
   }
 
   if (options.homepageBanner !== undefined) {
+    const wasOn = current.homepage_banner === true
     metadata.homepage_banner = options.homepageBanner
+    if (options.homepageBanner && !wasOn) {
+      // Fresh 72h window starts the moment the banner is switched on.
+      // Unrelated edits while it stays on must NOT extend it.
+      metadata.homepage_banner_at = new Date(now).toISOString()
+    } else if (!options.homepageBanner) {
+      delete metadata.homepage_banner_at
+    }
   }
 
   if (options.homepageBannerImage !== undefined) {
