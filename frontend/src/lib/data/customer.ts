@@ -106,65 +106,62 @@ export const getNeonSession = async () => {
   }
 }
 
+const mapNeonCustomer = (
+  neonSession: { user?: any } | null
+): HttpTypes.StoreCustomer | null => {
+  if (!neonSession?.user) return null
+  // Map Neon user to Medusa customer shape so UI can render account/cart
+  const u = neonSession.user as any
+  return {
+    id: `neon_${u.id}`,
+    email: u.email,
+    first_name: u.name?.split(" ")[0] || null,
+    last_name: u.name?.split(" ").slice(1).join(" ") || null,
+    has_account: true,
+  } as unknown as HttpTypes.StoreCustomer
+}
+
 export const retrieveCustomer =
   async (): Promise<HttpTypes.StoreCustomer | null> => {
-    // Neon Auth first — works while PandaStack sleeps
-    const neonSession = await getNeonSession()
-    if (neonSession?.user) {
-      // Map Neon user to Medusa customer shape so UI can render account/cart
-      const u = neonSession.user as any
-      return {
-        id: `neon_${u.id}`,
-        email: u.email,
-        first_name: u.name?.split(" ")[0] || null,
-        last_name: u.name?.split(" ").slice(1).join(" ") || null,
-        has_account: true,
-      } as unknown as HttpTypes.StoreCustomer
-    }
-
-    if (!(await hasAuthToken())) return null
-
-    const authHeaders = await getAuthHeaders()
-
-    if (!authHeaders) return null
-
-    const headers = {
-      ...authHeaders,
-    }
-
-    const next = {
-      ...(await getCacheOptions("customers")),
-    }
-
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        return await sdk.client
-          .fetch<{ customer: HttpTypes.StoreCustomer }>(`/store/customers/me`, {
-            method: "GET",
-            query: {
-              fields: "*orders",
-            },
-            headers,
-            next,
-            cache: "no-store",
-          })
-          .then(({ customer }) => customer)
-      } catch (error: any) {
-        const raw = String(error?.message ?? error ?? "")
-        const retryable =
-          error?.name === "AbortError" ||
-          [502, 503, 504].includes(Number(error?.status)) ||
-          /abort|timed out|timeout|warming|booting/i.test(raw)
-
-        if (!retryable || attempt === 1) {
-          return null
+    // Medusa JWT wins when present: it is the full commerce identity, and
+    // preferring it is what lets a bridged session graduate off the Neon
+    // fallback. Cookie presence is checked without any I/O first.
+    if (await hasAuthToken()) {
+      const authHeaders = await getAuthHeaders()
+      if (authHeaders) {
+        const headers = { ...authHeaders }
+        const next = { ...(await getCacheOptions("customers")) }
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            return await sdk.client
+              .fetch<{ customer: HttpTypes.StoreCustomer }>(
+                `/store/customers/me`,
+                {
+                  method: "GET",
+                  query: { fields: "*orders" },
+                  headers,
+                  next,
+                  cache: "no-store",
+                }
+              )
+              .then(({ customer }) => customer)
+          } catch (error: any) {
+            const raw = String(error?.message ?? error ?? "")
+            const retryable =
+              error?.name === "AbortError" ||
+              [502, 503, 504].includes(Number(error?.status)) ||
+              /abort|timed out|timeout|warming|booting/i.test(raw)
+            if (!retryable) break
+            if (attempt === 1) break
+            await new Promise((resolve) => setTimeout(resolve, 750))
+          }
         }
-
-        await new Promise((resolve) => setTimeout(resolve, 750))
       }
+      // Medusa session missing/expired/unreachable — fall through to Neon.
     }
 
-    return null
+    // Neon Auth fallback — works while the backend sleeps.
+    return mapNeonCustomer(await getNeonSession())
   }
 
 export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
