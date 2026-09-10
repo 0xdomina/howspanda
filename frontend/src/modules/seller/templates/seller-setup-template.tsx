@@ -141,15 +141,28 @@ function SellerBridgeAuto({ customer }: { customer: SellerSetupTemplateProps["cu
     if (tried.current) return
     tried.current = true
     let cancelled = false
-    bridgeNeonSession()
-      .then((res) => {
+    // A sleeping backend often wakes within a minute — retry a few times
+    // before falling back to the manual email-code form.
+    const attempt = async (triesLeft: number): Promise<void> => {
+      if (cancelled) return
+      try {
+        const res = await bridgeNeonSession()
         if (cancelled) return
-        if (res.ok) router.refresh()
-        else setFailed(true)
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
+        if (res.ok) {
+          router.refresh()
+          return
+        }
+      } catch {
+        if (cancelled) return
+      }
+      if (triesLeft <= 1) {
+        setFailed(true)
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20000))
+      await attempt(triesLeft - 1)
+    }
+    void attempt(4)
     return () => {
       cancelled = true
     }
@@ -196,7 +209,7 @@ export default function SellerSetupTemplate({
         <p className="mt-4 max-w-lg text-base-regular leading-7 text-ink-muted">
           {customer.first_name ? `Hi ${customer.first_name}. ` : ""}Your How’s U account can shop, sell, and deliver. Complete your profile once, then set up a store whenever you are ready.
         </p>
-        {needsBridge && !canSell ? (
+        {needsBridge ? (
           <SellerBridgeAuto customer={customer} />
         ) : !canSell ? (
           <div className="mt-8 rounded-control border border-ink-hairline bg-paper-tinted p-5">
