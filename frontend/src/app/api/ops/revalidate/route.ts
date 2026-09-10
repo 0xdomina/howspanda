@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "bad request" }, { status: 400 })
   }
-  if (body.secret !== secret) {
+  if (String(body.secret || "").trim() !== String(secret).trim()) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 })
   }
   const tag = body.tag || PUBLIC_PRODUCTS_TAG
