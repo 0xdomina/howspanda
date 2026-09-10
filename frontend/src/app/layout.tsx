@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const initialWishlist = await loadWishlist()
   const backendHealthUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
-    ? `${process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL.replace(/\/$/, "")}/health`
+    ? `${process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL.replace(/\r|\n/g, "").trim().replace(/^['"]|['"]$/g, "").replace(/\/$/, "")}/health`
     : "/api/backend/health"
 
   return (
