@@ -14,6 +14,14 @@ const LEGACY_MEDIA_HOSTS = [
   "http://hows-u-api.pandastack.app",
 ]
 
+// Belt-and-braces: a few rows were once stored as bare-host URLs without the
+// /media/ proxy segment (since repaired in-DB). Repair on the fly so no
+// render can ever 404 on them again.
+const LIVE_BACKEND_HOSTS = [
+  "https://hows-u-api.onrender.com",
+  "http://hows-u-api.onrender.com",
+]
+
 export const rebaseMediaUrl = (
   url: string | null | undefined
 ): string | null => {
@@ -23,17 +31,27 @@ export const rebaseMediaUrl = (
       return MEDUSA_BACKEND_URL + url.slice(host.length)
     }
   }
+  for (const host of LIVE_BACKEND_HOSTS) {
+    const rest = url.startsWith(host + "/") ? url.slice(host.length + 1) : null
+    if (rest !== null) {
+      const [first] = rest.split("/", 1)
+      let decoded = first
+      try {
+        decoded = decodeURIComponent(first)
+      } catch {
+        // keep raw segment
+      }
+      if (decoded !== "media") {
+        return `${host}/media/${rest}`
+      }
+    }
+  }
   return url
 }
 
 const rebaseDeep = (value: unknown): unknown => {
   if (typeof value === "string") {
-    for (const host of LEGACY_MEDIA_HOSTS) {
-      if (value.startsWith(host + "/")) {
-        return MEDUSA_BACKEND_URL + value.slice(host.length)
-      }
-    }
-    return value
+    return rebaseMediaUrl(value)
   }
   if (Array.isArray(value)) return value.map(rebaseDeep)
   if (value && typeof value === "object") {

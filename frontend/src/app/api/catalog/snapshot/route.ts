@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+import { rebaseProductMedia } from "@lib/util/rebase-media"
+
 export const dynamic = "force-dynamic"
 
 const BACKEND_URL = (
@@ -71,21 +73,11 @@ export async function GET() {
     }
     if (!r.ok) throw new Error(`backend ${r.status}`)
     const data = await r.json()
-    // Rebase pre-Render absolute PandaStack media URLs to the live backend.
+    // Rebase legacy/deformed absolute media URLs (dead hosts, missing
+    // /media/ segment) to the live backend. Shared util keeps every lane
+    // consistent.
     const raw = Array.isArray(data?.products) ? data.products : []
-    const products = raw.map((p: any) => {
-      if (p && typeof p.thumbnail === "string") {
-        for (const host of [
-          "https://hows-u-api.onrender.com",
-          "https://hows-u-api.pandastack.app",
-        ]) {
-          if (p.thumbnail.startsWith(host + "/")) {
-            return { ...p, thumbnail: BACKEND_URL + p.thumbnail.slice(host.length) }
-          }
-        }
-      }
-      return p
-    })
+    const products = raw.map((p: any) => rebaseProductMedia(p))
     return NextResponse.json(
       { products, count: products.length, source: "live" },
       {
