@@ -18,6 +18,10 @@ import {
   setAuthToken,
 } from "./cookies"
 import { removeSellerAuthToken, setSellerAuthToken } from "./seller-cookies"
+// Single-identity helpers live in the leaf module session-unify.ts (shared
+// with seller lanes without import cycles). Imported here for internal use;
+// external callers import from "@lib/data/session-unify" directly (a
+// "use server" file cannot re-export them).
 import {
   bridgeNeonSession,
   ensureMedusaSession,
@@ -315,13 +319,8 @@ export async function login(_currentState: unknown, formData: FormData) {
 }
 
 // Single-identity helpers live in the leaf module session-unify.ts (shared
-// with seller lanes without import cycles). Re-exported here so existing
-// imports from "@lib/data/customer" keep working.
-export {
-  bridgeNeonSession,
-  ensureMedusaSession,
-  getUnifiedAuthHeaders,
-} from "./session-unify"
+// with seller lanes without import cycles); external callers import from
+// "@lib/data/session-unify" directly (a "use server" file cannot re-export).
 
 // Called after a client-side Neon sign-up/sign-in (authClient sets the real
 // session cookie). Unifies the identity (Medusa JWT), transfers any guest

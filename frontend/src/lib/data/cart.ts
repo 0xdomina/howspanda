@@ -16,7 +16,7 @@ import {
 } from "./cookies"
 import { getRegion } from "./regions"
 import { getLocale } from "@lib/data/locale-actions"
-import { getUnifiedAuthHeaders } from "@lib/data/customer"
+import { getUnifiedAuthHeaders } from "@lib/data/session-unify"
 import { revalidateTagSafely } from "./cache"
 
 /**

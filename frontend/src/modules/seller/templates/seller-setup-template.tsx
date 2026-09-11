@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
-import { bridgeNeonSession } from "@lib/data/customer"
+import { bridgeNeonSession } from "@lib/data/session-unify"
 import {
   activateSellerIdentity,
   bridgeLoginOrSendCode,
