@@ -9,6 +9,17 @@ import { SortOptions } from "@modules/store/components/refinement-list/sort-prod
 import { getAuthHeaders, getCacheOptions } from "./cookies"
 import { getRegion, retrieveRegion } from "./regions"
 
+// Full priced-variant expansion for single-product lanes (PDP, buy box):
+// variant images back the gallery's variant filtering.
+const FULL_PRODUCT_FIELDS =
+  "*variants.calculated_price,+variants.inventory_quantity,*variants.images,+metadata,+tags,"
+
+// Slim card fields for grid lanes (homepage, store, related): product cards
+// render prices + stock + metadata + thumbnail/images only — variant images
+// are never touched there, so leave them (and their bytes) behind.
+const CARD_PRODUCT_FIELDS =
+  "*variants.calculated_price,+variants.inventory_quantity,+metadata,+tags,"
+
 export const listProducts = async ({
   pageParam = 1,
   queryParams,
@@ -83,8 +94,7 @@ export const listProducts = async ({
               limit,
               offset,
               region_id: region?.id,
-              fields:
-                "*variants.calculated_price,+variants.inventory_quantity,*variants.images,+metadata,+tags,",
+              fields: FULL_PRODUCT_FIELDS,
               ...queryParams,
             },
             headers,
@@ -153,13 +163,21 @@ export const listProductsWithSort = async ({
 }> => {
   const limit = queryParams?.limit || 12
 
+  // Chattiness guard: price sorts need the whole set client-side (the store
+  // API can't sort by price), so keep the 100-row cap there. created_at sorts
+  // slice a deterministic window instead of always hauling 100 priced rows —
+  // the homepage drops from 100 to 48, store pages to page*12.
+  const isPriceSort = sortBy === "price_asc" || sortBy === "price_desc"
+  const fetchLimit = isPriceSort ? 100 : Math.max(limit, 1) * Math.max(page, 1)
+
   const {
     response: { products, count },
   } = await listProducts({
     pageParam: 0,
     queryParams: {
       ...queryParams,
-      limit: 100,
+      limit: fetchLimit,
+      fields: CARD_PRODUCT_FIELDS,
     },
     countryCode,
     publicCache,
