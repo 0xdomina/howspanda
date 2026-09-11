@@ -10,6 +10,10 @@ export const metadata: Metadata = { title: "Product requests", description: "Res
 export default async function SellerRequestsPage() {
   const seller = await retrieveSeller().catch(() => null)
   if (!seller || !sellerHasPermission(seller, "requests")) notFound()
-  const [requests, products] = await Promise.all([listSellerProductRequests(), listSellerProducts()])
+  // Guarded: failures render the template's empty states, never a page error.
+  const [requests, products] = await Promise.all([
+    listSellerProductRequests().catch(() => []),
+    listSellerProducts().catch(() => []),
+  ])
   return <SellerRequests initial={requests} products={products} />
 }

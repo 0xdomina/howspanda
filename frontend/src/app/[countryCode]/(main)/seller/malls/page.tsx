@@ -18,10 +18,12 @@ export default async function SellerMallsPage() {
   if (!features.malls) notFound()
 
   const seller = await retrieveSeller().catch(() => null)
+  // Guarded: a backend nap must surface the retry/empty states in the
+  // template, never an error boundary over the whole workspace.
   const [malls, products, balance] = await Promise.all([
     listSellerMalls().catch(() => []),
-    listSellerProducts(),
-    retrieveSellerBalance(),
+    listSellerProducts().catch(() => []),
+    retrieveSellerBalance().catch(() => null),
   ])
 
   if (!seller || !sellerHasPermission(seller, "malls")) {

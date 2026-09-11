@@ -13,13 +13,14 @@ export default async function SellerRouteLayout({
   children: React.ReactNode
   params: Promise<{ countryCode: string }>
 }) {
-  const [{ countryCode }, sellerState, initialCustomer] = await Promise.all([
-    params,
-    retrieveSellerState(),
-    retrieveCustomer().catch(() => null),
-  ])
+  // Sequenced, not parallel: retrieveCustomer unifies identity first
+  // (bridging a Neon-only session into a Medusa JWT), so the seller read
+  // below sees the same user instead of racing it and misreading an owner
+  // as "no store".
+  const { countryCode } = await params
+  const customer = await retrieveCustomer().catch(() => null)
+  const sellerState = await retrieveSellerState()
   const seller = sellerState.seller
-  let customer = initialCustomer
 
   // Store status unknown (backend nap, not a "no"): NEVER show the
   // create-store flow — store owners would see "open a store" for a store
@@ -33,9 +34,9 @@ export default async function SellerRouteLayout({
   }
 
   if (!seller && customer) {
-    // Password-only (Neon) accounts unify on the client (SellerBridgeAuto
-    // calls the bridge server action, which alone may set cookies — server
-    // components can only read them). Until then they get the manual form.
+    // No store on the unified identity: either a true non-seller (setup
+    // flow) or a still-unbridged Neon account while the backend naps
+    // (one-step bridge form, never a dead-end redirect loop).
     const kyc = await retrieveMyKyc(customer.email, customer.phone).catch(() => null)
     // Any still-unbridged password account gets the one-step email-verify
     // form instead of a dead-end profile loop.
@@ -65,7 +66,20 @@ export default async function SellerRouteLayout({
   }
 
   return (
-    <SellerLayout seller={seller}>
+    <SellerLayout
+      seller={
+        seller
+          ? {
+              ...seller,
+              // SellerAdmin nests the storefront fields under .seller; the
+              // header template reads them flat — bridge the shape here so
+              // the workspace shows the store name, not a fallback.
+              name: seller.seller?.name ?? seller.first_name,
+              handle: seller.seller?.handle,
+            }
+          : null
+      }
+    >
       {children}
     </SellerLayout>
   )

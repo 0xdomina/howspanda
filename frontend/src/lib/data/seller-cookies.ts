@@ -1,6 +1,6 @@
 import "server-only"
 import { cookies as nextCookies } from "next/headers"
-import { getAuthHeaders } from "./cookies"
+import { ensureMedusaSession } from "./session-unify"
 
 const SELLER_COOKIE = "_medusa_seller_jwt"
 
@@ -11,11 +11,18 @@ export const getSellerAuthHeaders = async (): Promise<
     const cookies = await nextCookies()
     const token = cookies.get(SELLER_COOKIE)?.value
 
-    if (!token) {
-      return getAuthHeaders()
+    if (token) {
+      return { authorization: `Bearer ${token}` }
     }
 
-    return { authorization: `Bearer ${token}` }
+    // No seller JWT: fall back to the unified customer identity, bridging a
+    // Neon-only session on demand so store owners are never locked out of
+    // their shop for holding the "wrong" credential.
+    const customerToken = await ensureMedusaSession()
+    if (customerToken) {
+      return { authorization: `Bearer ${customerToken}` }
+    }
+    return {}
   } catch {
     return {}
   }

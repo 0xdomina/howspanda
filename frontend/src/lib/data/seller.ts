@@ -9,7 +9,8 @@ import {
 import { setAuthToken } from "./cookies"
 import { requestAuthOtp } from "./auth-otp"
 import { PUBLIC_PRODUCTS_TAG, revalidateTagSafely } from "./cache"
-import { getAuthHeaders, getCacheTag } from "./cookies"
+import { getAuthHeaders, getCacheTag, hasAnySession } from "./cookies"
+import { getUnifiedAuthHeaders } from "./session-unify"
 import {
   getSellerAuthHeaders,
   getSellerCacheTag,
@@ -92,7 +93,14 @@ export const retrieveSellerState = async (): Promise<
   try {
     const headers = await getSellerAuthHeaders()
 
-    if (!hasAuth(headers)) return { status: "none", seller: null }
+    // No usable credential at all: distinguish "signed out" (no session
+    // anywhere → confirmed no store) from "session exists but identity isn't
+    // unified yet" (backend nap mid-bridge → unknown → retry state, never the
+    // create-store flow for someone who already owns a store).
+    if (!hasAuth(headers)) {
+      if (await hasAnySession()) return { status: "unknown", seller: null }
+      return { status: "none", seller: null }
+    }
 
     try {
       const seller_admin = await sdk.client
@@ -289,7 +297,9 @@ export async function upgradeCustomerToSeller(
   if (!name) return "Choose a store name to continue."
 
   try {
-    const headers = await getAuthHeaders()
+    // Unified: a Neon-only store owner bridges here instead of being told to
+    // sign in again for the shop they already own.
+    const headers = await getUnifiedAuthHeaders()
     if (!hasAuth(headers)) return "Sign in to your How’s U account first."
 
     const { customer } = await sdk.client.fetch<{

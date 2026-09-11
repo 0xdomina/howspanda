@@ -18,6 +18,11 @@ import {
   setAuthToken,
 } from "./cookies"
 import { removeSellerAuthToken, setSellerAuthToken } from "./seller-cookies"
+import {
+  bridgeNeonSession,
+  ensureMedusaSession,
+  getUnifiedAuthHeaders,
+} from "./session-unify"
 
 type EmailPasswordActor = "customer" | "seller"
 
@@ -309,79 +314,14 @@ export async function login(_currentState: unknown, formData: FormData) {
   try { await transferCart() } catch {}
 }
 
-// Bridges a Neon session into a first-party Medusa JWT (backend verifies the
-// session token server-side, finds-or-creates the customer, mints the token).
-// Silent best-effort: a sleeping backend just means "try again on next load".
-// Bounded by timeoutMs so on-demand callers inside user-facing actions can
-// never hang the request while the backend cold-starts.
-export async function bridgeNeonSession(
-  timeoutMs = 12_000
-): Promise<{ ok: boolean; token?: string }> {
-  try {
-    const cookies = await nextCookies()
-    const sessionToken =
-      cookies.get("__Secure-better-auth.session_token")?.value ||
-      cookies.get("better-auth.session_token")?.value
-    if (!sessionToken) return { ok: false }
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const timeout = new Promise<null>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("bridge-timeout")), timeoutMs)
-    })
-    try {
-      const res = await Promise.race([
-        sdk.client.fetch<{ token?: string }>(`/store/auth/neon`, {
-          method: "POST",
-          body: { sessionToken },
-          cache: "no-store",
-        }),
-        timeout,
-      ])
-      if (!res?.token) return { ok: false }
-      await setAuthToken(res.token)
-      return { ok: true, token: res.token }
-    } finally {
-      if (timer) clearTimeout(timer)
-    }
-  } catch {
-    return { ok: false }
-  }
-}
-
-// Negative-result memo so a sleeping backend is not hammered on every action:
-// one failed bridge attempt suppresses retries for a minute. Success needs no
-// memo — the freshly-set _medusa_jwt cookie makes later calls return early.
-let lastBridgeFailedAt = 0
-const BRIDGE_RETRY_COOLDOWN_MS = 60_000
-
-// Single-identity guarantee: Neon and Medusa are companions, not competitors.
-// Whichever credential the user has, this returns a usable Medusa JWT —
-// minting one from the Neon session on demand when needed. Returns null only
-// when the user has no session at all or the backend is unreachable.
-export async function ensureMedusaSession(): Promise<string | null> {
-  const cookies = await nextCookies()
-  const existing = cookies.get("_medusa_jwt")?.value
-  if (existing) return existing
-  const hasNeon =
-    cookies.get("__Secure-better-auth.session_token")?.value ||
-    cookies.get("better-auth.session_token")?.value
-  if (!hasNeon) return null
-  if (Date.now() - lastBridgeFailedAt < BRIDGE_RETRY_COOLDOWN_MS) return null
-  const bridged = await bridgeNeonSession()
-  if (bridged.ok && bridged.token) return bridged.token
-  lastBridgeFailedAt = Date.now()
-  return null
-}
-
-// Drop-in companion to getAuthHeaders (cookies.ts): same shape, but unifies
-// identity first so Neon-only sessions act with full Medusa rights instead of
-// failing as guests. Cheap when already unified (two cookie reads).
-export async function getUnifiedAuthHeaders(): Promise<
-  { authorization: string } | {}
-> {
-  const token = await ensureMedusaSession()
-  if (!token) return {}
-  return { authorization: `Bearer ${token}` }
-}
+// Single-identity helpers live in the leaf module session-unify.ts (shared
+// with seller lanes without import cycles). Re-exported here so existing
+// imports from "@lib/data/customer" keep working.
+export {
+  bridgeNeonSession,
+  ensureMedusaSession,
+  getUnifiedAuthHeaders,
+} from "./session-unify"
 
 // Called after a client-side Neon sign-up/sign-in (authClient sets the real
 // session cookie). Unifies the identity (Medusa JWT), transfers any guest
