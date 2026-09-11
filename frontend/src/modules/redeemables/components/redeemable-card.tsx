@@ -2,13 +2,8 @@
 
 import { useState } from "react"
 
-const gradients: Record<string, string> = {
-  sunset: "linear-gradient(135deg,#ef4444 0%,#f59e0b 100%)",
-  midnight: "linear-gradient(135deg,#111827 0%,#4338ca 100%)",
-  mint: "linear-gradient(135deg,#047857 0%,#a7f3d0 100%)",
-  candy: "linear-gradient(135deg,#db2777 0%,#c084fc 100%)",
-  cobalt: "linear-gradient(135deg,#2563eb 0%,#22d3ee 100%)",
-}
+import { occasionFor } from "@lib/card-occasions"
+import { legacyGradientFor } from "@lib/store-skins"
 
 const typeLabel = (type: string) =>
   type === "gift_card" ? "Gift card" : type === "voucher" ? "Voucher" : type === "product_gift" ? "Product gift" : "Ticket"
@@ -80,6 +75,16 @@ export default function RedeemableCard({
 }: RedeemableCardProps) {
   const [copied, setCopied] = useState(false)
   const isTicket = type === "ticket" || type === "product_gift"
+  // Occasion art (Nike/Starbucks lesson: the artwork is the product) with a
+  // foil sheen sweep; legacy gradient ids render exactly as before.
+  const occasion = occasionFor(design)
+  const cardBackground = occasion?.art ?? legacyGradientFor(design)
+  const foilTint = occasion?.foil ?? "rgba(255,255,255,.35)"
+  const eyebrow = isTicket
+    ? type === "product_gift"
+      ? "Your collection pass"
+      : "Your entry pass"
+    : (occasion?.sentiment ?? "Made to keep")
   const value =
     type === "voucher"
       ? discountValue
@@ -109,7 +114,7 @@ export default function RedeemableCard({
     <article
       className="group relative isolate overflow-hidden rounded-[28px] text-white shadow-[0_20px_60px_-28px_rgba(15,23,42,.65)] transition-transform duration-200 hover:-translate-y-1 motion-reduce:transition-none"
       style={{
-        background: gradients[design ?? ""] ?? gradients.sunset,
+        background: cardBackground,
         border: accentColor ? `1px solid ${accentColor}99` : undefined,
       }}
       aria-label={`${typeLabel(type)}${title ? `: ${title}` : ""}`}
@@ -119,6 +124,15 @@ export default function RedeemableCard({
         <img src={image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-screen" />
       )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_8%,rgba(255,255,255,.38),transparent_32%),linear-gradient(120deg,rgba(255,255,255,.16),transparent_45%,rgba(0,0,0,.18))]" />
+      {/* Foil sheen: a slow light sweep across the card (Nike's animated-card
+          lesson, CSS-only). Still under prefers-reduced-motion. */}
+      <div
+        aria-hidden
+        className="card-foil-sheen pointer-events-none absolute inset-0"
+        style={{
+          background: `linear-gradient(115deg, transparent 30%, ${foilTint} 46%, rgba(255,255,255,.75) 50%, ${foilTint} 54%, transparent 70%)`,
+        }}
+      />
       <div className="relative p-5 small:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-2">
@@ -141,7 +155,7 @@ export default function RedeemableCard({
 
         <div className="mt-9 min-h-[96px]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/65">
-            {isTicket ? (type === "product_gift" ? "Your collection pass" : "Your entry pass") : "Made to keep"}
+            {eyebrow}
           </p>
           <h3 className="mt-2 line-clamp-2 font-display text-2xl font-medium leading-tight">
             {title || (isTicket ? eventName : undefined) || "A little something for you"}

@@ -5,8 +5,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import { encodeProductImage } from "@lib/media/image"
 import { uploadSellerMedia } from "@lib/data/seller-media"
 import { updateSellerStore } from "@lib/data/seller"
-
-type ThemeName = "sunset" | "midnight" | "mint" | "candy" | "cobalt"
+import { STORE_SKINS, skinFor } from "@lib/store-skins"
 
 type StoreInfo = {
   name?: string
@@ -15,17 +14,9 @@ type StoreInfo = {
   cover_image?: string
   description?: string
   accent_color?: string
-  theme?: ThemeName
+  theme?: string
   crypto_payments_enabled?: boolean
 }
-
-const themes: { id: ThemeName; label: string; sublabel: string; gradient: string; accent: string; ring: string }[] = [
-  { id: "sunset", label: "Sunset", sublabel: "Warm & inviting", gradient: "linear-gradient(135deg,#ef4444 0%,#f97316 55%,#f59e0b 100%)", accent: "#ef4444", ring: "ring-orange-200" },
-  { id: "midnight", label: "Midnight", sublabel: "Bold & premium", gradient: "linear-gradient(135deg,#0f172a 0%,#1e1b4b 45%,#4338ca 100%)", accent: "#4338ca", ring: "ring-indigo-200" },
-  { id: "mint", label: "Mint", sublabel: "Fresh & calm", gradient: "linear-gradient(135deg,#064e3b 0%,#059669 50%,#a7f3d0 100%)", accent: "#059669", ring: "ring-emerald-200" },
-  { id: "candy", label: "Candy", sublabel: "Playful & bright", gradient: "linear-gradient(135deg,#be185d 0%,#db2777 50%,#c084fc 100%)", accent: "#db2777", ring: "ring-pink-200" },
-  { id: "cobalt", label: "Cobalt", sublabel: "Clean & trusted", gradient: "linear-gradient(135deg,#1e3a8a 0%,#2563eb 50%,#22d3ee 100%)", accent: "#2563eb", ring: "ring-blue-200" },
-]
 
 const accentPalette = ["#ef4444","#f97316","#eab308","#059669","#06b6d4","#2563eb","#4338ca","#7c3aed","#db2777","#111827"]
 
@@ -36,13 +27,13 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
   const [coverImage, setCoverImage] = useState(store.cover_image ?? "")
   const [description, setDescription] = useState(store.description ?? "")
   const [accentColor, setAccentColor] = useState(store.accent_color ?? "#ef4444")
-  const [theme, setTheme] = useState<ThemeName>(store.theme ?? "sunset")
+  const [theme, setTheme] = useState<string>(store.theme ?? "sunset")
   const [cryptoEnabled, setCryptoEnabled] = useState(store.crypto_payments_enabled ?? true)
   const [uploading, setUploading] = useState<"logo" | "cover" | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const selectedTheme = themes.find((t) => t.id === theme) ?? themes[0]
+  const selectedTheme = skinFor(theme)
   const publicHandle = handle.trim().toLowerCase() || store.handle || "your-store"
 
   const uploadImage = async (e: ChangeEvent<HTMLInputElement>, target: "logo" | "cover") => {
@@ -138,11 +129,11 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
 
           <div className="glass-panel rounded-large p-6 small:p-7">
             <h3 className="font-display text-lg font-medium text-ink">Look and feel</h3>
-            <p className="mt-1 text-sm text-ink-muted">Five crafted themes — each with its own glass, gradient, and accent. Not a color picker.</p>
+            <p className="mt-1 text-sm text-ink-muted">Eight art-directed skins — each owns banner art, texture, accent and type. Pick a world, not a color.</p>
             <div className="mt-6 grid grid-cols-1 gap-3 small:grid-cols-2">
-              {themes.map((t)=>(
+              {STORE_SKINS.map((t)=>(
                 <button key={t.id} type="button" disabled={!isOwner} onClick={()=>{ setTheme(t.id); setAccentColor(t.accent)}} className={`group relative overflow-hidden rounded-large border p-3 text-left shadow-sm transition disabled:opacity-50 ${theme===t.id ? "border-ink ring-2 ring-ink/10" : "border-white/60 hover:border-ink/20"}`}>
-                  <div className="relative h-20 overflow-hidden rounded-control" style={{background:t.gradient}}>
+                  <div className="relative h-20 overflow-hidden rounded-control" style={{background:t.banner}}>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                     <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
                       <span className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-ink shadow-sm">{t.label}</span>
@@ -156,7 +147,8 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
               ))}
             </div>
             <div className="mt-6 rounded-control border border-ink-hairline bg-white/70 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Accent</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Fine-tune accent</p>
+              <p className="mt-1 text-xs text-ink-muted">Optional — the skin already sets one. Override it only if you must.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {accentPalette.map((c)=>(
                   <button key={c} type="button" disabled={!isOwner} onClick={()=>setAccentColor(c)} className={`h-9 w-9 rounded-full border-2 shadow-sm transition hover:scale-105 ${accentColor===c ? "border-ink ring-2 ring-ink/10" : "border-white"}`} style={{background:c}} aria-label={c} />
@@ -188,7 +180,7 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
               <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700">Preview</span>
             </div>
             <div key={theme+accentColor+coverImage+logo} className="overflow-hidden rounded-large border border-white/60 bg-white/80 shadow-sm transition-all duration-500">
-              <div className="relative h-28 overflow-hidden" style={{background: selectedTheme.gradient}}>
+              <div className="relative h-28 overflow-hidden" style={{background: selectedTheme.banner}}>
                 {coverImage && <img src={coverImage} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80 transition-opacity duration-500" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
                 <div className="absolute inset-0 backdrop-blur-[0.5px]" />
@@ -196,9 +188,9 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
               <div className="relative bg-white/85 px-5 pb-6 backdrop-blur">
                 <div className="-mt-8 flex items-end justify-between">
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-ink/10 text-xl font-medium text-ink shadow-md transition-all duration-500">{logo ? <img src={logo} alt="" className="h-full w-full object-cover" /> : (storeName.slice(0,1) || "Y").toUpperCase()}</div>
-                  <span className="rounded-full px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-colors duration-300" style={{backgroundColor: accentColor}}>Follow</span>
+                  <span className="rounded-full px-4 py-1.5 text-xs font-medium shadow-sm transition-colors duration-300" style={{backgroundColor: accentColor, color: "#fff"}}>Follow</span>
                 </div>
-                <h4 className="mt-4 font-display text-xl font-medium text-ink">{storeName || "Your store"}</h4>
+                <h4 className={`mt-4 text-xl text-ink ${selectedTheme.titleClass}`}>{storeName || "Your store"}</h4>
                 <p className="text-xs text-ink-muted">@{publicHandle}</p>
                 <p className="mt-3 line-clamp-3 text-sm leading-6 text-ink/80">{description || "Your store intro will appear here. Make it warm, make it you."}</p>
                 <div className="mt-6 grid grid-cols-3 gap-2">

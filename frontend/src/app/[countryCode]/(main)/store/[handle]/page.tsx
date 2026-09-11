@@ -3,22 +3,12 @@ import { notFound } from "next/navigation"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ShareButton from "@modules/common/components/share-button"
 import { getStoreProfile } from "@lib/data/follows"
+import { skinFor, skinVars } from "@lib/store-skins"
 import FollowButton from "@modules/store/components/follow-button"
 import { getBaseURL } from "@lib/util/env"
 import RedeemableCard from "@modules/redeemables/components/redeemable-card"
 import ProductShare from "@modules/products/components/product-share"
 import RequestProduct from "@modules/store/components/request-product"
-
-const visualFor = (variant?: string) => {
-  const defaults: Record<string, string> = {
-    sunset: "linear-gradient(135deg,#ef4444,#f59e0b)",
-    midnight: "linear-gradient(135deg,#111827,#4338ca)",
-    mint: "linear-gradient(135deg,#047857,#a7f3d0)",
-    candy: "linear-gradient(135deg,#db2777,#c084fc)",
-    cobalt: "linear-gradient(135deg,#2563eb,#22d3ee)",
-  }
-  return defaults[variant ?? ""] ?? defaults.sunset
-}
 
 export async function generateMetadata({
   params,
@@ -70,11 +60,22 @@ export default async function StorePage({
   const { seller, follower_count, followed_by_viewer, products, broadcasts, trust } =
     profile
 
+  // One skin, whole page: the banner art, accent actions, borders, badges and
+  // titles all drink from these variables. A seller fine-tuned accent wins
+  // over the skin accent; the skin still owns pattern, texture and type.
+  const skin = skinFor(seller.theme)
+  const vars = {
+    ...skinVars(skin),
+    ...(seller.accent_color
+      ? ({ "--store-accent": seller.accent_color } as Record<string, string>)
+      : {}),
+  }
+
   return (
-    <div className="figma-container flex flex-col gap-12 py-10 small:py-16">
+    <div className="figma-container flex flex-col gap-12 py-10 small:py-16" style={vars}>
       {/* Store header */}
-      <section className="glass-panel relative overflow-hidden rounded-control p-6 small:p-8" style={{ borderColor: `${seller.accent_color ?? "#ef4444"}33` }}>
-        <div className="absolute inset-x-0 top-0 h-28 opacity-90" style={{ background: visualFor(seller.theme) }} />
+      <section className="glass-panel relative overflow-hidden rounded-control p-6 small:p-8" style={{ borderColor: "var(--store-edge)" }}>
+        <div className="absolute inset-x-0 top-0 h-28 opacity-90" style={{ background: "var(--store-banner)" }} />
         {seller.cover_image && <img src={seller.cover_image} alt="" loading="lazy" decoding="async" className="absolute inset-x-0 top-0 h-28 w-full object-cover opacity-70" />}
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-transparent to-white/90" />
         <div className="relative flex flex-col gap-6 pt-10 small:flex-row small:items-end small:justify-between">
@@ -95,7 +96,7 @@ export default async function StorePage({
           )}
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-display text-2xl font-medium tracking-[-0.02em] text-ink">
+              <h1 className={`text-2xl text-ink ${skin.titleClass}`}>
                 {seller.name}
               </h1>
               {seller.verification_status === "verified" && (
@@ -155,8 +156,10 @@ export default async function StorePage({
             {broadcasts.map((b) => (
               <li
                 key={b.id}
-                className="figma-surface p-4"
+                className="figma-surface relative overflow-hidden p-4 pl-5"
+                style={{ borderColor: "var(--store-edge)" }}
               >
+                <span aria-hidden className="absolute inset-y-3 left-0 w-1 rounded-full" style={{ background: "var(--store-accent)" }} />
                 <p className="text-sm font-medium text-ink">{b.title}</p>
                 <p className="mt-1 text-sm text-ink-muted">{b.body}</p>
                 <p className="mt-2 text-xs text-ink-muted">
@@ -173,7 +176,7 @@ export default async function StorePage({
       {profile.redeemables.length > 0 && (
         <section>
           <div className="mb-4 flex items-end justify-between gap-4">
-            <div><p className="text-xs font-medium uppercase tracking-[0.16em] text-ink-muted">Made for sharing</p><h2 className="mt-1 font-display text-xl font-medium text-ink">Gift cards, tickets & vouchers</h2></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: "var(--store-accent)" }}>Made for sharing</p><h2 className="mt-1 font-display text-xl font-medium text-ink">Gift cards, tickets & vouchers</h2></div>
             <span className="text-xs text-ink-muted">Pick a little joy</span>
           </div>
           <div className="grid gap-4 small:grid-cols-2 large:grid-cols-3">
@@ -215,7 +218,7 @@ export default async function StorePage({
         ) : (
           <ul className="grid grid-cols-2 gap-4 small:grid-cols-3 medium:grid-cols-4">
             {products.map((p) => (
-              <li key={p.id} className="group card-lift overflow-hidden rounded-control border border-white/60 bg-white/70 p-2 shadow-sm backdrop-blur">
+              <li key={p.id} className="group card-lift overflow-hidden rounded-control bg-white/70 p-2 shadow-sm backdrop-blur transition-colors" style={{ border: "1px solid var(--store-edge)" }}>
                 <LocalizedClientLink
                   href={`/${countryCode}/products/${p.handle}`}
                   className="block"

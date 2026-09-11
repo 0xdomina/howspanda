@@ -42,10 +42,18 @@ const FollowButton = ({
           type="button"
           disabled={isPending}
           onClick={toggle}
-          className={`rounded-medium px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${
+          style={
+            following
+              ? undefined
+              : {
+                  backgroundColor: "var(--store-accent, #1c1917)",
+                  color: "var(--store-accent-ink, #ffffff)",
+                }
+          }
+          className={`rounded-medium px-4 py-2 text-sm font-medium shadow-sm transition disabled:opacity-50 ${
             following
               ? "border border-ink-strong text-ink hover:bg-ink hover:text-white"
-              : "bg-ink text-white hover:bg-ink/90"
+              : "hover:brightness-110"
           }`}
         >
           {isPending ? "…" : following ? "Following" : "Follow"}

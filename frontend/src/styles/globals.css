@@ -5,6 +5,32 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/* Gift-card foil sheen: a slow light sweep across occasion cards. */
+@keyframes card-foil-sweep {
+  0% {
+    transform: translateX(-70%) skewX(-8deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  45% {
+    transform: translateX(70%) skewX(-8deg);
+    opacity: 1;
+  }
+  60%,
+  100% {
+    transform: translateX(130%) skewX(-8deg);
+    opacity: 0;
+  }
+}
+
+.card-foil-sheen {
+  transform: translateX(-70%) skewX(-8deg);
+  animation: card-foil-sweep 7s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
 @layer base {
   html,
   body {

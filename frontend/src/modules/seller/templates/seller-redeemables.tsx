@@ -13,6 +13,11 @@ import { uploadSellerMedia } from "@lib/data/seller-media"
 import RedeemableCard from "@modules/redeemables/components/redeemable-card"
 import ShareButton from "@modules/common/components/share-button"
 import { getBaseURL } from "@lib/util/env"
+import {
+  CARD_OCCASIONS,
+  occasionDesignValue,
+} from "@lib/card-occasions"
+import { legacyGradientFor } from "@lib/store-skins"
 
 const money = (amount: number | string | null | undefined) => {
   const value = Number(amount ?? 0)
@@ -30,12 +35,13 @@ const typeLabel = (type: string) => {
   return "Ticket"
 }
 
-const designGradients: Record<string, string> = {
-  sunset: "linear-gradient(135deg,#ef4444,#f59e0b)",
-  midnight: "linear-gradient(135deg,#111827,#4338ca)",
-  mint: "linear-gradient(135deg,#047857,#a7f3d0)",
-  candy: "linear-gradient(135deg,#db2777,#c084fc)",
-  cobalt: "linear-gradient(135deg,#2563eb,#22d3ee)",
+const CLASSIC_DESIGNS = ["sunset", "midnight", "mint", "candy", "cobalt"] as const
+const CLASSIC_ACCENTS: Record<string, string> = {
+  sunset: "#ef4444",
+  midnight: "#4338ca",
+  mint: "#047857",
+  candy: "#db2777",
+  cobalt: "#2563eb",
 }
 
 const RedeemInStore = () => {
@@ -109,9 +115,9 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
   const [quantity, setQuantity] = useState("1")
   const [email, setEmail] = useState("")
   const [expires, setExpires] = useState("")
-  const [design, setDesign] = useState<"sunset" | "midnight" | "mint" | "candy" | "cobalt">("sunset")
+  const [design, setDesign] = useState<string>("occasion:birthday")
   const [backgroundImage, setBackgroundImage] = useState("")
-  const [accentColor, setAccentColor] = useState("#ef4444")
+  const [accentColor, setAccentColor] = useState("#f9a8d4")
   const [message, setMessage] = useState("")
   const [eventName, setEventName] = useState("")
   const [venueName, setVenueName] = useState("")
@@ -336,9 +342,32 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
       </div>
       <div className="rounded-medium border border-ink-hairline bg-white/40 p-3">
         <p className="text-sm font-medium text-ink">Make it memorable</p>
-        <p className="mt-1 text-xs text-ink-muted">Choose a look buyers will recognise when they receive it.</p>
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          {(Object.keys(designGradients) as ("sunset" | "midnight" | "mint" | "candy" | "cobalt")[]).map((item) => <button key={item} type="button" aria-label={`${item} design`} onClick={() => { setDesign(item); setAccentColor({ sunset: "#ef4444", midnight: "#4338ca", mint: "#047857", candy: "#db2777", cobalt: "#2563eb" }[item]) }} className={`h-8 rounded-small border-2 ${design === item ? "border-ink" : "border-transparent"}`} style={{ background: designGradients[item] }} />)}
+        <p className="mt-1 text-xs text-ink-muted">Pick the occasion — illustrated artwork buyers recognise instantly.</p>
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {CARD_OCCASIONS.map((o) => {
+            const value = occasionDesignValue(o.id)
+            const active = design === value
+            return (
+              <button
+                key={o.id}
+                type="button"
+                aria-label={`${o.label} occasion`}
+                title={o.label}
+                onClick={() => { setDesign(value); setAccentColor(o.accent) }}
+                className={`group relative h-14 overflow-hidden rounded-small border-2 transition ${active ? "border-ink ring-2 ring-ink/10" : "border-transparent hover:border-ink/20"}`}
+                style={{ background: o.art }}
+              >
+                <span className="absolute inset-x-0 bottom-0 bg-black/45 px-1 py-0.5 text-center text-[9px] font-semibold leading-tight text-white">
+                  {o.label}
+                </span>
+                {active && <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-white text-[10px] text-ink">✓</span>}
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-3 text-xs text-ink-muted">Or a classic gradient</p>
+        <div className="mt-2 grid grid-cols-5 gap-2">
+          {CLASSIC_DESIGNS.map((item) => <button key={item} type="button" aria-label={`${item} design`} onClick={() => { setDesign(item); setAccentColor(CLASSIC_ACCENTS[item]) }} className={`h-8 rounded-small border-2 ${design === item ? "border-ink" : "border-transparent"}`} style={{ background: legacyGradientFor(item) }} />)}
         </div>
         <div className="mt-3 flex items-center gap-3"><label className="text-xs text-ink-muted">Highlight</label><input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent" /></div>
         <label className="mt-3 flex cursor-pointer items-center justify-center rounded-medium border border-dashed border-ink-hairline px-3 py-2 text-xs font-medium text-ink hover:bg-white">{uploading ? "Preparing image…" : backgroundImage ? "Change artwork" : "Add artwork (optional)"}<input type="file" accept="image/*" className="sr-only" onChange={uploadBackground} disabled={uploading} /></label>

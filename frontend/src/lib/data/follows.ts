@@ -32,7 +32,7 @@ export type StoreProfile = {
     cover_image: string | null
     description: string | null
     accent_color: string
-    theme: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
+    theme: string
     verification_status: string
   }
   follower_count: number
@@ -42,7 +42,7 @@ export type StoreProfile = {
     id: string
     type: "gift_card" | "voucher" | "ticket" | "product_gift"
     title: string
-    design_variant?: "sunset" | "midnight" | "mint" | "candy" | "cobalt"
+    design_variant?: string
     background_image?: string | null
     accent_color?: string | null
     message?: string | null
