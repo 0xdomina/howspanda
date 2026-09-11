@@ -10,7 +10,9 @@ type AddressBookProps = {
 }
 
 const AddressBook: React.FC<AddressBookProps> = ({ customer, region }) => {
-  const { addresses } = customer
+  // Belt-and-braces: bridged (Neon) sessions can resolve a customer without
+  // an addresses field — an undefined map target crashes the whole page.
+  const addresses = customer.addresses ?? []
   return (
     <div className="w-full">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 mt-4">

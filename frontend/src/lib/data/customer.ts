@@ -110,7 +110,9 @@ const mapNeonCustomer = (
   neonSession: { user?: any } | null
 ): HttpTypes.StoreCustomer | null => {
   if (!neonSession?.user) return null
-  // Map Neon user to Medusa customer shape so UI can render account/cart
+  // Map Neon user to Medusa customer shape so UI can render account/cart.
+  // addresses is always an array: account + checkout components map over it
+  // and a missing field would crash those pages for bridged sessions.
   const u = neonSession.user as any
   return {
     id: `neon_${u.id}`,
@@ -118,6 +120,7 @@ const mapNeonCustomer = (
     first_name: u.name?.split(" ")[0] || null,
     last_name: u.name?.split(" ").slice(1).join(" ") || null,
     has_account: true,
+    addresses: [],
   } as unknown as HttpTypes.StoreCustomer
 }
 
@@ -144,7 +147,13 @@ export const retrieveCustomer =
                   cache: "no-store",
                 }
               )
-              .then(({ customer }) => customer)
+              .then(({ customer }) => ({
+                ...customer,
+                // Never hand UI a customer without an addresses array —
+                // AddressBook/AddAddress (profile) and ShippingAddress
+                // (checkout) map/filter over it unconditionally.
+                addresses: (customer as any)?.addresses ?? [],
+              }))
           } catch (error: any) {
             const raw = String(error?.message ?? error ?? "")
             const retryable =

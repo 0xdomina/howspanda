@@ -32,7 +32,7 @@ const AddAddress = ({
       return res
     },
     {
-      isDefaultShipping: addresses.length === 0,
+      isDefaultShipping: (addresses ?? []).length === 0,
       success: false,
       error: null,
     }

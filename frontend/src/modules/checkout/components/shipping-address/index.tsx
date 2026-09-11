@@ -38,9 +38,12 @@ const ShippingAddress = ({
   )
 
   // check if customer has saved addresses that are in the current region
+  // (bridged sessions may resolve a customer without an addresses field —
+  // never let that throw inside the checkout form).
+  const savedAddresses = customer?.addresses ?? []
   const addressesInRegion = useMemo(
     () =>
-      customer?.addresses.filter(
+      savedAddresses.filter(
         (a) => a.country_code && countriesInRegion?.includes(a.country_code)
       ),
     [customer?.addresses, countriesInRegion]
@@ -106,7 +109,7 @@ const ShippingAddress = ({
               : "Do you want to use one of your saved addresses?"}
           </p>
           <AddressSelect
-            addresses={customer.addresses}
+            addresses={savedAddresses}
             addressInput={
               mapKeys(formData, (_, key) =>
                 key.replace("shipping_address.", "")
