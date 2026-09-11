@@ -31,7 +31,11 @@ async function getStorefrontOrigin(): Promise<string> {
 
 async function saveAddressThroughEdge(
   address: object,
-  addressId?: string
+  addressId?: string,
+  // Freshly-bridged token, when the caller just unified identity: the edge
+  // route reads request cookies, which don't include a JWT set during this
+  // same request — forwarding it explicitly closes that gap.
+  bearerToken?: string
 ) {
   const origin = await getStorefrontOrigin()
   const response = await fetch(`${origin}/api/customer/addresses`, {
@@ -39,6 +43,7 @@ async function saveAddressThroughEdge(
     headers: {
       "content-type": "application/json",
       origin,
+      ...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
     },
     body: JSON.stringify({ address, addressId }),
     cache: "no-store",
@@ -169,13 +174,37 @@ export const retrieveCustomer =
       // Medusa session missing/expired/unreachable — fall through to Neon.
     }
 
+    // No usable Medusa JWT, but the user may hold a Neon session: unify on
+    // demand instead of settling for the limited Neon-only view. One attempt
+    // (cooldown-guarded inside) — then the full customer below, else fallback.
+    const bridgedToken = await ensureMedusaSession()
+    if (bridgedToken) {
+      try {
+        const fetched = await sdk.client.fetch<{
+          customer: HttpTypes.StoreCustomer
+        }>(`/store/customers/me`, {
+          method: "GET",
+          query: { fields: "*orders" },
+          headers: { authorization: `Bearer ${bridgedToken}` },
+          cache: "no-store",
+        })
+        const customer = fetched.customer
+        return {
+          ...customer,
+          addresses: (customer as any)?.addresses ?? [],
+        }
+      } catch {
+        // Bridged but the read still failed — fall through to Neon view.
+      }
+    }
+
     // Neon Auth fallback — works while the backend sleeps.
     return mapNeonCustomer(await getNeonSession())
   }
 
 export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
   const headers = {
-    ...(await getAuthHeaders()),
+    ...(await getUnifiedAuthHeaders()),
   }
 
   const updateRes = await sdk.store.customer
@@ -283,23 +312,75 @@ export async function login(_currentState: unknown, formData: FormData) {
 // Bridges a Neon session into a first-party Medusa JWT (backend verifies the
 // session token server-side, finds-or-creates the customer, mints the token).
 // Silent best-effort: a sleeping backend just means "try again on next load".
-export async function bridgeNeonSession(): Promise<{ ok: boolean }> {
+// Bounded by timeoutMs so on-demand callers inside user-facing actions can
+// never hang the request while the backend cold-starts.
+export async function bridgeNeonSession(
+  timeoutMs = 12_000
+): Promise<{ ok: boolean; token?: string }> {
   try {
     const cookies = await nextCookies()
     const sessionToken =
       cookies.get("__Secure-better-auth.session_token")?.value ||
       cookies.get("better-auth.session_token")?.value
     if (!sessionToken) return { ok: false }
-    const res = await sdk.client.fetch<{ token?: string }>(
-      `/store/auth/neon`,
-      { method: "POST", body: { sessionToken }, cache: "no-store" }
-    )
-    if (!res?.token) return { ok: false }
-    await setAuthToken(res.token)
-    return { ok: true }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<null>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("bridge-timeout")), timeoutMs)
+    })
+    try {
+      const res = await Promise.race([
+        sdk.client.fetch<{ token?: string }>(`/store/auth/neon`, {
+          method: "POST",
+          body: { sessionToken },
+          cache: "no-store",
+        }),
+        timeout,
+      ])
+      if (!res?.token) return { ok: false }
+      await setAuthToken(res.token)
+      return { ok: true, token: res.token }
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
   } catch {
     return { ok: false }
   }
+}
+
+// Negative-result memo so a sleeping backend is not hammered on every action:
+// one failed bridge attempt suppresses retries for a minute. Success needs no
+// memo — the freshly-set _medusa_jwt cookie makes later calls return early.
+let lastBridgeFailedAt = 0
+const BRIDGE_RETRY_COOLDOWN_MS = 60_000
+
+// Single-identity guarantee: Neon and Medusa are companions, not competitors.
+// Whichever credential the user has, this returns a usable Medusa JWT —
+// minting one from the Neon session on demand when needed. Returns null only
+// when the user has no session at all or the backend is unreachable.
+export async function ensureMedusaSession(): Promise<string | null> {
+  const cookies = await nextCookies()
+  const existing = cookies.get("_medusa_jwt")?.value
+  if (existing) return existing
+  const hasNeon =
+    cookies.get("__Secure-better-auth.session_token")?.value ||
+    cookies.get("better-auth.session_token")?.value
+  if (!hasNeon) return null
+  if (Date.now() - lastBridgeFailedAt < BRIDGE_RETRY_COOLDOWN_MS) return null
+  const bridged = await bridgeNeonSession()
+  if (bridged.ok && bridged.token) return bridged.token
+  lastBridgeFailedAt = Date.now()
+  return null
+}
+
+// Drop-in companion to getAuthHeaders (cookies.ts): same shape, but unifies
+// identity first so Neon-only sessions act with full Medusa rights instead of
+// failing as guests. Cheap when already unified (two cookie reads).
+export async function getUnifiedAuthHeaders(): Promise<
+  { authorization: string } | {}
+> {
+  const token = await ensureMedusaSession()
+  if (!token) return {}
+  return { authorization: `Bearer ${token}` }
 }
 
 // Called after a client-side Neon sign-up/sign-in (authClient sets the real
@@ -355,7 +436,9 @@ export async function transferCart() {
     return
   }
 
-  const headers = await getAuthHeaders()
+  // Unified: a Neon-only session bridges here so the cart actually changes
+  // hands instead of silently staying a guest cart.
+  const headers = await getUnifiedAuthHeaders()
 
   await sdk.store.cart.transferCart(cartId, {}, headers)
 
@@ -385,7 +468,7 @@ export const addCustomerAddress = async (
     is_default_shipping: isDefaultShipping,
   }
 
-  return saveAddressThroughEdge(address)
+  return saveAddressThroughEdge(address, undefined, (await ensureMedusaSession()) ?? undefined)
     .then(async ({ customer }) => {
       const customerCacheTag = await getCacheTag("customers")
       revalidateTagSafely(customerCacheTag)
@@ -400,7 +483,7 @@ export const deleteCustomerAddress = async (
   addressId: string
 ): Promise<void> => {
   const headers = {
-    ...(await getAuthHeaders()),
+    ...(await getUnifiedAuthHeaders()),
   }
 
   await sdk.store.customer
@@ -444,7 +527,7 @@ export const updateCustomerAddress = async (
     address.phone = phone
   }
 
-  return saveAddressThroughEdge(address, addressId)
+  return saveAddressThroughEdge(address, addressId, (await ensureMedusaSession()) ?? undefined)
     .then(async () => {
       const customerCacheTag = await getCacheTag("customers")
       revalidateTagSafely(customerCacheTag)

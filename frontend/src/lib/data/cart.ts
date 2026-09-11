@@ -16,6 +16,7 @@ import {
 } from "./cookies"
 import { getRegion } from "./regions"
 import { getLocale } from "@lib/data/locale-actions"
+import { getUnifiedAuthHeaders } from "@lib/data/customer"
 import { revalidateTagSafely } from "./cache"
 
 /**
@@ -150,8 +151,10 @@ export async function updateCart(data: HttpTypes.StoreUpdateCart) {
     throw new Error("No existing cart found, please create one before updating")
   }
 
+  // Unified identity: a Neon-only session bridges here so address updates
+  // stay linked to the customer instead of landing on a guest cart.
   const headers = {
-    ...(await getAuthHeaders()),
+    ...(await getUnifiedAuthHeaders()),
   }
 
   return sdk.store.cart
@@ -316,7 +319,7 @@ export async function setShippingMethod({
   shippingMethodId: string
 }) {
   const headers = {
-    ...(await getAuthHeaders()),
+    ...(await getUnifiedAuthHeaders()),
   }
 
   return sdk.store.cart
@@ -333,7 +336,7 @@ export async function initiatePaymentSession(
   data: HttpTypes.StoreInitializePaymentSession
 ) {
   const headers = {
-    ...(await getAuthHeaders()),
+    ...(await getUnifiedAuthHeaders()),
   }
 
   return sdk.store.payment
@@ -526,8 +529,10 @@ export async function placeOrder(cartId?: string) {
     throw new Error("No existing cart found when placing an order")
   }
 
+  // Unified identity: the order must belong to the user no matter which
+  // credential (Neon or Medusa) they signed in with.
   const headers = {
-    ...(await getAuthHeaders()),
+    ...(await getUnifiedAuthHeaders()),
   }
 
   const cartRes = await sdk.client

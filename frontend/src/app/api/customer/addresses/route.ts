@@ -29,7 +29,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Enter the required address details." }, { status: 400 })
   }
 
-  const token = request.cookies.get("_medusa_jwt")?.value
+  // Single-identity rule: Neon and Medusa are companions. Accept the Medusa
+  // JWT from a forwarded Authorization header (a server action may have just
+  // bridged identity during this same request, so the cookie isn't set yet),
+  // else the cookie — else bridge the Neon session inline right here instead
+  // of failing with "sign in again".
+  const forwardedAuth = request.headers.get("authorization")
+  const headerToken =
+    forwardedAuth?.toLowerCase().startsWith("bearer ")
+      ? forwardedAuth.slice(7).trim()
+      : null
+  let token = headerToken || request.cookies.get("_medusa_jwt")?.value || null
+  if (!token) {
+    const neonSessionToken =
+      request.cookies.get("__Secure-better-auth.session_token")?.value ||
+      request.cookies.get("better-auth.session_token")?.value
+    if (neonSessionToken) {
+      try {
+        const bridged = await fetch(`${BACKEND_URL}/store/auth/neon`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionToken: neonSessionToken }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(12_000),
+        })
+        const bridgedBody = (await bridged.json().catch(() => null)) as {
+          token?: string
+        } | null
+        if (bridged.ok && bridgedBody?.token) token = bridgedBody.token
+      } catch {
+        // Backend unreachable — fall through to the 401 below.
+      }
+    }
+  }
   const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
   if (!token || !publishableKey) {
     return NextResponse.json({ message: "Please sign in again to save your address." }, { status: 401 })
