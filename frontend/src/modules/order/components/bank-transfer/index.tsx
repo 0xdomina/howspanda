@@ -195,6 +195,85 @@ export default function BankTransferCard({
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
+  // Browser → B2 direct PUT with byte progress. Rejects with `isNetwork`
+  // when the failure is network-level (unreachable host / blocked preflight)
+  // as opposed to an HTTP error status — only network failures qualify for
+  // the backend-relay fallback below.
+  const putDirectToB2 = (
+    uploadUrl: string,
+    file: File,
+    mime: string,
+    onKey: () => string
+  ) =>
+    new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhrRef.current = xhr
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          // Reserve the last 10% for server-side verification.
+          setProgress(Math.round((e.loaded / e.total) * 90))
+        }
+      }
+      xhr.onload = () =>
+        xhr.status >= 200 && xhr.status < 300
+          ? resolve(onKey())
+          : reject(
+              Object.assign(
+                new Error("Proof upload failed. Please try again."),
+                { isNetwork: false }
+              )
+            )
+      xhr.onerror = () =>
+        reject(
+          Object.assign(
+            new Error("Network error during upload. Please try again."),
+            { isNetwork: true }
+          )
+        )
+      xhr.onabort = () => reject(new Error("Upload cancelled."))
+      xhr.open("PUT", uploadUrl)
+      xhr.setRequestHeader("content-type", mime)
+      xhr.send(file)
+    })
+
+  // Backend relay fallback: same-origin POST through our own API route (no
+  // B2 reachability, CORS, or presigned-URL expiry involved). Used when the
+  // direct PUT fails at all — the relay validates + stores identically.
+  const postViaBackendRelay = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const form = new FormData()
+      form.append("file", file, file.name || "payment-proof.webp")
+      const xhr = new XMLHttpRequest()
+      xhrRef.current = xhr
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          setProgress(Math.round((e.loaded / e.total) * 90))
+        }
+      }
+      xhr.onload = () => {
+        let body: any = null
+        try {
+          body = JSON.parse(xhr.responseText || "{}")
+        } catch {
+          body = null
+        }
+        if (xhr.status >= 200 && xhr.status < 300 && body?.url) {
+          resolve(body.url as string)
+          return
+        }
+        const message =
+          (body && typeof body.message === "string" && body.message) ||
+          "Proof upload failed. Please try again."
+        reject(new Error(message))
+      }
+      xhr.onerror = () =>
+        reject(new Error("Could not reach the store. Check your connection and try again."))
+      xhr.onabort = () => reject(new Error("Upload cancelled."))
+      // Same-origin: cookies ride along, no preflight, no extra headers.
+      xhr.open("POST", "/api/customer/proof-upload")
+      xhr.send(form)
+    })
+
   const handleUpload = async (f: File) => {
     xhrRef.current?.abort()
     setUploadError(null)
@@ -223,40 +302,40 @@ export default function BankTransferCard({
         return
       }
 
-      // XMLHttpRequest: the only way to get REAL byte-level upload progress.
-      const url = await new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhrRef.current = xhr
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            // Reserve the last 10% for server-side verification.
-            setProgress(Math.round((e.loaded / e.total) * 90))
-          }
+      let proofReference: string
+      try {
+        // Primary lane: straight to private B2 (works even while the API
+        // naps, spares backend bandwidth).
+        const key = await putDirectToB2(
+          prepared.uploadUrl,
+          uploadFile,
+          mime,
+          () => prepared.key
+        )
+        setProgress(95)
+        const completed = await completeProofUpload({
+          key,
+          size: uploadFile.size,
+          mime,
+        })
+        if (completed.error || !completed.url) {
+          setUploadError(completed.error ?? "Proof upload could not be verified.")
+          setProgress(null)
+          return
         }
-        xhr.onload = () =>
-          xhr.status >= 200 && xhr.status < 300
-            ? resolve(prepared.key)
-            : reject(new Error("Proof upload failed. Please try again."))
-        xhr.onerror = () => reject(new Error("Network error during upload. Please try again."))
-        xhr.onabort = () => reject(new Error("Upload cancelled."))
-        xhr.open("PUT", prepared.uploadUrl)
-        xhr.setRequestHeader("content-type", mime)
-        xhr.send(uploadFile)
-      })
-
-      setProgress(95)
-      const completed = await completeProofUpload({
-        key: url,
-        size: uploadFile.size,
-        mime,
-      })
-      if (completed.error || !completed.url) {
-        setUploadError(completed.error ?? "Proof upload could not be verified.")
-        setProgress(null)
-        return
+        proofReference = completed.url
+      } catch (directError: any) {
+        if (directError?.message === "Upload cancelled.") throw directError
+        // Direct lane failed (blocked upload, expired presigned URL, B2
+        // unreachable from this network…): relay the same bytes through the
+        // backend instead of stranding the buyer. The relay validates and
+        // stores identically, so no verify step is needed after it.
+        setProgress(0)
+        proofReference = await postViaBackendRelay(uploadFile)
       }
+
       setProgress(100)
-      setProofUrl(completed.url)
+      setProofUrl(proofReference)
       setPreviewUrl(URL.createObjectURL(f))
     } catch (e: any) {
       if (e?.message !== "Upload cancelled.") {

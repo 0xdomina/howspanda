@@ -100,11 +100,13 @@ const PROOF_EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
 }
 
-// Phased proof upload so the UI can show REAL byte progress: the browser PUTs
-// straight to B2 with XMLHttpRequest (fetch has no upload-progress events).
-// 1. prepareProofUpload → { key, uploadUrl } (server action, validated)
-// 2. client XHR PUTs the file to uploadUrl with onprogress
-// 3. completeProofUpload({ key, size, mime }) → { url: "private://..." }
+// Phased proof upload so the UI can show REAL byte progress (XMLHttpRequest;
+// fetch has no upload-progress events). Two lanes, same guarantee:
+// 1. Primary: prepareProofUpload → { key, uploadUrl } → browser PUTs straight
+//    to private B2 → completeProofUpload({ key, size, mime }) → "private://…"
+// 2. Relay fallback (bank-transfer component): if the direct PUT fails, the
+//    same bytes POST multipart to /store/uploads, which validates + stores
+//    into private B2 and returns the reference directly (no verify step).
 // The returned `private://` URI only becomes meaningful once bound to an
 // order by submitBankProof.
 export const prepareProofUpload = async (
