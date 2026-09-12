@@ -26,6 +26,7 @@ export default async function SellerSettingsPage() {
         accent_color: seller.seller?.accent_color,
         theme: seller.seller?.theme,
         crypto_payments_enabled: seller.seller?.crypto_payments_enabled,
+        telegram_linked: Boolean(seller.seller?.telegram_chat_id),
       }}
       isOwner={seller.role !== "staff"}
     />

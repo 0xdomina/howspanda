@@ -37,6 +37,7 @@ export type SellerAdmin = {
     accent_color?: string
     theme?: string
     crypto_payments_enabled?: boolean
+    telegram_chat_id?: string | null
   }
 }
 
@@ -386,7 +387,6 @@ export const listSellerProducts = async (): Promise<SellerProduct[]> => {
     return []
   }
 }
-
 export const retrieveSellerBalance = async () => {
   try {
     const headers = await getSellerAuthHeaders()
@@ -400,6 +400,54 @@ export const retrieveSellerBalance = async () => {
       .catch(() => null)
   } catch {
     return null
+  }
+}
+
+// --- Telegram order alerts --------------------------------------------------
+// One-time link handshake for instant new-order pings. The backend mints a
+// short-lived code; settings shows the deep link; the webhook binds the chat.
+
+export type TelegramLinkResult =
+  | {
+      linked: boolean
+      store_name: string
+      code: string
+      deep_link: string | null
+      bot_username: string | null
+      expires_at: string
+    }
+  | { error: string }
+
+export const requestTelegramLink = async (): Promise<TelegramLinkResult> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { error: "Not signed in as a seller." }
+    const res = await sdk.client.fetch<any>("/sellers/me/telegram-link", {
+      method: "POST",
+      headers,
+      cache: "no-store",
+    })
+    if (res?.message && !res?.code) return { error: res.message }
+    return res as TelegramLinkResult
+  } catch (error: any) {
+    return { error: error?.message ?? "Could not start Telegram linking." }
+  }
+}
+
+export const unlinkTelegram = async (): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return { ok: false, error: "Not signed in as a seller." }
+    await sdk.client.fetch("/sellers/me/telegram-unlink", {
+      method: "POST",
+      headers,
+      cache: "no-store",
+    })
+    const sellerCacheTag = await getSellerCacheTag("seller")
+    revalidateTagSafely(sellerCacheTag)
+    return { ok: true }
+  } catch (error: any) {
+    return { ok: false, error: error?.message ?? "Could not unlink Telegram." }
   }
 }
 

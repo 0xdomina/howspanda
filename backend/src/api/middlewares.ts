@@ -1784,6 +1784,13 @@ export default defineMiddlewares({
       middlewares: [OTP_RATE_LIMIT, validateAndTransformBody(PostNeonBridgeSchema)],
     },
     {
+      // Telegram Bot API webhook: public by necessity (Telegram calls it),
+      // secret-token gated inside the handler, rate-limited like OTP lanes.
+      matcher: "/telegram/webhook",
+      methods: ["POST"],
+      middlewares: [OTP_RATE_LIMIT],
+    },
+    {
       matcher: "/auth/email/change/request",
       methods: ["POST"],
       middlewares: [

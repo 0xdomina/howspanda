@@ -17,6 +17,10 @@ import { MALL_MODULE } from "../../../../../modules/mall"
 import BuyerWalletModuleService from "../../../../../modules/buyer-wallet/service"
 import { BUYER_WALLET_MODULE } from "../../../../../modules/buyer-wallet"
 import { requirePlatformFeature } from "../../../../../lib/features/access"
+import {
+  notifySellerNewOrder,
+  telegramConfigured,
+} from "../../../../../lib/telegram/notify"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest,
@@ -163,6 +167,46 @@ export const POST = async (
           })
         }
       }
+    }
+
+    // Telegram order alerts: ping each linked store the instant its items
+    // sell. Best-effort and invisible to the buyer — any failure is swallowed
+    // so alerts can never fail (or slow) an order.
+    try {
+      if (telegramConfigured() && placedOrder) {
+        const counts = new Map<string, number>()
+        for (const item of (placedOrder.items ?? []) as any[]) {
+          const sid = item?.product?.seller?.id as string | undefined
+          if (sid) counts.set(sid, (counts.get(sid) ?? 0) + (Number(item.quantity) || 1))
+        }
+        if (counts.size > 0) {
+          const { data: sellers } = await query.graph({
+            entity: "seller",
+            fields: ["id", "name", "telegram_chat_id"],
+            filters: { id: [...counts.keys()] },
+          })
+          const major = Number(placedOrder.total ?? 0) / 100
+          const totalFormatted = `${placedOrder.currency_code?.toUpperCase() ?? "NGN"} ${major.toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
+          const storefront = (process.env.STOREFRONT_URL || "https://hows-u.vercel.app").replace(/\/$/, "")
+          await Promise.all(
+            (sellers ?? [])
+              .filter((s: any) => s?.telegram_chat_id)
+              .map((s: any) =>
+                notifySellerNewOrder({
+                  chatId: s.telegram_chat_id as string,
+                  storeName: s.name ?? "Your store",
+                  orderDisplayId: placedOrder.display_id ?? placedOrder.id,
+                  itemCount: counts.get(s.id) ?? 0,
+                  totalFormatted,
+                  buyerEmail: placedOrder.email,
+                  manageUrl: `${storefront}/ng/seller/orders`,
+                }).catch(() => false)
+              )
+          )
+        }
+      }
+    } catch {
+      // Alerts never fail orders.
     }
 
     res.json({

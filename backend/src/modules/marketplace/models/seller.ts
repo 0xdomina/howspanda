@@ -23,6 +23,11 @@ const Seller = model.define("seller", {
   // per-seller crypto payment switch: when OFF the crypto-usdc rail is closed
   // for this seller (no crypto session can be created against their products)
   crypto_payments_enabled: model.boolean().default(true),
+  // Telegram order alerts: chat to notify + one-time link handshake. Linking
+  // is per store (owner links the store's Telegram); NULL chat = unlinked.
+  telegram_chat_id: model.text().nullable(),
+  telegram_link_code: model.text().nullable(),
+  telegram_link_expires_at: model.dateTime().nullable(),
   admins: model.hasMany(() => SellerAdmin, {
     mappedBy: "seller",
   }),

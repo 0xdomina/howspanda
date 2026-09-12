@@ -6,6 +6,7 @@ import { encodeProductImage } from "@lib/media/image"
 import { uploadSellerMedia } from "@lib/data/seller-media"
 import { updateSellerStore } from "@lib/data/seller"
 import { STORE_SKINS, skinFor } from "@lib/store-skins"
+import { requestTelegramLink, unlinkTelegram } from "@lib/data/seller"
 
 type StoreInfo = {
   name?: string
@@ -16,6 +17,7 @@ type StoreInfo = {
   accent_color?: string
   theme?: string
   crypto_payments_enabled?: boolean
+  telegram_linked?: boolean
 }
 
 const accentPalette = ["#ef4444","#f97316","#eab308","#059669","#06b6d4","#2563eb","#4338ca","#7c3aed","#db2777","#111827"]
@@ -29,6 +31,10 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
   const [accentColor, setAccentColor] = useState(store.accent_color ?? "#ef4444")
   const [theme, setTheme] = useState<string>(store.theme ?? "sunset")
   const [cryptoEnabled, setCryptoEnabled] = useState(store.crypto_payments_enabled ?? true)
+  const [telegramLinked, setTelegramLinked] = useState(store.telegram_linked ?? false)
+  const [telegramLink, setTelegramLink] = useState<{ deep_link: string | null; code: string; expires_at: string; bot_username: string | null } | null>(null)
+  const [telegramBusy, setTelegramBusy] = useState(false)
+  const [telegramError, setTelegramError] = useState<string | null>(null)
   const [uploading, setUploading] = useState<"logo" | "cover" | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -54,6 +60,38 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
       setUploading(null)
       e.target.value = ""
     }
+  }
+
+  const startTelegramLink = () => {
+    if (!isOwner || telegramBusy) return
+    setTelegramError(null)
+    setTelegramBusy(true)
+    startTransition(async () => {
+      const res = await requestTelegramLink()
+      setTelegramBusy(false)
+      if ("error" in res) {
+        setTelegramError(res.error)
+        return
+      }
+      setTelegramLinked(res.linked)
+      setTelegramLink({ deep_link: res.deep_link, code: res.code, expires_at: res.expires_at, bot_username: res.bot_username })
+    })
+  }
+
+  const breakTelegramLink = () => {
+    if (!isOwner || telegramBusy) return
+    setTelegramError(null)
+    setTelegramBusy(true)
+    startTransition(async () => {
+      const res = await unlinkTelegram()
+      setTelegramBusy(false)
+      if (!res.ok) {
+        setTelegramError(res.error ?? "Could not unlink Telegram.")
+        return
+      }
+      setTelegramLinked(false)
+      setTelegramLink(null)
+    })
   }
 
   const save = (payload: Record<string, unknown>) => {
@@ -164,12 +202,51 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
           </div>
 
           <div className="glass-panel rounded-large p-6 small:p-7">
-            <h3 className="font-display text-lg font-medium text-ink">Payments</h3>
-            <div className="mt-4 flex items-start justify-between gap-4 rounded-control border border-ink-hairline bg-white/70 p-4">
+            <h3 className="font-display text-lg font-medium text-ink">Payments</h3>            <div className="mt-4 flex items-start justify-between gap-4 rounded-control border border-ink-hairline bg-white/70 p-4">
               <div><p className="text-sm font-medium text-ink">Accept crypto (USDC)</p><p className="mt-1 text-xs leading-5 text-ink-muted">When off, buyers can’t pay for your products with crypto. Bank and Paystack stay on.</p></div>
               <button type="button" role="switch" aria-checked={cryptoEnabled} disabled={!isOwner || isPending} onClick={()=>setCryptoEnabled(!cryptoEnabled)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${cryptoEnabled ? "bg-emerald-600" : "bg-ink-hairline"}`}><span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${cryptoEnabled ? "translate-x-5" : "translate-x-0.5"}`} /></button>
             </div>
             {isOwner && <button type="button" disabled={isPending} onClick={()=>{ setMessage(null); startTransition(async()=>{ const r=await updateSellerStore({crypto_payments_enabled:cryptoEnabled}); setMessage(r.success?{ok:true,text:"Payment settings saved."}:{ok:false,text:r.error??"Could not save."}) })}} className="mt-4 rounded-control bg-ink px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-ink/90 disabled:opacity-50">{isPending ? "Saving…" : "Save payment settings"}</button>}
+          </div>
+
+          <div className="glass-panel rounded-large p-6 small:p-7">
+            <h3 className="font-display text-lg font-medium text-ink">Order alerts</h3>
+            <p className="mt-1 text-sm text-ink-muted">Get an instant Telegram message the moment a new order needs your attention. Free, no limits.</p>
+            <div className="mt-4 rounded-control border border-ink-hairline bg-white/70 p-4">
+              {telegramLinked ? (
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-emerald-700">Telegram linked ✓</p>
+                    <p className="mt-1 text-xs leading-5 text-ink-muted">New orders will ping your Telegram immediately. Unlink to stop them.</p>
+                  </div>
+                  {isOwner && <button type="button" disabled={telegramBusy} onClick={breakTelegramLink} className="shrink-0 rounded-control border border-ink-hairline bg-white px-4 py-2 text-sm font-medium text-ink shadow-sm hover:bg-paper-tinted disabled:opacity-50">{telegramBusy ? "Working…" : "Unlink"}</button>}
+                </div>
+              ) : telegramLink ? (
+                <div>
+                  <p className="text-sm font-medium text-ink">Almost there — tap to finish linking</p>
+                  <p className="mt-1 text-xs leading-5 text-ink-muted">Opens Telegram. Tap Start and the store links itself. This code expires soon.</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {telegramLink.deep_link ? (
+                      <a href={telegramLink.deep_link} target="_blank" rel="noreferrer" className="rounded-control bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-ink/90">Open Telegram to link</a>
+                    ) : (
+                      <p className="text-xs text-ink-muted">Search for the store bot on Telegram and send <span className="font-mono font-semibold text-ink">/start {telegramLink.code}</span></p>
+                    )}
+                    <span className="font-mono text-xs text-ink-muted">code: {telegramLink.code}</span>
+                  </div>
+                  {isOwner && <button type="button" disabled={telegramBusy} onClick={startTelegramLink} className="mt-3 text-xs font-medium text-ink underline hover:no-underline disabled:opacity-50">Generate a fresh code</button>}
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-ink">Not linked</p>
+                    <p className="mt-1 text-xs leading-5 text-ink-muted">Without this you only find out about orders when you open the app or email.</p>
+                  </div>
+                  {isOwner && <button type="button" disabled={telegramBusy} onClick={startTelegramLink} className="shrink-0 rounded-control bg-ink px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-ink/90 disabled:opacity-50">{telegramBusy ? "Working…" : "Link Telegram"}</button>}
+                </div>
+              )}
+              {telegramError && <p className="mt-3 text-xs text-rose-600">{telegramError}</p>}
+              {!isOwner && <p className="mt-3 text-xs text-ink-muted">Only the owner can link order alerts.</p>}
+            </div>
           </div>
         </div>
 

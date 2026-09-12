@@ -22,7 +22,10 @@ export const PatchSellerMeSchema = z.strictObject({
   cover_image: z.string().url().nullable().optional(),
   description: z.string().max(1000).nullable().optional(),
   accent_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  theme: z.enum(["sunset", "midnight", "mint", "candy", "cobalt"]).optional(),
+  // Store skins are an open curated set (sunset/midnight/mint/candy/cobalt
+  // plus newer art-directed ids like owambe/market/mono) — free string, the
+  // storefront resolves unknown ids to the default skin.
+  theme: z.string().min(1).max(32).optional(),
   // Owner-only store payment switch: OFF closes the crypto-usdc rail for this
   // seller (no crypto session can be created against their products).
   crypto_payments_enabled: z.boolean().optional(),
