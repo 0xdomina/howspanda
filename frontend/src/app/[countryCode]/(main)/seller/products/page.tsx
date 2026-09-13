@@ -1,11 +1,12 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
-import { retrieveSeller, listSellerProducts } from "@lib/data/seller"
+import { retrieveSellerState, listSellerProducts } from "@lib/data/seller"
 import Button from "@modules/common/components/button"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { convertToLocale } from "@lib/util/money"
 import { sellerHasPermission } from "@lib/seller-permissions"
+import SellerRetryPanel from "@modules/seller/components/retry-panel"
 
 export const metadata: Metadata = {
   title: "Your products",
@@ -13,11 +14,28 @@ export const metadata: Metadata = {
 }
 
 export default async function SellerProductsPage() {
-  const [seller, products] = await Promise.all([
-    retrieveSeller().catch(() => null),
-    listSellerProducts().catch(() => []),
+  const [sellerState, products] = await Promise.all([
+    retrieveSellerState().catch(() => null),
+    listSellerProducts().catch(() => null),
   ])
-  const productList = products || []
+  const seller = sellerState?.seller ?? null
+
+  // Backend nap mid-bridge: retry, never a 404 and never the empty state.
+  if (!sellerState || sellerState.status === "unknown") {
+    return (
+      <div data-testid="seller-products-page">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-display text-2xl font-medium tracking-[-0.02em] text-ink">
+            Products
+          </h2>
+        </div>
+        <SellerRetryPanel
+          title="Checking your store"
+          body="The store couldn't be reached just now. Your listings are safe — try again in a moment."
+        />
+      </div>
+    )
+  }
 
   if (!seller || !sellerHasPermission(seller, "products")) {
     notFound()
@@ -36,7 +54,9 @@ export default async function SellerProductsPage() {
         </Button>
       </div>
 
-      {productList.length === 0 ? (
+      {products === null ? (
+        <SellerRetryPanel />
+      ) : products.length === 0 ? (
         <div className="text-center py-16 border border-dashed rounded-large">
           <p className="text-ink-muted">No products yet.</p>
           <p className="text-sm text-ink-muted mt-1">
@@ -45,7 +65,7 @@ export default async function SellerProductsPage() {
         </div>
       ) : (
         <ul className="overflow-hidden rounded-control border border-ink-hairline bg-white divide-y divide-ink-hairline">
-          {productList.map((product: any) => {
+          {products.map((product: any) => {
             const cheapest =
               product.variants
                 ?.map((v: any) => v.prices?.[0]?.amount ?? 0)

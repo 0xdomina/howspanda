@@ -370,10 +370,13 @@ export async function sellerSignout(countryCode: string) {
   redirect(`/${countryCode}/account`)
 }
 
-export const listSellerProducts = async (): Promise<SellerProduct[]> => {
+export const listSellerProducts = async (): Promise<SellerProduct[] | null> => {
+  // null = the list itself couldn't load (signed out, backend napping).
+  // Callers must render a retry state for null — only a real [] means
+  // "this store has never listed a product".
   try {
     const headers = await getSellerAuthHeaders()
-    if (!hasAuth(headers)) return []
+    if (!hasAuth(headers)) return null
 
     return await sdk.client
       .fetch<{ products: SellerProduct[] }>("/sellers/products", {
@@ -382,9 +385,9 @@ export const listSellerProducts = async (): Promise<SellerProduct[]> => {
         cache: "no-store",
       })
       .then(({ products }) => products ?? [])
-      .catch(() => [])
+      .catch(() => null)
   } catch {
-    return []
+    return null
   }
 }
 export const retrieveSellerBalance = async () => {
@@ -1023,7 +1026,7 @@ export const retrieveSellerProduct = async (
     const headers = await getSellerAuthHeaders()
     if (!hasAuth(headers)) return null
 
-    const products = await listSellerProducts()
+    const products = (await listSellerProducts()) ?? []
     return products.find((p) => p.id === id) ?? null
   } catch {
     return null

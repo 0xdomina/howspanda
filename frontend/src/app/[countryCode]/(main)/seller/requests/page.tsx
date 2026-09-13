@@ -13,7 +13,9 @@ export default async function SellerRequestsPage() {
   // Guarded: failures render the template's empty states, never a page error.
   const [requests, products] = await Promise.all([
     listSellerProductRequests().catch(() => []),
-    listSellerProducts().catch(() => []),
+    listSellerProducts()
+      .then((p) => p ?? [])
+      .catch(() => []),
   ])
   return <SellerRequests initial={requests} products={products} />
 }

@@ -55,7 +55,9 @@ export default async function MallDetailPage({
     retrieveCustomer().catch(() => null),
     listMallGoods(id).catch(() => []),
     retrieveSeller().catch(() => null),
-    listSellerProducts().catch(() => []),
+    listSellerProducts()
+      .then((p) => p ?? [])
+      .catch(() => []),
     retrieveSellerBalance().catch(() => null),
   ])
 

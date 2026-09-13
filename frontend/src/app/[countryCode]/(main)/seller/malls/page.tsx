@@ -22,7 +22,9 @@ export default async function SellerMallsPage() {
   // template, never an error boundary over the whole workspace.
   const [malls, products, balance] = await Promise.all([
     listSellerMalls().catch(() => []),
-    listSellerProducts().catch(() => []),
+    listSellerProducts()
+      .then((p) => p ?? [])
+      .catch(() => []),
     retrieveSellerBalance().catch(() => null),
   ])
 

@@ -17,6 +17,11 @@ function imageDimensions(buffer: Buffer, ext: string) {
     return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) }
   }
 
+  // GIF logical screen descriptor: width/height as LE uint16 at bytes 6/8.
+  if (ext === "gif" && buffer.length >= 10) {
+    return { width: buffer.readUInt16LE(6), height: buffer.readUInt16LE(8) }
+  }
+
   if (ext === "jpg") {
     let offset = 2
     while (offset + 9 < buffer.length) {

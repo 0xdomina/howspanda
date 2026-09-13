@@ -19,7 +19,9 @@ export default async function MallCreatePage() {
   if (!seller || !sellerHasPermission(seller, "malls")) notFound()
 
   const [products, balance] = await Promise.all([
-    listSellerProducts(),
+    listSellerProducts()
+      .then((p) => p ?? [])
+      .catch(() => []),
     retrieveSellerBalance(),
   ])
   const availableBalanceNgn =

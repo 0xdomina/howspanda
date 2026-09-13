@@ -105,6 +105,8 @@ const PROOF_IMAGE_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  "image/avif": "avif",
+  "image/gif": "gif",
 }
 const PROOF_MAX_BYTES = 10 * 1024 * 1024
 
@@ -143,9 +145,18 @@ export async function completeProofUpload(input: {
   if (!config || !extension) return null
   if (!input.key.startsWith(config.prefix + "/") || input.key.includes("..")) return null
 
-  const head = await getClient(config).send(
-    new HeadObjectCommand({ Bucket: config.bucket, Key: input.key })
-  ).catch(() => null)
+  const head = await (async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const found = await getClient(config).send(
+        new HeadObjectCommand({ Bucket: config.bucket, Key: input.key })
+      ).catch(() => null)
+      if (found?.ContentLength) return found
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
+      }
+    }
+    return null
+  })()
   if (!head?.ContentLength || head.ContentLength !== input.expectedSize) return null
 
   return { uri: `${PRIVATE_PROOF_PREFIX}${input.key}`}

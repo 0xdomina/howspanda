@@ -7,6 +7,8 @@ const EXT_MIME: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
   webp: "image/webp",
+  avif: "image/avif",
+  gif: "image/gif",
 }
 
 let proofClient: S3Client | null = null
@@ -71,13 +73,24 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "Invalid proof key")
   }
 
-  let head
-  try {
-    head = await client.send(
-      new HeadObjectCommand({ Bucket: proofBucket()!, Key: body.key })
-    )
-  } catch {
-    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload was not completed")
+  let head: any = null
+  // B2/S3 can take a moment before a fresh PUT is visible to HEAD. Retry
+  // briefly so a fast verify right after upload doesn't fail spuriously —
+  // the buyer UI already falls back to the backend relay on failure, but a
+  // retry here avoids a wasteful second upload.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      head = await client.send(
+        new HeadObjectCommand({ Bucket: proofBucket()!, Key: body.key })
+      )
+      break
+    } catch {
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
+        continue
+      }
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload was not completed")
+    }
   }
 
   if (!head.ContentLength || head.ContentLength < 1 || head.ContentLength > IMAGE_MAX_BYTES || head.ContentLength !== size) {

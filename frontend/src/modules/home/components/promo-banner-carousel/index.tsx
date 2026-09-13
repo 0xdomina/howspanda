@@ -5,9 +5,10 @@ import { useEffect, useState } from "react"
 import type { HttpTypes } from "@medusajs/types"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
-import ShareButton from "@modules/common/components/share-button"
-import { getBaseURL } from "@lib/util/env"
 
+// Seller banner images show exactly as uploaded: no headline, no gradient,
+// no dimming. The whole slide links to the product; only the pager dots sit
+// on top (bottom center) so nothing covers the artwork.
 export default function PromoBannerCarousel({
   products,
   countryCode,
@@ -29,17 +30,15 @@ export default function PromoBannerCarousel({
 
   if (!slides.length) return null
 
-  const product = slides[active] ?? slides[0]
   const bannerImageOf = (p: HttpTypes.StoreProduct) =>
     typeof p.metadata?.homepage_banner_image === "string"
       ? (p.metadata.homepage_banner_image as string)
       : p.thumbnail
-  const bannerImage = bannerImageOf(product)
 
   return (
     <section className="figma-container pt-8 small:pt-12" aria-label="Featured products">
       <div
-        className="relative min-h-[360px] overflow-hidden rounded-[28px] bg-ink text-paper shadow-float small:min-h-[430px]"
+        className="relative min-h-[360px] overflow-hidden rounded-[28px] bg-ink/5 shadow-float small:min-h-[430px]"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onFocus={() => setPaused(true)}
@@ -48,69 +47,45 @@ export default function PromoBannerCarousel({
         {slides.map((slide, index) => {
           const src = bannerImageOf(slide)
           if (!src) return null
+          const isActive = index === active
           return (
-            <Image
+            <LocalizedClientLink
               key={slide.id}
-              src={src}
-              alt={slide.title}
-              fill
-              priority={index === 0}
-              loading={index === 0 ? undefined : "lazy"}
-              fetchPriority={index === 0 ? "high" : "low"}
-              sizes="(max-width: 768px) 100vw, 1200px"
-              aria-hidden={index === active ? undefined : true}
+              href={`/products/${slide.handle}`}
+              aria-label={`Shop ${slide.title}`}
+              aria-hidden={isActive ? undefined : true}
+              tabIndex={isActive ? undefined : -1}
               className={
-                "object-cover object-center transition-opacity duration-700 " +
-                (index === active ? "opacity-75" : "opacity-0")
+                "absolute inset-0 transition-opacity duration-700 " +
+                (isActive ? "opacity-100" : "pointer-events-none opacity-0")
               }
-            />
+            >
+              <Image
+                src={src}
+                alt={slide.title}
+                fill
+                priority={index === 0}
+                loading={index === 0 ? undefined : "lazy"}
+                fetchPriority={index === 0 ? "high" : "low"}
+                sizes="(max-width: 768px) 100vw, 1200px"
+                className="object-cover object-center"
+              />
+            </LocalizedClientLink>
           )
         })}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />
-        <div className="relative flex min-h-[360px] flex-col justify-between p-7 small:min-h-[430px] small:p-12">
-          <div className="flex items-center justify-between gap-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
-            <span>Featured on How’s U</span>
-            <div className="flex items-center gap-3">
-              <ShareButton
-                entity="product"
-                entityId={product.id}
-                className="grid h-9 w-9 place-items-center rounded-full border border-white/30 bg-black/20 text-white backdrop-blur-sm transition-transform duration-200 hover:bg-black/30 active:scale-95"
-                payload={{
-                  url: `${getBaseURL()}/${countryCode}/products/${product.handle}`,
-                  text: `${product.title} on How's u`,
-                  title: product.title,
-                  description:
-                    product.description || "A fresh find from an independent seller on How's u.",
-                  image: bannerImage ?? undefined,
-                }}
-              />
-              <span>{String(active + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
-            </div>
-          </div>
-          <div key={product.id} className="media-enter max-w-xl">
-            <p className="mb-3 text-sm font-medium text-white/75">{product.title}</p>
-            <h2 className="font-display text-4xl font-semibold tracking-tight text-white small:text-6xl">
-              Fresh finds, made for your everyday.
-            </h2>
-            <p className="mt-5 max-w-md text-sm leading-6 text-white/75 small:text-base">
-              Discover something new from independent sellers on How’s U.
-            </p>
-            <LocalizedClientLink href={`/products/${product.handle}`} className="mt-7 inline-flex rounded-full bg-white px-5 py-3 text-sm font-semibold text-ink transition-transform duration-200 hover:-translate-y-0.5">
-              Shop this product
-            </LocalizedClientLink>
-          </div>
-          <div className="flex items-center gap-2" role="tablist" aria-label="Featured product banners">
-            {slides.map((slide, index) => (
-              <button
-                key={slide.id}
-                type="button"
-                role="tab"
-                aria-label={`Show featured product ${index + 1}`}
-                aria-selected={index === active}
-                onClick={() => setActive(index)}
-                className={`h-1.5 rounded-full transition-all duration-200 ${index === active ? "w-10 bg-white" : "w-5 bg-white/40 hover:bg-white/70"}`}
-              />
-            ))}
+        <div className="absolute inset-x-0 bottom-4 flex items-center justify-center" role="tablist" aria-label="Featured product banners">
+          <div className="flex items-center gap-2 rounded-full bg-black/30 px-3 py-2 backdrop-blur-sm">
+          {slides.map((slide, index) => (
+            <button
+              key={slide.id}
+              type="button"
+              role="tab"
+              aria-label={`Show featured product ${index + 1}: ${slide.title}`}
+              aria-selected={index === active}
+              onClick={() => setActive(index)}
+              className={`h-1.5 rounded-full transition-all duration-200 ${index === active ? "w-10 bg-white" : "w-5 bg-white/60 hover:bg-white"}`}
+            />
+          ))}
           </div>
         </div>
       </div>

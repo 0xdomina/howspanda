@@ -19,7 +19,12 @@ const BACKEND_URL = (
   .replace(/\/$/, "")
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
-const ALLOWED_MIME = new Set(["image/png", "image/jpeg", "image/webp"])
+
+// Every raster receipt photo is welcome — only SVG is refused outright
+// (markup can carry scripts). Anything else image/* rides to the backend,
+// which sniffs the real bytes and decides; exotic originals (BMP/TIFF)
+// that the canvas pipeline couldn't normalize get a precise error there.
+const BLOCKED_MIME = /svg/i
 
 function validOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin")
@@ -80,9 +85,15 @@ export async function POST(request: NextRequest) {
   if (file.size > IMAGE_MAX_BYTES) {
     return NextResponse.json({ message: "File too large — max 10MB." }, { status: 400 })
   }
-  if (!ALLOWED_MIME.has(file.type)) {
+  if (BLOCKED_MIME.test(file.type) || /\.svg$/i.test(file.name || "")) {
     return NextResponse.json(
-      { message: "Only PNG, JPEG, and WebP images are accepted." },
+      { message: "SVG images aren't supported. Upload a photo instead." },
+      { status: 400 }
+    )
+  }
+  if (file.type && !/^image\//i.test(file.type)) {
+    return NextResponse.json(
+      { message: "Only image files are accepted." },
       { status: 400 }
     )
   }

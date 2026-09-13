@@ -32,8 +32,14 @@ function downscale(bitmap: ImageBitmap): [HTMLCanvasElement, CanvasRenderingCont
 }
 
 export async function encodeProductImage(file: File): Promise<Blob> {
-  if (!/^image\/(jpeg|png|webp|avif)$/i.test(file.type)) {
-    throw new Error("Choose a JPEG, PNG, WebP, or AVIF image.")
+  // Every raster image is welcome except SVG (stored-XSS carrier — the
+  // server rejects it too). The canvas normalizes whatever arrives into a
+  // small WebP, so HEIC/JPEG/PNG/AVIF/GIF/BMP receipts all upload the same.
+  if (/svg/i.test(file.type) || /\.svg$/i.test(file.name || "")) {
+    throw new Error("SVG images aren't supported. Upload a photo instead.")
+  }
+  if (!/^image\//i.test(file.type)) {
+    throw new Error("Choose an image file (JPEG, PNG, WebP, AVIF, or GIF).")
   }
   if (file.size > MAX_INPUT_BYTES) {
     throw new Error("Choose an image smaller than 30 MB.")

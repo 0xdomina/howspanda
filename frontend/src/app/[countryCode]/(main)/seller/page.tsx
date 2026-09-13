@@ -9,6 +9,7 @@ import {
   listPayoutAccounts,
   listSellerOrders,
 } from "@lib/data/seller"
+import SellerRetryPanel from "@modules/seller/components/retry-panel"
 import Button from "@modules/common/components/button"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { convertToLocale } from "@lib/util/money"
@@ -98,13 +99,16 @@ export default async function SellerDashboardPage() {
       listPayoutAccounts().catch(() => []),
       listSellerOrders().catch(() => []),
     ])
-  const products = productsRaw || []
+  const products = productsRaw ?? null
   const payoutAccounts = payoutAccountsRaw || []
   const orders = ordersRaw || []
 
   if (!seller) {
     notFound()
   }
+
+  const productsFailedToLoad = products === null
+  const productCount = products?.length ?? 0
 
   const checklist = [
     {
@@ -115,7 +119,7 @@ export default async function SellerDashboardPage() {
       cta: "Set up payouts",
     },
     {
-      done: products.length > 0,
+      done: productsFailedToLoad ? true : productCount > 0,
       title: "List your first product",
       body: "A photo, a price, a short description — you're live.",
       href: "/seller/products/new",
@@ -224,7 +228,7 @@ export default async function SellerDashboardPage() {
         {canViewProducts && <div className="figma-surface p-5">
           <p className="text-sm text-ink-muted">Products</p>
           <p className="mt-1 font-mono tabular-nums text-2xl text-ink">
-            {products.length}
+            {productsFailedToLoad ? "—" : productCount}
           </p>
         </div>}
         <TrustScoreCard />
@@ -248,7 +252,12 @@ export default async function SellerDashboardPage() {
         </div>
       )}
 
-      {products.length === 0 && (
+      {productsFailedToLoad && (
+        <div className="mb-8">
+          <SellerRetryPanel />
+        </div>
+      )}
+      {!productsFailedToLoad && productCount === 0 && (
         <div className="flex flex-col gap-4">
           <div className="figma-surface p-5">
             <h3 className="font-display text-xl font-medium text-ink mb-2">
@@ -266,11 +275,11 @@ export default async function SellerDashboardPage() {
           </div>
         </div>
       )}
-      {products.length > 0 && (
+      {!productsFailedToLoad && productCount > 0 && (
         <div className="flex flex-col gap-4">
           <div className="figma-surface p-5">
             <h3 className="font-display text-xl font-medium text-ink mb-2">
-              Your products ({products.length})
+              Your products ({productCount})
             </h3>
             <p className="text-sm text-ink-muted mb-4">
               Edit prices, photos, and flash-sale flags any time. Changes go

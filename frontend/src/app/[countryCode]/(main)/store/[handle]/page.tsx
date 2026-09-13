@@ -4,6 +4,8 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import ShareButton from "@modules/common/components/share-button"
 import { getStoreProfile } from "@lib/data/follows"
 import { skinFor, skinVars } from "@lib/store-skins"
+import { convertToLocale } from "@lib/util/money"
+import { rebaseMediaUrl } from "@lib/util/rebase-media"
 import FollowButton from "@modules/store/components/follow-button"
 import { getBaseURL } from "@lib/util/env"
 import RedeemableCard from "@modules/redeemables/components/redeemable-card"
@@ -71,19 +73,25 @@ export default async function StorePage({
       : {}),
   }
 
+  // Media rows written before the Render migration (or with an old proxy
+  // shape) resolve through the live backend so older product photos keep
+  // rendering instead of 404ing.
+  const cover = rebaseMediaUrl(seller.cover_image)
+  const logo = rebaseMediaUrl(seller.logo)
+
   return (
     <div className="figma-container flex flex-col gap-12 py-10 small:py-16" style={vars}>
       {/* Store header */}
       <section className="glass-panel relative overflow-hidden rounded-control p-6 small:p-8" style={{ borderColor: "var(--store-edge)" }}>
         <div className="absolute inset-x-0 top-0 h-28 opacity-90" style={{ background: "var(--store-banner)" }} />
-        {seller.cover_image && <img src={seller.cover_image} alt="" loading="lazy" decoding="async" className="absolute inset-x-0 top-0 h-28 w-full object-cover opacity-70" />}
+        {cover && <img src={cover} alt="" loading="lazy" decoding="async" className="absolute inset-x-0 top-0 h-28 w-full object-cover opacity-70" />}
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-transparent to-white/90" />
         <div className="relative flex flex-col gap-6 pt-10 small:flex-row small:items-end small:justify-between">
         <div className="flex items-end gap-4">
-          {seller.logo ? (
+          {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={seller.logo}
+              src={logo}
               alt={seller.name}
               loading="lazy"
               decoding="async"
@@ -138,7 +146,7 @@ export default async function StorePage({
               title: seller.name,
               description:
                 seller.description || "Explore this independent storefront on How's u.",
-              image: seller.logo ?? undefined,
+              image: logo ?? undefined,
             }}
           />
         </div>
@@ -217,16 +225,20 @@ export default async function StorePage({
           <p className="text-sm text-ink-muted">No products listed yet.</p>
         ) : (
           <ul className="grid grid-cols-2 gap-4 small:grid-cols-3 medium:grid-cols-4">
-            {products.map((p) => (
+            {products.map((p) => {
+              const thumbnail = rebaseMediaUrl(p.thumbnail)
+              const hasPrice =
+                typeof p.price_amount === "number" && Number.isFinite(p.price_amount)
+              return (
               <li key={p.id} className="group card-lift overflow-hidden rounded-control bg-white/70 p-2 shadow-sm backdrop-blur transition-colors" style={{ border: "1px solid var(--store-edge)" }}>
                 <LocalizedClientLink
                   href={`/${countryCode}/products/${p.handle}`}
                   className="block"
                 >
-                  {p.thumbnail ? (
+                  {thumbnail ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={p.thumbnail}
+                      src={thumbnail}
                       alt={p.title}
                       loading="lazy"
                       decoding="async"
@@ -238,12 +250,21 @@ export default async function StorePage({
                   <p className="mt-2 line-clamp-2 text-sm font-medium text-ink group-hover:text-ink">
                     {p.title}
                   </p>
+                  {hasPrice && (
+                    <p className="mt-0.5 font-mono tabular-nums text-sm text-ink">
+                      {convertToLocale({
+                        amount: p.price_amount as number,
+                        currency_code: p.price_currency ?? "ngn",
+                      })}
+                    </p>
+                  )}
                 </LocalizedClientLink>
                 <div className="mt-2 flex justify-end">
                   <ProductShare product={p} />
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </section>

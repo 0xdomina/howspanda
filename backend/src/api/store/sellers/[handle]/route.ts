@@ -35,6 +35,8 @@ export const GET = async (
       "accent_color",
       "theme",
       "products.*",
+      "products.variants.*",
+      "products.variants.prices.*",
     ],
     filters: { handle: req.params.handle },
   })
@@ -91,12 +93,31 @@ export const GET = async (
     followed_by_viewer,
     products: (seller.products ?? [])
       .filter((p) => p?.status === "published")
-      .map((p) => ({
-        id: p!.id,
-        title: p!.title,
-        handle: p!.handle,
-        thumbnail: p!.thumbnail ?? null,
-      })),
+      .map((p) => {
+        // Cheapest variant price so the storefront can show a price without
+        // a second pricing call. Amounts are in the price's currency minor
+        // units, matching convertToLocale on the storefront.
+        let price_amount: number | null = null
+        let price_currency: string | null = null
+        for (const v of (p as any)?.variants ?? []) {
+          for (const price of v?.prices ?? []) {
+            const amount = Number(price?.amount)
+            if (!Number.isFinite(amount)) continue
+            if (price_amount === null || amount < price_amount) {
+              price_amount = amount
+              price_currency = price?.currency_code ?? price_currency
+            }
+          }
+        }
+        return {
+          id: p!.id,
+          title: p!.title,
+          handle: p!.handle,
+          thumbnail: p!.thumbnail ?? null,
+          price_amount,
+          price_currency,
+        }
+      }),
     redeemables: forSale,
     trust,
     broadcasts: broadcasts.slice(0, 3).map((b) => ({

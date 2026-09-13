@@ -13,10 +13,14 @@ import { randomUUID } from "node:crypto"
 // → returns { url: "private://..." }
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
+// Every raster receipt photo is welcome — only SVG is refused (it never
+// reaches here: the browser and the relay block markup first).
 const EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  "image/avif": "avif",
+  "image/gif": "gif",
 }
 
 let proofClient: S3Client | null = null
@@ -78,7 +82,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   if (!ext || size < 1 || size > IMAGE_MAX_BYTES) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "Upload a valid image (PNG, JPEG, or WebP) up to 10MB"
+      "Upload a valid image (JPEG, PNG, WebP, AVIF, or GIF) up to 10MB"
     )
   }
 

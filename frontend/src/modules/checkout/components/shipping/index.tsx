@@ -81,6 +81,17 @@ const Shipping: React.FC<ShippingProps> = ({
   const router = useRouter()
   const pathname = usePathname()
 
+  // Keep the optimistic selection in sync when the server cart arrives late
+  // (e.g. after router.refresh() or a hard navigation). Without this the
+  // radio can look unchecked even though the cart already has a method.
+  useEffect(() => {
+    const serverId = cart.shipping_methods?.at(-1)?.shipping_option_id ?? null
+    if (serverId && !shippingMethodId) {
+      setShippingMethodId(serverId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.shipping_methods?.at(-1)?.shipping_option_id])
+
   const isOpen = searchParams.get("step") === "delivery"
 
   const stepHref = (step: string) => {
@@ -177,16 +188,27 @@ const Shipping: React.FC<ShippingProps> = ({
       return id
     })
 
-    await setShippingMethod({ cartId: cart.id, shippingMethodId: id })
-      .catch((err) => {
-        setShippingMethodId(currentId)
-
-        setError(err.message)
-      })
-      .finally(() => {
-        setIsLoading(false)
-      })
+    try {
+      await setShippingMethod({ cartId: cart.id, shippingMethodId: id })
+      // The `cart` prop comes from the server component and stays stale
+      // until the next server render. Refresh so `cart.shipping_methods`
+      // (used by the summary + payment step) catches up with the optimistic
+      // `shippingMethodId` above — otherwise the continue button stays
+      // disabled until a hard refresh.
+      router.refresh()
+    } catch (err: any) {
+      setShippingMethodId(currentId)
+      setError(err?.message ?? "Could not save delivery choice.")
+    } finally {
+      setIsLoading(false)
+    }
   }
+
+  // Optimistic selection drives the continue button. Relying only on the
+  // server `cart.shipping_methods` prop leaves the button disabled until a
+  // hard refresh because the prop only updates on the next server render.
+  const selectedForContinue =
+    shippingMethodId ?? cart.shipping_methods?.at(-1)?.shipping_option_id ?? null
 
   return (
     <div className="bg-white">
@@ -413,7 +435,7 @@ const Shipping: React.FC<ShippingProps> = ({
               className="mt"
               onClick={handleSubmit}
               isLoading={isLoading}
-              disabled={!cart.shipping_methods?.[0] || isLoading}
+              disabled={!selectedForContinue || isLoading}
               data-testid="submit-delivery-option-button"
             >
               {isLoading ? "Saving delivery choice…" : "Continue to payment"}

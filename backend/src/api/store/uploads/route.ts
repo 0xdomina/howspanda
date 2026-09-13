@@ -78,7 +78,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       }
       const prepared = await prepareProofUpload({ mime, size: size! })
       if (!prepared) {
-        throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload a valid image (PNG, JPEG, or WebP) up to 10MB")
+        throw new MedusaError(MedusaError.Types.INVALID_DATA, "Upload a valid image (JPEG, PNG, WebP, AVIF, or GIF) up to 10MB")
       }
       res.json(prepared)
       return
@@ -131,12 +131,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       "Only image files are allowed"
     )
   }
-  if (sniffed.ext === "gif") {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      "Animated images are not supported. Upload a screenshot instead."
-    )
-  }
+  // GIF receipts are fine as payment proof (the seller simply views the
+  // image). The animated-image ban lives on the seller product-media route.
   const metadata = validateMediaMetadata(file.buffer, "image", sniffed.ext)
 
   const filename = `${randomUUID()}.${sniffed.ext}`

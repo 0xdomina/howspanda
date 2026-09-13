@@ -94,11 +94,6 @@ export const submitBankProof = async (
 }
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024
-const PROOF_EXTENSIONS: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-}
 
 // Phased proof upload so the UI can show REAL byte progress (XMLHttpRequest;
 // fetch has no upload-progress events). Two lanes, same guarantee:
@@ -116,8 +111,10 @@ export const prepareProofUpload = async (
   if (size > IMAGE_MAX_BYTES) {
     return { error: "File too large — max 10MB" }
   }
-  if (!PROOF_EXTENSIONS[mime]) {
-    return { error: "Only PNG, JPEG, and WebP images are accepted." }
+  // Every raster receipt photo is welcome — only SVG is refused outright
+  // (markup can carry scripts; the backend sniffs bytes and agrees).
+  if (/svg/i.test(mime || "")) {
+    return { error: "SVG images aren't supported. Upload a photo instead." }
   }
   try {
     const prepared = await sdk.client.fetch<{

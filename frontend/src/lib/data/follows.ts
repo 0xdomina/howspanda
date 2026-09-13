@@ -37,7 +37,14 @@ export type StoreProfile = {
   }
   follower_count: number
   followed_by_viewer: boolean
-  products: { id: string; title: string; handle: string; thumbnail: string | null }[]
+  products: {
+    id: string
+    title: string
+    handle: string
+    thumbnail: string | null
+    price_amount?: number | null
+    price_currency?: string | null
+  }[]
   redeemables: {
     id: string
     type: "gift_card" | "voucher" | "ticket" | "product_gift"

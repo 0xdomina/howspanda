@@ -282,6 +282,29 @@ export default function BankTransferCard({
     setProgress(0)
     setUploadingProof(true)
     try {
+      // iPhone HEIC/HEIF never survives the pipeline (canvas can't decode it
+      // and every upload lane rejects it). Fail fast with an actionable
+      // message instead of a generic "upload failed".
+      const lowerName = (f.name || "").toLowerCase()
+      if (/svg/i.test(f.type) || lowerName.endsWith(".svg")) {
+        setUploadError(
+          "SVG images aren't supported — upload a photo of your receipt instead."
+        )
+        setProgress(null)
+        return
+      }
+      if (
+        /heic|heif/i.test(f.type) ||
+        lowerName.endsWith(".heic") ||
+        lowerName.endsWith(".heif")
+      ) {
+        setUploadError(
+          "HEIC photos aren't supported — open the receipt, take a screenshot (PNG/JPEG), and upload that instead."
+        )
+        setProgress(null)
+        return
+      }
+
       let uploadFile = f
       let mime = f.type
       try {
@@ -295,17 +318,21 @@ export default function BankTransferCard({
         // performs the same byte and dimension checks on that fallback.
       }
 
-      const prepared = await prepareProofUpload(mime, uploadFile.size)
-      if ("error" in prepared) {
-        setUploadError(prepared.error)
-        setProgress(null)
-        return
-      }
+      const isClientValidationError = (msg: string) =>
+        /too large|max 10mb|only image|not supported|choose an? /i.test(msg)
 
-      let proofReference: string
-      try {
-        // Primary lane: straight to private B2 (works even while the API
-        // naps, spares backend bandwidth).
+      // Primary lane: presigned PUT straight to private storage. Any failure
+      // in prepare → PUT → complete falls through to the same-origin backend
+      // relay below, which validates + stores identically. Only client-side
+      // validation errors (oversize / unsupported type) skip the relay
+      // because the relay would reject them the same way.
+      const uploadViaDirectLane = async (): Promise<string> => {
+        const prepared = await prepareProofUpload(mime, uploadFile.size)
+        if ("error" in prepared) {
+          throw Object.assign(new Error(prepared.error), {
+            skipRelay: isClientValidationError(prepared.error),
+          })
+        }
         const key = await putDirectToB2(
           prepared.uploadUrl,
           uploadFile,
@@ -319,17 +346,23 @@ export default function BankTransferCard({
           mime,
         })
         if (completed.error || !completed.url) {
-          setUploadError(completed.error ?? "Proof upload could not be verified.")
-          setProgress(null)
-          return
+          throw new Error(
+            completed.error ?? "Proof upload could not be verified."
+          )
         }
-        proofReference = completed.url
+        return completed.url
+      }
+
+      let proofReference: string
+      try {
+        proofReference = await uploadViaDirectLane()
       } catch (directError: any) {
         if (directError?.message === "Upload cancelled.") throw directError
+        if (directError?.skipRelay) throw directError
         // Direct lane failed (blocked upload, expired presigned URL, B2
-        // unreachable from this network…): relay the same bytes through the
-        // backend instead of stranding the buyer. The relay validates and
-        // stores identically, so no verify step is needed after it.
+        // unreachable from this network, backend waking up…): relay the same
+        // bytes through the backend instead of stranding the buyer. The relay
+        // validates and stores identically, so no verify step is needed.
         setProgress(0)
         proofReference = await postViaBackendRelay(uploadFile)
       }
@@ -502,7 +535,7 @@ export default function BankTransferCard({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/png,image/jpeg,image/webp,image/avif"
+                      accept="image/*"
                       onChange={(e) => {
                         const f = e.target.files?.[0]
                         if (f) handleUpload(f)
@@ -565,7 +598,13 @@ export default function BankTransferCard({
                   </div>
                 )}
                 {uploadError && (
-                  <p className="mt-1 text-xs text-rose-600">{uploadError}</p>
+                  <p
+                    className="mt-1 text-xs text-rose-600"
+                    data-testid="bank-proof-upload-error"
+                    role="alert"
+                  >
+                    {uploadError}
+                  </p>
                 )}
               </div>
 
