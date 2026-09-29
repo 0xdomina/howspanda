@@ -50,6 +50,18 @@ type SideMenuProps = {
 const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false, isAuthenticated = false, hasSeller = false }: SideMenuProps) => {
   const countryToggleState = useToggleState()
   const languageToggleState = useToggleState()
+  // NG-only mode: pickers auto-hide when there is a single country/locale.
+  // Add a second region/locale in Medusa and they reappear with zero code changes.
+  const countryCount =
+    regions?.reduce((n, r) => n + (r.countries?.length ?? 0), 0) ?? 0
+  const showCountrySelector = countryCount > 1
+  const showLanguageSelector = (locales?.length ?? 0) > 1
+  const singleCountryLabel =
+    countryCount === 1
+      ? regions
+          ?.flatMap((r) => r.countries ?? [])
+          .find((c) => c?.iso_2)?.display_name ?? "Nigeria"
+      : null
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -157,8 +169,14 @@ const SideMenu = ({ regions, locales, currentLocale, mallsEnabled = false, isAut
               </ul>
             </div>
             <div className="mt-6 flex flex-col gap-y-6">
-              {!!locales?.length && <div className="flex justify-between" onMouseEnter={languageToggleState.open} onMouseLeave={languageToggleState.close}><LanguageSelect toggleState={languageToggleState} locales={locales} currentLocale={currentLocale} /><ArrowRightMini className={clx("transition-transform duration-150", languageToggleState.state ? "-rotate-90" : "")} /></div>}
+              {showLanguageSelector && !!locales?.length && <div className="flex justify-between" onMouseEnter={languageToggleState.open} onMouseLeave={languageToggleState.close}><LanguageSelect toggleState={languageToggleState} locales={locales} currentLocale={currentLocale} /><ArrowRightMini className={clx("transition-transform duration-150", languageToggleState.state ? "-rotate-90" : "")} /></div>}
+              {showCountrySelector ? (
               <div className="flex justify-between" onMouseEnter={countryToggleState.open} onMouseLeave={countryToggleState.close}>{regions && <CountrySelect toggleState={countryToggleState} regions={regions} />}<ArrowRightMini className={clx("transition-transform duration-150", countryToggleState.state ? "-rotate-90" : "")} /></div>
+              ) : (
+                singleCountryLabel && (
+                  <Text className="txt-compact-small text-ink-muted">Shipping to: {singleCountryLabel}</Text>
+                )
+              )}
               <Text className="flex justify-between txt-compact-small">© {new Date().getFullYear()} How&rsquo;s U.</Text>
             </div>
           </aside>

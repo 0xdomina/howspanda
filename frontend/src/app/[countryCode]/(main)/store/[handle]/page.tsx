@@ -232,7 +232,7 @@ export default async function StorePage({
               return (
               <li key={p.id} className="group card-lift overflow-hidden rounded-control bg-white/70 p-2 shadow-sm backdrop-blur transition-colors" style={{ border: "1px solid var(--store-edge)" }}>
                 <LocalizedClientLink
-                  href={`/${countryCode}/products/${p.handle}`}
+                  href={`/products/${p.handle}`}
                   className="block"
                 >
                   {thumbnail ? (
