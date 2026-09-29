@@ -16,6 +16,11 @@ type VariantRow = {
   stock: string
 }
 
+type CategoryOption = {
+  id: string
+  name: string
+}
+
 const EditProduct = ({
   productId,
   title: initialTitle,
@@ -26,6 +31,8 @@ const EditProduct = ({
   variants: initialVariants,
   flashSale: initialFlashSale,
   homepageBanner: initialHomepageBanner,
+  categories = [],
+  initialCategoryId = "",
   showVideo,
 }: {
   productId: string
@@ -42,6 +49,8 @@ const EditProduct = ({
   }[]
   flashSale?: boolean
   homepageBanner?: boolean
+  categories?: CategoryOption[]
+  initialCategoryId?: string
   showVideo: boolean
 }) => {
   const router = useRouter()
@@ -52,6 +61,7 @@ const EditProduct = ({
   const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl ?? null)
   const [flashSale, setFlashSale] = useState(Boolean(initialFlashSale))
   const [homepageBanner, setHomepageBanner] = useState(Boolean(initialHomepageBanner))
+  const [categoryId, setCategoryId] = useState(initialCategoryId ?? "")
   const [variants, setVariants] = useState<VariantRow[]>(() =>
     initialVariants.map((v) => ({
       id: v.id,
@@ -74,6 +84,7 @@ const EditProduct = ({
       videoUrl?: string | null
       flashSale?: boolean
       homepageBanner?: boolean
+      categoryIds?: string[]
       variants?: {
         id: string
         price?: number
@@ -84,6 +95,7 @@ const EditProduct = ({
       description: description || undefined,
       photos,
       bannerUrl,
+      categoryIds: categoryId ? [categoryId] : [],
       variants: variants.map((v) => ({
         id: v.id,
         price: v.price !== "" ? Number(v.price) : undefined,
@@ -130,6 +142,26 @@ const EditProduct = ({
           onVideoChange={setVideoUrl}
           showVideo={showVideo}
         />
+
+        <div>
+          <label className="text-sm font-medium text-ink" htmlFor="product-category">
+            Category
+          </label>
+          <select
+            id="product-category"
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field text-ink focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
+            data-testid="product-category-input"
+          >
+            <option value="">No category</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {variants.length > 0 && (
           <div

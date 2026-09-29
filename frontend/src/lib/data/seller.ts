@@ -56,6 +56,7 @@ export type SellerProduct = {
     homepage_banner_image?: string | null
   }
   images?: { url: string }[]
+  categories?: { id: string; name?: string }[]
   options?: { title?: string; values?: { value?: string }[] }[]
   variants?: {
     id: string
@@ -1043,6 +1044,7 @@ export const updateSellerProduct = async (
     videoUrl?: string | null
     flashSale?: boolean
     homepageBanner?: boolean
+    categoryIds?: string[]
     variants?: {
       id: string
       price?: number
@@ -1064,6 +1066,7 @@ export const updateSellerProduct = async (
     if (update.videoUrl !== undefined) body.video_url = update.videoUrl
     if (update.flashSale !== undefined) body.flash_sale = update.flashSale
     if (update.homepageBanner !== undefined) body.homepage_banner = update.homepageBanner
+    if (update.categoryIds !== undefined) body.category_ids = update.categoryIds
 
     await sdk.client.fetch(`/sellers/products/${id}`, {
       method: "PATCH",
@@ -1107,6 +1110,8 @@ export const createSellerProduct = async (
     const stock =
       stockRaw !== "" && stockRaw != null ? Number(stockRaw) : undefined
     const variantsJson = formData.get("variants_json") as string
+    const categoryId = formData.get("category_id") as string | null
+    const category_ids = categoryId ? [categoryId] : undefined
     const currency_code = "ngn"
 
     const variants = variantsJson ? JSON.parse(variantsJson) : null
@@ -1122,6 +1127,7 @@ export const createSellerProduct = async (
           status: "published" as const,
           flash_sale: flashSale,
           homepage_banner: homepageBanner,
+          category_ids,
           options: variants.options,
           variants: variants.variants,
         }
@@ -1137,6 +1143,7 @@ export const createSellerProduct = async (
           status: "published" as const,
           flash_sale: flashSale,
           homepage_banner: homepageBanner,
+          category_ids,
         }
 
     // PandaStack may briefly return a warm-up 503 while the Medusa process is

@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { retrieveSeller, retrieveSellerProduct } from "@lib/data/seller"
+import { listCategories } from "@lib/data/categories"
 import EditProduct from "@modules/seller/components/edit-product"
 import { sellerHasPermission } from "@lib/seller-permissions"
 
@@ -38,6 +39,8 @@ export default async function EditProductPage({
   const photos = (product.images ?? []).map((image) => image.url).filter(Boolean)
   const orderedPhotos = photos.length ? photos : product.thumbnail ? [product.thumbnail] : []
 
+  const categories = await listCategories({ limit: 100 }).catch(() => [])
+
   return (
     <div data-testid="edit-product-page">
       <EditProduct
@@ -49,6 +52,11 @@ export default async function EditProductPage({
         videoUrl={product.metadata?.product_video ?? null}
         flashSale={product.metadata?.flash_sale}
         homepageBanner={product.metadata?.homepage_banner}
+        categories={(categories ?? []).map((c) => ({
+          id: c.id,
+          name: c.name,
+        }))}
+        initialCategoryId={product.categories?.[0]?.id ?? ""}
         variants={variants}
         showVideo={true}
       />

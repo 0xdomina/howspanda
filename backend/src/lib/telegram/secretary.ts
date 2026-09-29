@@ -14,6 +14,8 @@ export type NewProductDraft = {
   priceMajor?: number
   stock?: number
   description?: string
+  categoryId?: string
+  categoryName?: string
   photos: string[]
 }
 
@@ -24,16 +26,19 @@ export type SecretaryStep =
   | "new_stock"
   | "new_photos"
   | "new_description"
+  | "new_category"
   | "new_confirm"
   | "edit_pick"
   | "edit_field"
   | "edit_value"
+  | "edit_category"
   | "edit_photo"
 
 export type EditField =
   | "title"
   | "price"
   | "stock"
+  | "category"
   | "description"
   | "status"
   | "photo"
@@ -139,6 +144,7 @@ export function newProductSummary(d: NewProductDraft): string {
   lines.push(``, `Title: ${d.title ?? "—"}`)
   lines.push(`Price: ${d.priceMajor != null ? formatNgnMajor(d.priceMajor) : "—"}`)
   lines.push(`Stock: ${d.stock != null ? d.stock : "—"}`)
+  lines.push(`Category: ${d.categoryName ?? "—"}`)
   lines.push(`Photos: ${d.photos.length ? `${d.photos.length} attached` : "none"}`)
   lines.push(`Description: ${d.description || "—"}`)
   lines.push(``, `Reply YES to publish, or /cancel to discard.`)
@@ -146,7 +152,7 @@ export function newProductSummary(d: NewProductDraft): string {
 }
 
 export const EDIT_FIELD_PROMPT =
-  `What should change? Reply with one: title, price, stock, photo, description, status.`
+  `What should change? Reply with one: title, price, stock, category, photo, description, status.`
 
 /** Normalizes "Title" / "PRICE" / "photo " → field, or null. */
 export function normalizeEditField(raw: string): EditField | null {
@@ -154,6 +160,7 @@ export function normalizeEditField(raw: string): EditField | null {
   if (t === "title" || t === "name") return "title"
   if (t === "price") return "price"
   if (t === "stock" || t === "quantity" || t === "qty") return "stock"
+  if (t === "category" || t === "categories" || t === "aisle") return "category"
   if (t === "photo" || t === "picture" || t === "image") return "photo"
   if (t === "description" || t === "desc") return "description"
   if (t === "status" || t === "visibility" || t === "publish") return "status"

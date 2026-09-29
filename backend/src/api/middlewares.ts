@@ -246,6 +246,9 @@ export const PostSellerMobileProductSchema = z.strictObject({
   flash_sale: z.boolean().optional(),
   homepage_banner: z.boolean().optional(),
   handle: z.string().optional(),
+  // Optional product categories (by id). Resolved from the store's category
+  // list on the client; the route forwards them to the create workflow.
+  category_ids: z.array(z.string().min(1)).max(10).optional(),
   images: z.array(z.object({ url: z.string().url() })).optional(),
   options: z
     .array(
@@ -290,6 +293,8 @@ export const PatchSellerMobileProductSchema = z.strictObject({
   status: z.enum(["draft", "published", "archived"]).optional(),
   flash_sale: z.boolean().optional(),
   homepage_banner: z.boolean().optional(),
+  // Replaces the product's category set (empty array clears it).
+  category_ids: z.array(z.string().min(1)).max(10).optional(),
   variants: z
     .array(
       z.object({

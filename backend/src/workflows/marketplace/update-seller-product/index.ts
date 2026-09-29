@@ -20,7 +20,8 @@ type WorkflowInput = {
   seller_admin_id: string
   product_id: string
   /**
-   * Base fields to update (title / description / thumbnail / status).
+   * Base fields to update (title / description / thumbnail / status /
+   * categories). `category_ids` replaces the product's category set.
    */
   update: {
     title?: string
@@ -29,6 +30,7 @@ type WorkflowInput = {
     images?: { url: string }[]
     status?: "draft" | "published" | "archived"
     metadata?: Record<string, unknown>
+    category_ids?: string[]
   }
   /**
    * Optional per-variant updates, keyed by existing variant id. Each may

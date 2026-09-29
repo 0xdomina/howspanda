@@ -49,10 +49,11 @@ with a Manage Business deep link for those.
 ## Product flow (`/new`)
 
 `title → price (₦ major, ×100 to minor) → stock → photos (0–4) → description
-→ confirm → createSellerProductWorkflow`. Photo bytes come from Telegram
+→ category (numbered pick, SKIP for none) → confirm →
+createSellerProductWorkflow` with `category_ids`. Photo bytes come from Telegram
 `getFile`, sniffed with the existing upload sniffer, stored via FILE service
 (S3/B2) or local `uploads/image/` in dev. Price input accepts `2500`, `₦2,500`,
-`2,500.50`.
+`2,500.50`. `/edit` also offers `category` (number pick, NONE clears).
 
 ## Rollout
 

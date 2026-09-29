@@ -23,7 +23,18 @@ type VariantValue = {
   stock: string
 }
 
-const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
+type CategoryOption = {
+  id: string
+  name: string
+}
+
+const AddProduct = ({
+  showVideo,
+  categories = [],
+}: {
+  showVideo: boolean
+  categories?: CategoryOption[]
+}) => {
   const [state, formAction] = useActionState(createSellerProduct, {
     success: false,
     error: null,
@@ -132,6 +143,29 @@ const AddProduct = ({ showVideo }: { showVideo: boolean }) => {
               />
             </div>
           )}
+
+          <div>
+            <label className="text-sm font-medium text-ink" htmlFor="product-category">
+              Category
+            </label>
+            <select
+              id="product-category"
+              name="category_id"
+              defaultValue=""
+              className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field text-ink focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
+              data-testid="product-category-input"
+            >
+              <option value="">No category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-ink-muted">
+              Helps shoppers find this product in its aisle.
+            </p>
+          </div>
 
           <ProductMedia
             photos={photos}

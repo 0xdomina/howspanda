@@ -26,7 +26,7 @@ type ProductPayload = HttpTypes.AdminCreateProduct & {
 // workflow keeps `stock` (quantity to sell) per variant as inventory levels.
 function toFullProductShape(
   body: MobileProductBody
-): ProductPayload {
+): ProductPayload & { category_ids?: string[] } {
   const photos = body.photos ?? (body.photo ? [body.photo] : [])
 
   if (body.variants || body.options) {
@@ -43,6 +43,7 @@ function toFullProductShape(
     description: body.description,
     handle: body.handle,
     status: body.status ?? "published",
+    category_ids: body.category_ids,
     thumbnail: photos[0] ?? null,
     images: body.images ?? photos.map((url) => ({ url })),
     options: [{ title: "One Size", values: ["One Size"] }],
@@ -123,6 +124,7 @@ export const GET = async (
     entity: "seller_admin",
     fields: [
       "seller.products.*",
+      "seller.products.categories.*",
       "seller.products.options.*",
       "seller.products.options.values.*",
       "seller.products.variants.*",

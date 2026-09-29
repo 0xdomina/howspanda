@@ -28,9 +28,11 @@ export const PATCH = async (
     images?: { url: string }[]
     status?: "draft" | "published" | "archived"
     metadata?: Record<string, unknown>
+    category_ids?: string[]
   } = {}
   if (body.title !== undefined) update.title = body.title
   if (body.description !== undefined) update.description = body.description
+  if (body.category_ids !== undefined) update.category_ids = body.category_ids
   if (body.photos !== undefined) {
     update.thumbnail = body.photos[0] ?? null
     update.images = body.photos.map((url) => ({ url }))

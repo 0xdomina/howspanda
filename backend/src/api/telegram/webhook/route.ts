@@ -431,9 +431,13 @@ async function handleFlowText(req: MedusaRequest, chatId: string, text: string) 
     case "new_description": {
       const upper = text.toUpperCase()
       session.draft.description = upper === "SKIP" ? undefined : text.slice(0, 500)
-      session.step = "new_confirm"
+      session.step = "new_category"
       touchSecretarySession(session)
-      await sendTelegramText(chatId, newProductSummary(session.draft))
+      await sendCategoryPicker(req, chatId)
+      return
+    }
+    case "new_category": {
+      await handleNewCategory(req, chatId, text)
       return
     }
     case "new_confirm": {
@@ -483,6 +487,18 @@ async function handleFlowText(req: MedusaRequest, chatId: string, text: string) 
         await sendTelegramText(chatId, "Send the new cover photo now, or /cancel.")
         return
       }
+      if (field === "category") {
+        const cats = await listStoreCategories(req)
+        if (!cats.length) {
+          await sendTelegramText(chatId, "No categories exist yet — your store team adds them. Reply /edit to change something else.")
+          return
+        }
+        session.edit = { ...(session.edit as any), list: cats }
+        session.step = "edit_category"
+        touchSecretarySession(session)
+        await sendTelegramText(chatId, categoryPickerMessage(cats))
+        return
+      }
       session.step = "edit_value"
       touchSecretarySession(session)
       await sendTelegramText(chatId, editValuePrompt(field))
@@ -490,6 +506,10 @@ async function handleFlowText(req: MedusaRequest, chatId: string, text: string) 
     }
     case "edit_value": {
       await handleEditValue(req, chatId, text)
+      return
+    }
+    case "edit_category": {
+      await handleEditCategory(req, chatId, text)
       return
     }
     case "edit_photo": {
@@ -503,7 +523,7 @@ async function handleFlowText(req: MedusaRequest, chatId: string, text: string) 
   }
 }
 
-function editValuePrompt(field: "title" | "price" | "stock" | "description" | "status" | "photo"): string {
+function editValuePrompt(field: "title" | "price" | "stock" | "category" | "description" | "status" | "photo"): string {
   switch (field) {
     case "title":
       return "Send the new title (2+ characters)."
@@ -802,6 +822,7 @@ async function handleConfirmStep(req: MedusaRequest, chatId: string) {
           title: draft.title,
           description: draft.description,
           status: "published",
+          category_ids: draft.categoryId ? [draft.categoryId] : undefined,
           thumbnail: photos[0] ?? null,
           images: photos.map((url) => ({ url })),
           options: [{ title: "One Size", values: ["One Size"] }],
@@ -827,6 +848,133 @@ async function handleConfirmStep(req: MedusaRequest, chatId: string) {
     await sendTelegramText(
       chatId,
       "Publishing failed on the store side. Nothing was lost — send /new to try again, or use Manage Business → Products."
+    )
+  }
+}
+
+async function listStoreCategories(
+  req: MedusaRequest
+): Promise<{ id: string; title: string }[]> {
+  try {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const { data } = (await query.graph({
+      entity: "product_category",
+      fields: ["id", "name"],
+    })) as { data: any[] }
+    return (data ?? [])
+      .filter((c) => c?.id)
+      .map((c) => ({ id: String(c.id), title: String(c.name ?? "Untitled") }))
+      .slice(0, 20)
+  } catch {
+    return []
+  }
+}
+
+function categoryPickerMessage(cats: { id: string; title: string }[]): string {
+  return [
+    `Which category? Reply with the number:`,
+    ...cats.map((c, i) => `${i + 1}. ${c.title}`),
+    ``,
+    `Or reply SKIP for no category.`,
+  ].join("\n")
+}
+
+async function sendCategoryPicker(req: MedusaRequest, chatId: string): Promise<void> {
+  const cats = await listStoreCategories(req)
+  if (!cats.length) {
+    const session = getSecretarySession(chatId)
+    if (session) {
+      session.step = "new_confirm"
+      touchSecretarySession(session)
+      await sendTelegramText(chatId, newProductSummary(session.draft))
+    }
+    return
+  }
+  const session = getSecretarySession(chatId)
+  if (session) {
+    session.edit = { list: cats }
+    touchSecretarySession(session)
+  }
+  await sendTelegramText(chatId, categoryPickerMessage(cats))
+}
+
+async function handleNewCategory(req: MedusaRequest, chatId: string, text: string): Promise<void> {
+  const session = getSecretarySession(chatId)
+  if (!session || session.step !== "new_category") return
+  const upper = text.trim().toUpperCase()
+  const cats = session.edit?.list ?? []
+  if (upper === "SKIP" || upper === "NO" || upper === "NONE") {
+    session.draft.categoryId = undefined
+    session.draft.categoryName = undefined
+    session.edit = undefined
+    session.step = "new_confirm"
+    touchSecretarySession(session)
+    await sendTelegramText(chatId, newProductSummary(session.draft))
+    return
+  }
+  const n = Number(text.trim())
+  if (!Number.isInteger(n) || n < 1 || n > cats.length) {
+    await sendTelegramText(
+      chatId,
+      cats.length
+        ? `Reply with a number 1–${cats.length}, or SKIP for no category.`
+        : `Reply SKIP to continue without a category.`
+    )
+    return
+  }
+  const picked = cats[n - 1]
+  session.draft.categoryId = picked.id
+  session.draft.categoryName = picked.title
+  session.edit = undefined
+  session.step = "new_confirm"
+  touchSecretarySession(session)
+  await sendTelegramText(chatId, newProductSummary(session.draft))
+}
+
+async function handleEditCategory(req: MedusaRequest, chatId: string, text: string): Promise<void> {
+  const session = getSecretarySession(chatId)
+  const edit = session?.edit
+  if (!session || !edit?.productId) {
+    clearSecretarySession(chatId)
+    await sendTelegramText(chatId, "That edit expired. Send /edit to start over.")
+    return
+  }
+  const upper = text.trim().toUpperCase()
+  const cats = edit.list ?? []
+  const label = edit.productTitle ?? "product"
+  let categoryIds: string[]
+  let doneMsg: string
+  if (upper === "NONE" || upper === "CLEAR" || upper === "SKIP") {
+    categoryIds = []
+    doneMsg = `Done: "${label}" has no category now.`
+  } else {
+    const n = Number(text.trim())
+    if (!Number.isInteger(n) || n < 1 || n > cats.length) {
+      await sendTelegramText(
+        chatId,
+        `Reply with a number 1–${cats.length}, NONE to clear, or /cancel.`
+      )
+      return
+    }
+    const picked = cats[n - 1]
+    categoryIds = [picked.id]
+    doneMsg = `Done: "${label}" is now in ${picked.title}.`
+  }
+  try {
+    await updateSellerProductWorkflow(req.scope).run({
+      input: {
+        seller_admin_id: session.sellerAdminId,
+        product_id: edit.productId,
+        update: { category_ids: categoryIds },
+      },
+    })
+    clearSecretarySession(chatId)
+    await sendTelegramText(chatId, doneMsg)
+  } catch {
+    clearSecretarySession(chatId)
+    await sendTelegramText(
+      chatId,
+      "That update failed on the store side. Nothing changed — try /edit again or use Manage Business → Products."
     )
   }
 }
