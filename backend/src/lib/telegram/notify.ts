@@ -99,6 +99,21 @@ export async function notifyTelegramLinked(input: {
       `${input.storeName} is linked for order alerts.`,
       ``,
       `You will get a message here the moment a new order needs your attention.`,
+      `Send /help to see what I can do as your store secretary.`,
     ].join("\n"),
   })
+}
+
+/** Best-effort plain reply for the secretary. Never throws. */
+export async function sendTelegramText(
+  chatId: number | string,
+  text: string,
+  extra?: Record<string, unknown>
+): Promise<boolean> {
+  const sent = await botApi<{ message_id?: number }>("sendMessage", {
+    chat_id: chatId,
+    text,
+    ...(extra ?? {}),
+  })
+  return Boolean(sent)
 }
