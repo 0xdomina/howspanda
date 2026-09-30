@@ -20,7 +20,19 @@ COPY package.json package-lock.json ./
 RUN npm ci --include=dev --legacy-peer-deps
 
 COPY . .
-RUN npm run build
+RUN npm run build \
+    # Admin dashboard ships separately (backend/vercel.json -> Vercel), so
+    # drop its static output: thousands of files the API image never serves.
+    && rm -rf .medusa/admin \
+    # Drop devDependencies after the build: the runtime only needs the
+    # compiled .medusa output + production deps (@medusajs/cli spawns the
+    # server). Halves the image file count (microVM image packing and cold
+    # pulls both benefit; Render/PandaStack use this same Dockerfile).
+    && npm prune --omit=dev --legacy-peer-deps \
+    # Node never loads these at runtime (~50% of node_modules inodes):
+    # type definitions, source maps, READMEs, licenses/changelogs.
+    && find ./node_modules -type f \( -name '*.d.ts' -o -name '*.map' -o -name '*.md' -o -iname 'LICENSE*' -o -iname 'LICENCE*' -o -iname 'CHANGELOG*' -o -iname 'AUTHORS*' -o -iname 'NOTICE*' -o -iname 'COPYING*' \) -delete \
+    && npm cache clean --force
 
 FROM node:22.12-slim AS runtime
 

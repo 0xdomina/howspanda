@@ -15,3 +15,10 @@ Dockerfile*
 .git/
 .github/
 medusa-config.js
+# Local/dev-only state, never part of any image (Render/PandaStack/InstaCloud)
+.mimosa
+.insta
+.vscode
+.vercel
+.yarn
+uploads
