@@ -9,11 +9,24 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.json({ ok: true })
-  for (const name of ["_medusa_jwt", "_medusa_seller_jwt", "_medusa_cart_id"]) {
+  // Medusa tokens plus every Better Auth session cookie variant. Production
+  // serves over HTTPS, where Better Auth uses the __Secure- prefix — missing
+  // those left users "logged in" after logout.
+  for (const name of [
+    "_medusa_jwt",
+    "_medusa_seller_jwt",
+    "_medusa_cart_id",
+    "better-auth.session_token",
+    "__Secure-better-auth.session_token",
+    "better-auth.session_data",
+    "__Secure-better-auth.session_data",
+    "better-auth.dont_remember",
+    "__Secure-better-auth.dont_remember",
+  ]) {
     response.cookies.set(name, "", {
       maxAge: 0,
       httpOnly: true,
-      sameSite: "strict",
+      sameSite: "lax",
       secure: true,
       path: "/",
     })

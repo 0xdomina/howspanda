@@ -219,21 +219,21 @@ export default function SellerSettingsPremium({ store, isOwner }: { store: Store
 
           <div className="glass-panel rounded-large p-6 small:p-7">
             <h3 className="font-display text-lg font-medium text-ink">Delivery</h3>
-            <p className="mt-1 text-sm text-ink-muted">Your store default. Each product can override it — fixed fee, free delivery, or courier request.</p>
+            <p className="mt-1 text-sm text-ink-muted">Your store default. Products can override it.</p>
             <div className="mt-4 space-y-4">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-ink">Fixed delivery fee (NGN)</label>
                 <input value={deliveryFee} onChange={(e)=>setDeliveryFee(e.target.value)} disabled={!isOwner || freeDelivery} inputMode="decimal" placeholder="e.g. 1500" className="w-full rounded-control border border-ink-hairline bg-white/80 px-4 py-3 text-sm text-ink shadow-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:opacity-50" />
-                <p className="mt-1 text-xs text-ink-muted">Buyers pay this with the order total. Leave empty for courier-request by default.</p>
+                <p className="mt-1 text-xs text-ink-muted">Buyers pay this with the order total.</p>
               </div>
               <div className="flex items-start justify-between gap-4 rounded-control border border-ink-hairline bg-white/70 p-4">
-                <div><p className="text-sm font-medium text-ink">Free delivery store-wide</p><p className="mt-1 text-xs leading-5 text-ink-muted">You absorb delivery on every product unless a product sets its own fee.</p></div>
+                <div><p className="text-sm font-medium text-ink">Free delivery store-wide</p><p className="mt-1 text-xs leading-5 text-ink-muted">You absorb delivery on every product.</p></div>
                 <button type="button" role="switch" aria-checked={freeDelivery} disabled={!isOwner || isPending} onClick={()=>setFreeDelivery(!freeDelivery)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${freeDelivery ? "bg-emerald-600" : "bg-ink-hairline"}`}><span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${freeDelivery ? "translate-x-5" : "translate-x-0.5"}`} /></button>
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-ink">Pickup address</label>
                 <input value={pickupAddress} onChange={(e)=>setPickupAddress(e.target.value)} disabled={!isOwner} placeholder="Where couriers collect parcels" className="w-full rounded-control border border-ink-hairline bg-white/80 px-4 py-3 text-sm text-ink shadow-sm outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10 disabled:opacity-50" />
-                <p className="mt-1 text-xs text-ink-muted">Needed for courier jobs to auto-post when payment is confirmed.</p>
+                <p className="mt-1 text-xs text-ink-muted">Couriers collect from here.</p>
               </div>
             </div>
             {isOwner && <button type="button" disabled={isPending} onClick={()=>{ setMessage(null); const feeRaw = deliveryFee.trim(); const fee = feeRaw === "" ? null : Math.round(Number(feeRaw) * 100); if (feeRaw !== "" && (!Number.isFinite(fee) || (fee as number) < 0)) { setMessage({ok:false,text:"Delivery fee must be a positive number of naira."}); return }; startTransition(async()=>{ const r=await updateSellerStore({delivery_fee: fee, free_delivery: freeDelivery, pickup_address: pickupAddress.trim() || null}); setMessage(r.success?{ok:true,text:"Delivery settings saved."}:{ok:false,text:r.error??"Could not save."}) })}} className="mt-4 rounded-control bg-ink px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-ink/90 disabled:opacity-50">{isPending ? "Saving…" : "Save delivery settings"}</button>}

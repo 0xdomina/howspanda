@@ -58,7 +58,7 @@ const PostCourierButton = ({
         return
       }
       setDone(true)
-      setMessage("Posted to the courier board — couriers can now bid.")
+      setMessage("Posted. Couriers can now bid.")
       router.refresh()
     })
   }

@@ -5,7 +5,11 @@ import { MARKETPLACE_MODULE } from "../../../modules/marketplace"
 import {
   notifyTelegramLinked,
   sendTelegramText,
+  editTelegramButtons,
+  PROOF_REJECT_REASONS,
 } from "../../../lib/telegram/notify"
+import { sendBankTransferNotice } from "../../../lib/bank-transfer/notify"
+import { maybeAutoPostCourierJob } from "../../../lib/delivery/auto-post"
 import {
   SECRETARY_HELP,
   PAYOUT_REDIRECT,
@@ -39,7 +43,7 @@ type TelegramUpdate = {
   callback_query?: {
     id?: string
     data?: string
-    message?: { chat?: { id?: number | string } }
+    message?: { message_id?: number; chat?: { id?: number | string } }
   }
 }
 
@@ -68,6 +72,13 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       await sendTelegramText(chatId, "Cancelled. Send /help to see what I can do.")
     } else if (chatId && (data === "sec:confirm" || data === "new:confirm")) {
       await handleConfirmStep(req, String(chatId))
+    } else if (chatId && data.startsWith("proof:")) {
+      await handleProofCallback(
+        req,
+        String(chatId),
+        callback.message?.message_id,
+        data
+      )
     }
     res.json({ ok: true })
     return
@@ -976,6 +987,120 @@ async function handleEditCategory(req: MedusaRequest, chatId: string, text: stri
       chatId,
       "That update failed on the store side. Nothing changed — try /edit again or use Manage Business → Products."
     )
+  }
+}
+
+function proofKeyboard(orderId: string, manageUrl: string) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Confirm payment", callback_data: `proof:confirm:${orderId}` },
+        { text: "Reject", callback_data: `proof:reject:${orderId}` },
+      ],
+      [{ text: "Review proof", url: manageUrl }],
+    ],
+  }
+}
+
+function storefrontBase(): string {
+  return (process.env.STOREFRONT_URL || "https://hows-u.vercel.app").replace(/\/$/, "")
+}
+
+// One-click payment verdicts from the proof alert buttons. Confirm settles
+// the order (buyer notice + courier auto-post, mirroring Manage Business).
+// Reject swaps the buttons for reason picks, then rejects with that note.
+async function handleProofCallback(
+  req: MedusaRequest,
+  chatId: string,
+  messageId: number | undefined,
+  data: string
+): Promise<void> {
+  const store = await findStoreByChat(req, chatId).catch(() => null)
+  if (!store) {
+    await sendTelegramText(chatId, "This chat is not linked to a store.")
+    return
+  }
+  const parts = data.split(":")
+  const action = parts[1]
+  const orderId = parts[2]
+  if (!orderId) return
+
+  const marketplace: MarketplaceModuleService =
+    req.scope.resolve(MARKETPLACE_MODULE)
+  const manageUrl = `${storefrontBase()}/ng/seller/orders`
+
+  if (action === "reject" && messageId) {
+    await editTelegramButtons(chatId, messageId, {
+      inline_keyboard: [
+        PROOF_REJECT_REASONS.slice(0, 2).map((r) => ({
+          text: r.label,
+          callback_data: `proof:reason:${orderId}:${r.key}`,
+        })),
+        PROOF_REJECT_REASONS.slice(2).map((r) => ({
+          text: r.label,
+          callback_data: `proof:reason:${orderId}:${r.key}`,
+        })),
+        [{ text: "Back", callback_data: `proof:back:${orderId}` }],
+      ],
+    })
+    return
+  }
+
+  if (action === "back" && messageId) {
+    await editTelegramButtons(chatId, messageId, proofKeyboard(orderId, manageUrl))
+    return
+  }
+
+  if (action === "reason") {
+    const reason = PROOF_REJECT_REASONS.find((r) => r.key === parts[3])
+    if (!reason) return
+    try {
+      const proof = await marketplace.rejectBankTransferProof(
+        orderId,
+        store.sellerId,
+        reason.note
+      )
+      await sendBankTransferNotice(req.scope, {
+        to: proof.buyer_email,
+        recipient: "buyer",
+        kind: "bank_transfer_rejected",
+        subject: "The store couldn't find your bank transfer",
+        bodyHtml: `The store could not find the transfer for order ${proof.order_id}. Their note: "${proof.rejection_note}". If the money is still on its way, it can still be confirmed once it lands.`,
+        payload: { order_id: proof.order_id, rejection_note: proof.rejection_note },
+      })
+      await sendTelegramText(chatId, `Rejected (${reason.note}). The buyer can re-upload.`)
+    } catch {
+      await sendTelegramText(chatId, "That order is no longer awaiting verdict.")
+    }
+    return
+  }
+
+  if (action === "confirm") {
+    try {
+      const proof = await marketplace.confirmBankTransferProof(orderId, store.sellerId)
+      await sendBankTransferNotice(req.scope, {
+        to: proof.buyer_email,
+        recipient: "buyer",
+        kind: "bank_transfer_confirmed",
+        subject: "Your bank transfer was confirmed",
+        bodyHtml: `The store confirmed your bank transfer for order ${proof.order_id}. Reference: ${proof.reference}.`,
+        payload: { order_id: proof.order_id, reference: proof.reference },
+      })
+      const auto = await maybeAutoPostCourierJob(req.scope, {
+        orderId,
+        sellerId: store.sellerId,
+        buyerEmail: proof.buyer_email,
+      })
+      await sendTelegramText(
+        chatId,
+        auto.posted
+          ? `Payment confirmed. Courier job posted to the board.`
+          : `Payment confirmed. Fulfil the order in Manage Business.`
+      )
+    } catch {
+      await sendTelegramText(chatId, "That order is no longer awaiting verdict.")
+    }
+    return
   }
 }
 

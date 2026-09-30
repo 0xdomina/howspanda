@@ -3,7 +3,8 @@ import {
   MedusaResponse,
 } from "@medusajs/framework/http"
 import { z } from "@medusajs/framework/zod"
-import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
+import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils"
+import { deleteProductsWorkflow } from "@medusajs/medusa/core-flows"
 import { PatchSellerMobileProductSchema } from "../../../middlewares"
 import updateSellerProductWorkflow from "../../../../workflows/marketplace/update-seller-product"
 import { requireSellerPermission } from "../../../../lib/sellers/resolve-seller"
@@ -90,4 +91,34 @@ export const PATCH = async (
   res.json({
     product: result.product,
   })
+}
+
+// Seller removes a product they own from the platform. Same ownership rule
+// as edits: the product must sit under this seller's store.
+export const DELETE = async (
+  req: AuthenticatedMedusaRequest,
+  res: MedusaResponse
+) => {
+  const context = await requireSellerPermission(req, "products")
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+  const { data: admins } = (await query.graph({
+    entity: "seller_admin",
+    fields: ["seller.products.id"],
+    filters: { id: [context.sellerAdminId] },
+  })) as { data: any[] }
+  const owned = ((admins[0]?.seller?.products ?? []) as { id: string }[]).some(
+    (p) => p.id === req.params.id
+  )
+  if (!owned) {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Product not found for this seller"
+    )
+  }
+
+  await deleteProductsWorkflow(req.scope).run({
+    input: { ids: [req.params.id] },
+  })
+
+  res.json({ id: req.params.id, deleted: true })
 }

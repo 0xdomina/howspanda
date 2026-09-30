@@ -350,8 +350,11 @@ export async function signout(countryCode: string) {
     const store = await nextCookies()
     for (const name of [
       "better-auth.session_token",
+      "__Secure-better-auth.session_token",
       "better-auth.session_data",
+      "__Secure-better-auth.session_data",
       "better-auth.dont_remember",
+      "__Secure-better-auth.dont_remember",
     ]) {
       try {
         store.set(name, "", { maxAge: -1, path: "/" })

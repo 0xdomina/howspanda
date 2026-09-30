@@ -96,6 +96,7 @@ export const POST = async (
       await notifySellerProofSubmitted({
         chatId: (seller as any).telegram_chat_id as string,
         storeName: (seller as any).name ?? "Your store",
+        orderId: req.params.id,
         orderDisplayId: placedOrder?.display_id ?? req.params.id,
         itemCount,
         totalFormatted,

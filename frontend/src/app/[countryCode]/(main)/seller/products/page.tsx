@@ -7,6 +7,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import { convertToLocale } from "@lib/util/money"
 import { sellerHasPermission } from "@lib/seller-permissions"
 import SellerRetryPanel from "@modules/seller/components/retry-panel"
+import DeleteProductButton from "@modules/seller/components/delete-product-button"
 
 export const metadata: Metadata = {
   title: "Your products",
@@ -104,6 +105,8 @@ export default async function SellerProductsPage() {
                   >
                     Edit
                   </LocalizedClientLink>
+                  <span className="mx-1 text-ink-hairline">·</span>
+                  <DeleteProductButton productId={product.id} productTitle={product.title} />
                 </div>
               </li>
             )

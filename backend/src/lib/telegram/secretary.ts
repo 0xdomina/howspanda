@@ -102,20 +102,20 @@ export function clearSecretarySession(chatId: string): void {
 export const SECRETARY_HELP = [
   `I am your store secretary.`,
   ``,
-  `/products — list your products with prices + stock`,
-  `/new — create a product step by step`,
-  `/edit — change a product's price, stock, photo or details`,
-  `/orders — latest orders with escrow status`,
-  `/store — store summary + link to Manage Business`,
-  `/cancel — stop what we are doing`,
-  `/unlink — disconnect this chat from the store`,
+  `/products. Your products with prices and stock.`,
+  `/new. Create a product step by step.`,
+  `/edit. Change price, stock, photo or details.`,
+  `/orders. Latest orders with escrow status.`,
+  `/store. Store summary and Manage Business link.`,
+  `/cancel. Stop what we are doing.`,
+  `/unlink. Disconnect this chat from the store.`,
   ``,
-  `Money moves (payouts, withdrawals, bank accounts) always happen in Manage Business — ask me and I will point you there.`,
+  `Payouts and bank accounts live in Manage Business only.`,
 ].join("\n")
 
 export const PAYOUT_REDIRECT = [
-  `I never move money from chat — that keeps your earnings safe.`,
-  `Please open Manage Business → Payouts to request or track payouts.`,
+  `I never move money from chat.`,
+  `Open Manage Business, then Payouts.`,
 ].join("\n")
 
 export function isPayoutAsk(text: string): boolean {

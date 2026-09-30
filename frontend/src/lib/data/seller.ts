@@ -1038,6 +1038,30 @@ export const retrieveSellerProduct = async (
   }
 }
 
+export const deleteSellerProduct = async (
+  id: string
+): Promise<string | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return "Not signed in as a seller."
+
+    await sdk.client.fetch(`/sellers/products/${id}`, {
+      method: "DELETE",
+      headers,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTagSafely(tag)
+    const productsTag = await getCacheTag("products")
+    revalidateTagSafely(productsTag)
+    revalidateTagSafely(PUBLIC_PRODUCTS_TAG)
+
+    return null
+  } catch (error: any) {
+    return error.toString()
+  }
+}
+
 export const updateSellerProduct = async (
   id: string,
   update: {

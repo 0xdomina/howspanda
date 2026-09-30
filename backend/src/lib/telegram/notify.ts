@@ -118,6 +118,26 @@ export async function sendTelegramText(
   return Boolean(sent)
 }
 
+/** Swap a message's inline buttons (e.g. reject → reason picker). Never throws. */
+export async function editTelegramButtons(
+  chatId: number | string,
+  messageId: number | string,
+  keyboard: unknown
+): Promise<boolean> {
+  const sent = await botApi("editMessageReplyMarkup", {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: keyboard,
+  })
+  return Boolean(sent)
+}
+
+export const PROOF_REJECT_REASONS: { key: string; label: string; note: string }[] = [
+  { key: "amount", label: "Wrong amount", note: "Amount doesn't match" },
+  { key: "reference", label: "No reference", note: "No reference in narration" },
+  { key: "blurred", label: "Blurred receipt", note: "Receipt unclear" },
+  { key: "other", label: "Something else", note: "Needs review" },
+]
 /** Best-effort photo message (e.g. a payment receipt). Never throws. */
 export async function sendTelegramPhoto(
   chatId: number | string,
@@ -142,6 +162,7 @@ export async function sendTelegramPhoto(
 export async function notifySellerProofSubmitted(input: {
   chatId: string
   storeName: string
+  orderId: string
   orderDisplayId: string | number
   itemCount: number
   totalFormatted: string
@@ -159,12 +180,20 @@ export async function notifySellerProofSubmitted(input: {
   if (input.buyerEmail) lines.push(`Buyer: ${input.buyerEmail}`)
   lines.push(
     ``,
-    `The buyer tapped "I've made this transfer" — check the receipt and confirm or reject in your seller workspace.`
+    `The buyer tapped "I've made this transfer". Check the receipt and confirm or reject in your seller workspace.`
   )
   const caption = lines.join("\n")
+  // One-click verdict: confirm settles it, reject asks for a reason first.
+  // Review link stays for the full workspace view.
   const keyboard = {
     reply_markup: {
-      inline_keyboard: [[{ text: "Review proof", url: input.manageUrl }]],
+      inline_keyboard: [
+        [
+          { text: "Confirm payment", callback_data: `proof:confirm:${input.orderId}` },
+          { text: "Reject", callback_data: `proof:reject:${input.orderId}` },
+        ],
+        [{ text: "Review proof", url: input.manageUrl }],
+      ],
     },
   }
   if (input.receiptUrl) {

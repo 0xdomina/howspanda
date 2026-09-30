@@ -352,9 +352,9 @@ const AddProduct = ({
                 data-testid="product-delivery-input"
               >
                 <option value="">Use store default</option>
-                <option value="fixed">Fixed fee — buyer pays with order</option>
-                <option value="free">Free delivery — you absorb it</option>
-                <option value="courier">Courier request — job posts on payment</option>
+                <option value="fixed">Fixed fee</option>
+                <option value="free">Free delivery</option>
+                <option value="courier">Courier request</option>
               </select>
             </div>
             {deliveryMode === "fixed" && (

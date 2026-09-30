@@ -516,11 +516,11 @@ export default function BankTransferCard({
               </p>
               {deliveryFeeMinor > 0 ? (
                 <p className="text-sm text-ink-muted">
-                  Goods {fmt(expectedAmount)} + delivery {fmt(deliveryFeeMinor / 100)} — transfer the total.
+                  Goods {fmt(expectedAmount)} plus delivery {fmt(deliveryFeeMinor / 100)}.
                 </p>
               ) : transfer?.delivery_mode === "courier" ? (
                 <p className="text-sm text-ink-muted">
-                  Courier delivery will be arranged after payment — transfer the goods total now.
+                  Courier comes after payment. Transfer the goods total now.
                 </p>
               ) : (
                 <p className="text-sm text-ink-muted">

@@ -45,6 +45,10 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
   const backendHealthUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
     ? `${process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL.replace(/\r|\n/g, "").trim().replace(/^['"]|['"]$/g, "").replace(/\/$/, "")}/health`
     : "/api/backend/health"
+  const buildId =
+    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
+    process.env.NEXT_PUBLIC_BUILD_ID ??
+    "local"
 
   return (
     <html
@@ -54,7 +58,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
       <body className="bg-paper font-sans text-ink antialiased">
         <WishlistProvider initialItems={initialWishlist}><main className="relative page-enter pb-20 small:pb-0">{props.children}</main></WishlistProvider>
         <BottomTabBar />
-        <WarmAgent />
+        <WarmAgent build={buildId} />
         <script
           // Quietly start the backend through our same-origin health proxy so
           // the backend URL is never exposed in the page source.
