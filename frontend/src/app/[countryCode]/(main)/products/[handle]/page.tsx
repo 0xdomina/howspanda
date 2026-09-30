@@ -48,6 +48,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const product = await listProducts({
     countryCode: params.countryCode,
     queryParams: { handle },
+    // Public catalog lane: one shared cache entry per region instead of one
+    // per visitor. Seller edits bust it via PUBLIC_PRODUCTS_TAG.
+    publicCache: true,
   }).then(({ response }) => response.products[0])
 
   if (!product) {
@@ -89,19 +92,24 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 
 export default async function ProductPage(props: Props) {
   const params = await props.params
-  const region = await getRegion(params.countryCode)
   const searchParams = await props.searchParams
 
   const selectedVariantId = searchParams.v_id
 
+  // Region + product resolve concurrently (the product query re-resolves the
+  // region internally from cache — awaiting it first would only serialize).
+  const [region, pricedProduct] = await Promise.all([
+    getRegion(params.countryCode),
+    listProducts({
+      countryCode: params.countryCode,
+      queryParams: { handle: params.handle },
+      publicCache: true,
+    }).then(({ response }) => response.products[0]),
+  ])
+
   if (!region) {
     notFound()
   }
-
-  const pricedProduct = await listProducts({
-    countryCode: params.countryCode,
-    queryParams: { handle: params.handle },
-  }).then(({ response }) => response.products[0])
 
   if (!pricedProduct) {
     return <ProductUnavailable />

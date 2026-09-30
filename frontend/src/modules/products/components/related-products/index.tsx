@@ -39,6 +39,8 @@ export default async function RelatedProducts({
   const products = await listProducts({
     queryParams,
     countryCode,
+    // Same shared catalog cache as the PDP query (busted on seller edits).
+    publicCache: true,
   }).then(({ response }) => {
     return response.products.filter(
       (responseProduct) => responseProduct.id !== product.id
