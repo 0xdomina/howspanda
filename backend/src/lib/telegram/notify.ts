@@ -117,3 +117,60 @@ export async function sendTelegramText(
   })
   return Boolean(sent)
 }
+
+/** Best-effort photo message (e.g. a payment receipt). Never throws. */
+export async function sendTelegramPhoto(
+  chatId: number | string,
+  photoUrl: string,
+  caption: string,
+  extra?: Record<string, unknown>
+): Promise<boolean> {
+  const sent = await botApi<{ message_id?: number }>("sendPhoto", {
+    chat_id: chatId,
+    photo: photoUrl,
+    caption,
+    ...(extra ?? {}),
+  })
+  return Boolean(sent)
+}
+
+/**
+ * Payment-gated order alert: fires when the buyer SUBMITS transfer proof
+ * (not at order creation — no money has moved before that). The receipt
+ * rides along as the photo so the seller can verify at a glance.
+ */
+export async function notifySellerProofSubmitted(input: {
+  chatId: string
+  storeName: string
+  orderDisplayId: string | number
+  itemCount: number
+  totalFormatted: string
+  buyerEmail?: string | null
+  reference: string
+  receiptUrl?: string | null
+  manageUrl: string
+}): Promise<boolean> {
+  const lines = [
+    `Payment proof for ${input.storeName}`,
+    ``,
+    `Order ${input.orderDisplayId} · ${input.itemCount} item${input.itemCount === 1 ? "" : "s"} · ${input.totalFormatted}`,
+    `Reference: ${input.reference}`,
+  ]
+  if (input.buyerEmail) lines.push(`Buyer: ${input.buyerEmail}`)
+  lines.push(
+    ``,
+    `The buyer tapped "I've made this transfer" — check the receipt and confirm or reject in your seller workspace.`
+  )
+  const caption = lines.join("\n")
+  const keyboard = {
+    reply_markup: {
+      inline_keyboard: [[{ text: "Review proof", url: input.manageUrl }]],
+    },
+  }
+  if (input.receiptUrl) {
+    const withPhoto = await sendTelegramPhoto(input.chatId, input.receiptUrl, caption, keyboard)
+    if (withPhoto) return true
+    // Photo send failed (URL expired, file too big) — the text must still land.
+  }
+  return sendTelegramText(input.chatId, caption, keyboard)
+}

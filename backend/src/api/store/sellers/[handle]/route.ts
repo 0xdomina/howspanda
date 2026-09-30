@@ -34,6 +34,8 @@ export const GET = async (
       "description",
       "accent_color",
       "theme",
+      "delivery_fee",
+      "free_delivery",
       "products.*",
       "products.variants.*",
       "products.variants.prices.*",
@@ -88,6 +90,10 @@ export const GET = async (
       accent_color: seller.accent_color,
       theme: seller.theme,
       verification_status,
+      // Public delivery defaults (no pickup address — private). Per-product
+      // metadata.delivery overrides these on the storefront.
+      delivery_fee: (seller as any).delivery_fee ?? null,
+      free_delivery: Boolean((seller as any).free_delivery),
     },
     follower_count,
     followed_by_viewer,

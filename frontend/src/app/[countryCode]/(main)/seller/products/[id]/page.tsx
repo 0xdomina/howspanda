@@ -57,6 +57,8 @@ export default async function EditProductPage({
           name: c.name,
         }))}
         initialCategoryId={product.categories?.[0]?.id ?? ""}
+        initialDeliveryMode={product.metadata?.delivery?.mode ?? ""}
+        initialDeliveryFee={product.metadata?.delivery?.fee ?? null}
         variants={variants}
         showVideo={true}
       />

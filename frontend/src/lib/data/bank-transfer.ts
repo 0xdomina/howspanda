@@ -27,6 +27,8 @@ export type BankTransferTransfer = {
   confirmed_at: string | null
   rejected_at: string | null
   expired_at: string | null
+  delivery_mode: string | null
+  delivery_fee: number | null
 }
 
 export type BankTransferResponse =

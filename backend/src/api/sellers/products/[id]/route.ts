@@ -54,7 +54,8 @@ export const PATCH = async (
     body.video_url !== undefined ||
     body.flash_sale !== undefined ||
     body.homepage_banner !== undefined ||
-    body.banner_url !== undefined
+    body.banner_url !== undefined ||
+    body.delivery !== undefined
   ) {
     const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
     const { data: [current] } = await query.graph({
@@ -66,6 +67,10 @@ export const PATCH = async (
       ...((current?.metadata ?? {}) as Record<string, unknown>),
     }
     if (body.video_url !== undefined) currentMetadata.product_video = body.video_url
+    if (body.delivery !== undefined) {
+      if (body.delivery === null) delete currentMetadata.delivery
+      else currentMetadata.delivery = body.delivery
+    }
     update.metadata = applyPromotionMetadata(currentMetadata, {
       flashSale: body.flash_sale,
       homepageBanner: body.homepage_banner,

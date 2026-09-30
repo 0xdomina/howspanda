@@ -53,6 +53,7 @@ export const GET = async (
           "items.variant",
           "items.variant.product",
           "items.detail",
+          "shipping_address.*",
           "shipping_methods",
           "payment_collections",
           "fulfillments",

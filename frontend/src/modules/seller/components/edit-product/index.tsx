@@ -33,6 +33,8 @@ const EditProduct = ({
   homepageBanner: initialHomepageBanner,
   categories = [],
   initialCategoryId = "",
+  initialDeliveryMode = "",
+  initialDeliveryFee = null,
   showVideo,
 }: {
   productId: string
@@ -51,6 +53,8 @@ const EditProduct = ({
   homepageBanner?: boolean
   categories?: CategoryOption[]
   initialCategoryId?: string
+  initialDeliveryMode?: string
+  initialDeliveryFee?: number | null
   showVideo: boolean
 }) => {
   const router = useRouter()
@@ -62,6 +66,10 @@ const EditProduct = ({
   const [flashSale, setFlashSale] = useState(Boolean(initialFlashSale))
   const [homepageBanner, setHomepageBanner] = useState(Boolean(initialHomepageBanner))
   const [categoryId, setCategoryId] = useState(initialCategoryId ?? "")
+  const [deliveryMode, setDeliveryMode] = useState(initialDeliveryMode ?? "")
+  const [deliveryFee, setDeliveryFee] = useState(
+    initialDeliveryFee != null ? String(Number(initialDeliveryFee) / 100) : ""
+  )
   const [variants, setVariants] = useState<VariantRow[]>(() =>
     initialVariants.map((v) => ({
       id: v.id,
@@ -85,6 +93,7 @@ const EditProduct = ({
       flashSale?: boolean
       homepageBanner?: boolean
       categoryIds?: string[]
+      delivery?: { mode: "fixed" | "free" | "courier"; fee?: number } | null
       variants?: {
         id: string
         price?: number
@@ -96,6 +105,15 @@ const EditProduct = ({
       photos,
       bannerUrl,
       categoryIds: categoryId ? [categoryId] : [],
+      delivery:
+        deliveryMode === "fixed" || deliveryMode === "free" || deliveryMode === "courier"
+          ? {
+              mode: deliveryMode,
+              ...(deliveryMode === "fixed" && deliveryFee.trim() !== "" && Number.isFinite(Number(deliveryFee))
+                ? { fee: Math.round(Number(deliveryFee) * 100) }
+                : {}),
+            }
+          : null,
       variants: variants.map((v) => ({
         id: v.id,
         price: v.price !== "" ? Number(v.price) : undefined,
@@ -161,6 +179,44 @@ const EditProduct = ({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="grid gap-3">
+          <div>
+            <label className="text-sm font-medium text-ink" htmlFor="product-delivery-mode">
+              Delivery
+            </label>
+            <select
+              id="product-delivery-mode"
+              value={deliveryMode}
+              onChange={(e) => setDeliveryMode(e.target.value)}
+              className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field text-ink focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
+              data-testid="product-delivery-input"
+            >
+              <option value="">Use store default</option>
+              <option value="fixed">Fixed fee — buyer pays with order</option>
+              <option value="free">Free delivery — you absorb it</option>
+              <option value="courier">Courier request — job posts on payment</option>
+            </select>
+          </div>
+          {deliveryMode === "fixed" && (
+            <div>
+              <label className="text-sm font-medium text-ink" htmlFor="product-delivery-fee">
+                Delivery fee (NGN)
+              </label>
+              <input
+                id="product-delivery-fee"
+                type="number"
+                min="0"
+                step="any"
+                value={deliveryFee}
+                onChange={(e) => setDeliveryFee(e.target.value)}
+                placeholder="e.g. 1500"
+                className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
+                data-testid="product-delivery-fee-input"
+              />
+            </div>
+          )}
         </div>
 
         {variants.length > 0 && (

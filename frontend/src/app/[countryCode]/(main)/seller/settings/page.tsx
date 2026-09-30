@@ -27,6 +27,9 @@ export default async function SellerSettingsPage() {
         theme: seller.seller?.theme,
         crypto_payments_enabled: seller.seller?.crypto_payments_enabled,
         telegram_linked: Boolean(seller.seller?.telegram_chat_id),
+        delivery_fee: seller.seller?.delivery_fee ?? null,
+        free_delivery: seller.seller?.free_delivery ?? false,
+        pickup_address: seller.seller?.pickup_address ?? null,
       }}
       isOwner={seller.role !== "staff"}
     />

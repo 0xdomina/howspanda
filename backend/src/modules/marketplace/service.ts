@@ -448,6 +448,8 @@ class MarketplaceModuleService extends MedusaService({
     reference: string
     currencyCode?: string
     bank: Record<string, unknown>
+    deliveryMode?: string
+    deliveryFee?: number
   }) {
     const existing = await this.bankTransferForOrder(
       input.orderId,
@@ -465,6 +467,8 @@ class MarketplaceModuleService extends MedusaService({
         currency_code: input.currencyCode ?? "ngn",
         bank: input.bank,
         status: "awaiting_proof" as const,
+        delivery_mode: input.deliveryMode ?? null,
+        delivery_fee: input.deliveryFee ?? null,
       })
     } catch (error) {
       // A repeated completion request can race the initial existence check.

@@ -249,6 +249,14 @@ export const PostSellerMobileProductSchema = z.strictObject({
   // Optional product categories (by id). Resolved from the store's category
   // list on the client; the route forwards them to the create workflow.
   category_ids: z.array(z.string().min(1)).max(10).optional(),
+  // Delivery override for this product: fixed (fee in minor NGN, paid with
+  // the order), free, or courier (buyer arranges). Absent = store default.
+  delivery: z
+    .object({
+      mode: z.enum(["fixed", "free", "courier"]),
+      fee: z.number().int().min(0).optional(),
+    })
+    .optional(),
   images: z.array(z.object({ url: z.string().url() })).optional(),
   options: z
     .array(
@@ -295,6 +303,14 @@ export const PatchSellerMobileProductSchema = z.strictObject({
   homepage_banner: z.boolean().optional(),
   // Replaces the product's category set (empty array clears it).
   category_ids: z.array(z.string().min(1)).max(10).optional(),
+  // Delivery override (same shape as create). Absent = keep current.
+  delivery: z
+    .object({
+      mode: z.enum(["fixed", "free", "courier"]),
+      fee: z.number().int().min(0).optional(),
+    })
+    .nullable()
+    .optional(),
   variants: z
     .array(
       z.object({
@@ -684,7 +700,8 @@ export const PostDeliveryJobSchema = z.object({
   pickupAddress: z.string().min(3),
   destinationAddress: z.string().min(3),
   destinationPhone: z.string().optional(),
-  postedPrice: z.number().positive().max(1000000),
+  // 0 = open to offers (auto-posted courier jobs); positive = asking price.
+  postedPrice: z.number().min(0).max(1000000),
 })
 
 export const PostDeliveryOfferSchema = z.object({

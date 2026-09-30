@@ -31,6 +31,11 @@ const PaymentProof = model.define("payment_proof", {
   proof_url: model.text().nullable(),
   buyer_note: model.text().nullable(),
   rejection_note: model.text().nullable(),
+  // Delivery as chosen at checkout: fixed (fee paid with the order),
+  // free (seller absorbs), or courier (buyer arranges / auto-posted job).
+  // delivery_fee in minor units, meaningful for fixed.
+  delivery_mode: model.text().nullable(),
+  delivery_fee: model.number().nullable(),
   recheck_until: model.dateTime().nullable(),
   submitted_at: model.dateTime().nullable(),
   confirmed_at: model.dateTime().nullable(),

@@ -29,6 +29,11 @@ export const PatchSellerMeSchema = z.strictObject({
   // Owner-only store payment switch: OFF closes the crypto-usdc rail for this
   // seller (no crypto session can be created against their products).
   crypto_payments_enabled: z.boolean().optional(),
+  // Delivery defaults (minor NGN fee, free toggle, pickup address for
+  // courier-job auto-posting). Per-product metadata.delivery overrides.
+  delivery_fee: z.number().int().min(0).nullable().optional(),
+  free_delivery: z.boolean().optional(),
+  pickup_address: z.string().max(500).nullable().optional(),
   first_name: z.string().min(1).optional(),
   last_name: z.string().min(1).optional(),
 })
@@ -98,6 +103,9 @@ export const PATCH = async (
     accent_color: string
     theme: string
     crypto_payments_enabled: boolean
+    delivery_fee: number | null
+    free_delivery: boolean
+    pickup_address: string | null
   }> = {}
   if (body.name !== undefined) storeFields.name = body.name
   if (body.handle !== undefined) storeFields.handle = body.handle
@@ -109,6 +117,9 @@ export const PATCH = async (
   if (body.crypto_payments_enabled !== undefined) {
     storeFields.crypto_payments_enabled = body.crypto_payments_enabled
   }
+  if (body.delivery_fee !== undefined) storeFields.delivery_fee = body.delivery_fee
+  if (body.free_delivery !== undefined) storeFields.free_delivery = body.free_delivery
+  if (body.pickup_address !== undefined) storeFields.pickup_address = body.pickup_address
 
   if (Object.keys(storeFields).length > 0) {
     if (context.role !== "owner") {

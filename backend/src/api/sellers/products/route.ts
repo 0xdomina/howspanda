@@ -30,12 +30,16 @@ function toFullProductShape(
   const photos = body.photos ?? (body.photo ? [body.photo] : [])
 
   if (body.variants || body.options) {
-    const { photo: _photo, photos: _photos, banner_url: _bannerUrl, ...productBody } = body
-    return {
+    const { photo: _photo, photos: _photos, banner_url: _bannerUrl, delivery: _delivery, ...productBody } = body
+    const shaped = {
       ...productBody,
       thumbnail: photos[0] ?? null,
       images: body.images ?? photos.map((url) => ({ url })),
     } as unknown as ProductPayload
+    if (body.delivery !== undefined) {
+      shaped.metadata = { ...shaped.metadata, delivery: body.delivery }
+    }
+    return shaped
   }
 
   return {
@@ -44,6 +48,7 @@ function toFullProductShape(
     handle: body.handle,
     status: body.status ?? "published",
     category_ids: body.category_ids,
+    metadata: body.delivery !== undefined ? { delivery: body.delivery } : undefined,
     thumbnail: photos[0] ?? null,
     images: body.images ?? photos.map((url) => ({ url })),
     options: [{ title: "One Size", values: ["One Size"] }],

@@ -445,11 +445,18 @@ export default function BankTransferCard({
     transfer?.status === "awaiting_proof" || transfer?.status === "rejected"
 
   const expectedAmount = Number(orderTotal || transfer?.amount || 0)
+  // Server-resolved delivery snapshot: fixed fees join the payable total,
+  // courier jobs are arranged after payment, free needs nothing.
+  const deliveryFeeMinor =
+    transfer?.delivery_mode === "fixed" && typeof transfer?.delivery_fee === "number"
+      ? transfer.delivery_fee
+      : 0
+  const payableTotal = expectedAmount + deliveryFeeMinor / 100
   const enteredAmount = amount.trim() === "" ? null : Number(amount)
   const amountMatch =
     enteredAmount === null || !Number.isFinite(enteredAmount)
       ? null
-      : Math.abs(enteredAmount - expectedAmount) < 0.005
+      : Math.abs(enteredAmount - payableTotal) < 0.005
 
   return (
     <div
@@ -505,11 +512,21 @@ export default function BankTransferCard({
             <div>
               <p className={labelClass}>Amount to transfer</p>
               <p className="mt-1 text-ink font-mono tabular-nums">
-                {fmt(orderTotal || transfer.amount)}
+                {fmt(payableTotal)}
               </p>
-              <p className="text-sm text-ink-muted">
-                Transfer this exact amount — mismatches slow confirmation.
-              </p>
+              {deliveryFeeMinor > 0 ? (
+                <p className="text-sm text-ink-muted">
+                  Goods {fmt(expectedAmount)} + delivery {fmt(deliveryFeeMinor / 100)} — transfer the total.
+                </p>
+              ) : transfer?.delivery_mode === "courier" ? (
+                <p className="text-sm text-ink-muted">
+                  Courier delivery will be arranged after payment — transfer the goods total now.
+                </p>
+              ) : (
+                <p className="text-sm text-ink-muted">
+                  Transfer this exact amount — mismatches slow confirmation.
+                </p>
+              )}
             </div>
           </div>
 
@@ -626,16 +643,16 @@ export default function BankTransferCard({
                   <p id="bank-proof-amount-hint" className="mt-1 text-xs" data-testid="bank-proof-amount-match">
                     {amountMatch === null ? (
                       <span className="text-ink-muted">
-                        Expected: {fmt(expectedAmount)}
+                        Expected: {fmt(payableTotal)}
                       </span>
                     ) : amountMatch ? (
                       <span className="font-medium text-emerald-700">
-                        ✓ Matches {fmt(expectedAmount)}
+                        ✓ Matches {fmt(payableTotal)}
                       </span>
                     ) : (
                       <span className="font-medium text-amber-700">
                         ⚠ You entered {fmt(enteredAmount ?? 0)} — expected{" "}
-                        {fmt(expectedAmount)}
+                        {fmt(payableTotal)}
                       </span>
                     )}
                   </p>

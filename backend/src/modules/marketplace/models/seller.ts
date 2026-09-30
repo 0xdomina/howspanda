@@ -28,6 +28,12 @@ const Seller = model.define("seller", {
   telegram_chat_id: model.text().nullable(),
   telegram_link_code: model.text().nullable(),
   telegram_link_expires_at: model.dateTime().nullable(),
+  // Delivery defaults (minor NGN). Per-product metadata.delivery overrides.
+  // NULL fee = no default (courier-request flow). pickup_address feeds
+  // courier-job auto-posting on payment confirm.
+  delivery_fee: model.number().nullable(),
+  free_delivery: model.boolean().default(false),
+  pickup_address: model.text().nullable(),
   admins: model.hasMany(() => SellerAdmin, {
     mappedBy: "seller",
   }),

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { retrieveSeller, listSellerOrders } from "@lib/data/seller"
 import { MEDUSA_BACKEND_URL } from "@lib/config"
 import OrderActions from "@modules/seller/components/order-actions"
+import PostCourierButton from "@modules/seller/components/post-courier-button"
 import SellerBankTransfer from "@modules/seller/components/bank-transfer"
 import { sellerHasPermission } from "@lib/seller-permissions"
 
@@ -50,6 +51,10 @@ export default async function SellerOrdersPage() {
                 </div>
                 <OrderActions order={order} />
               </div>
+              <PostCourierButton
+                order={order}
+                pickupAddress={seller.seller?.pickup_address ?? null}
+              />
               <SellerBankTransfer
                 order={order}
                 backendUrl={MEDUSA_BACKEND_URL}

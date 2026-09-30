@@ -38,6 +38,9 @@ export type SellerAdmin = {
     theme?: string
     crypto_payments_enabled?: boolean
     telegram_chat_id?: string | null
+    delivery_fee?: number | null
+    free_delivery?: boolean | null
+    pickup_address?: string | null
   }
 }
 
@@ -54,6 +57,7 @@ export type SellerProduct = {
     flash_sale_cycle?: number
     homepage_banner?: boolean
     homepage_banner_image?: string | null
+    delivery?: { mode?: string; fee?: number } | null
   }
   images?: { url: string }[]
   categories?: { id: string; name?: string }[]
@@ -1045,6 +1049,7 @@ export const updateSellerProduct = async (
     flashSale?: boolean
     homepageBanner?: boolean
     categoryIds?: string[]
+    delivery?: { mode: "fixed" | "free" | "courier"; fee?: number } | null
     variants?: {
       id: string
       price?: number
@@ -1067,6 +1072,7 @@ export const updateSellerProduct = async (
     if (update.flashSale !== undefined) body.flash_sale = update.flashSale
     if (update.homepageBanner !== undefined) body.homepage_banner = update.homepageBanner
     if (update.categoryIds !== undefined) body.category_ids = update.categoryIds
+    if (update.delivery !== undefined) body.delivery = update.delivery
 
     await sdk.client.fetch(`/sellers/products/${id}`, {
       method: "PATCH",
@@ -1112,6 +1118,20 @@ export const createSellerProduct = async (
     const variantsJson = formData.get("variants_json") as string
     const categoryId = formData.get("category_id") as string | null
     const category_ids = categoryId ? [categoryId] : undefined
+    const deliveryMode = (formData.get("delivery_mode") as string | null) || undefined
+    const deliveryFeeRaw = formData.get("delivery_fee")
+    const deliveryFee =
+      deliveryFeeRaw !== "" && deliveryFeeRaw != null ? Number(deliveryFeeRaw) : undefined
+    // Minor units for the backend (matches the store's money convention).
+    const delivery =
+      deliveryMode === "fixed" || deliveryMode === "free" || deliveryMode === "courier"
+        ? {
+            mode: deliveryMode as "fixed" | "free" | "courier",
+            ...(deliveryMode === "fixed" && deliveryFee != null && Number.isFinite(deliveryFee)
+              ? { fee: Math.round(deliveryFee * 100) }
+              : {}),
+          }
+        : undefined
     const currency_code = "ngn"
 
     const variants = variantsJson ? JSON.parse(variantsJson) : null
@@ -1128,6 +1148,7 @@ export const createSellerProduct = async (
           flash_sale: flashSale,
           homepage_banner: homepageBanner,
           category_ids,
+          delivery,
           options: variants.options,
           variants: variants.variants,
         }
@@ -1144,6 +1165,7 @@ export const createSellerProduct = async (
           flash_sale: flashSale,
           homepage_banner: homepageBanner,
           category_ids,
+          delivery,
         }
 
     // PandaStack may briefly return a warm-up 503 while the Medusa process is
@@ -1467,6 +1489,9 @@ export const updateSellerStore = async (body: {
   accent_color?: string
   theme?: string
   crypto_payments_enabled?: boolean
+  delivery_fee?: number | null
+  free_delivery?: boolean
+  pickup_address?: string | null
   first_name?: string
   last_name?: string
 }): Promise<{ success: boolean; error: string | null }> => {

@@ -65,10 +65,10 @@ class DeliveryModuleService extends MedusaService({
         "packageDescription, pickupAddress, and destinationAddress are required"
       )
     }
-    if (!(Number.isFinite(input.postedPrice) && input.postedPrice > 0 && input.postedPrice <= 1_000_000)) {
+    if (!(Number.isFinite(input.postedPrice) && input.postedPrice >= 0 && input.postedPrice <= 1_000_000)) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "postedPrice must be a positive number"
+        "postedPrice must be zero (open to offers) or a positive number"
       )
     }
     // Location accuracy: both endpoints must resolve to real coordinates or the

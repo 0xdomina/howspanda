@@ -7,6 +7,17 @@ type ProductInfoProps = {
 }
 
 const ProductInfo = ({ product }: ProductInfoProps) => {
+  const delivery = (product.metadata as Record<string, any> | undefined)?.delivery as
+    | { mode?: string; fee?: number }
+    | undefined
+  const deliveryLabel =
+    delivery?.mode === "fixed" && Number(delivery?.fee) > 0
+      ? `Delivery ₦${(Number(delivery.fee) / 100).toLocaleString("en-NG")} · paid with order`
+      : delivery?.mode === "free"
+        ? "Free delivery"
+        : delivery?.mode === "courier"
+          ? "Courier on request — arranged after payment"
+          : null
   return (
     <div id="product-info">
       <div className="flex flex-col gap-y-4 lg:max-w-[500px] mx-auto">
@@ -25,6 +36,12 @@ const ProductInfo = ({ product }: ProductInfoProps) => {
         >
           {product.title}
         </Heading>
+
+        {deliveryLabel && (
+          <p className="text-sm font-medium text-emerald-700" data-testid="product-delivery">
+            {deliveryLabel}
+          </p>
+        )}
 
         <Text
           className="text-medium text-ink-muted whitespace-pre-line"

@@ -21,6 +21,7 @@ import {
   notifySellerNewOrder,
   telegramConfigured,
 } from "../../../../../lib/telegram/notify"
+import { resolveDelivery } from "../../../../../lib/delivery/resolve"
 
 export const POST = async (
   req: AuthenticatedMedusaRequest,
@@ -125,6 +126,7 @@ export const POST = async (
         "currency_code",
         "payment_collections.payment_sessions.provider_id",
         "items.product.seller.id",
+        "items.product.metadata",
       ],
       filters: { id: result.order.id },
     })
@@ -149,6 +151,36 @@ export const POST = async (
           status: "verified",
           is_default: true,
         })
+        // Delivery snapshot at checkout: per-product override wins, else the
+        // store default (fixed fee / free / courier-request). Recorded on the
+        // proof so the seller verifies goods + fee against one transfer.
+        const { data: [sellerRow] } = (await query.graph({
+          entity: "seller",
+          fields: ["id", "delivery_fee", "free_delivery"],
+          filters: { id: sellerIds },
+        })) as { data: any[] }
+        let deliveryMode: string | undefined
+        let deliveryFee: number | undefined
+        try {
+          // Single selling mode per order today: first item's resolution wins
+          // (mixed carts resolve per item at display time; the proof carries
+          // the order-level snapshot the buyer actually paid).
+          const firstMeta = (placedOrder?.items ?? []).map(
+            (i: any) => i?.product?.metadata
+          )
+          const resolved = firstMeta.map((m: any) =>
+            resolveDelivery(m, sellerRow)
+          )
+          const fixed = resolved.find((r) => r.mode === "fixed")
+          const picked =
+            fixed ?? resolved.find((r) => r.mode === "free") ?? resolved[0]
+          if (picked) {
+            deliveryMode = picked.mode
+            deliveryFee = picked.fee || undefined
+          }
+        } catch {
+          // Delivery snapshot is advisory — never fail order completion.
+        }
         if (account && placedOrder?.email && placedOrder.display_id != null) {
           await marketplace.createBankTransferProof({
             orderId: placedOrder.id,
@@ -156,6 +188,8 @@ export const POST = async (
             buyerEmail: placedOrder.email,
             reference: marketplace.bankTransferReference(placedOrder.display_id),
             currencyCode: placedOrder.currency_code,
+            deliveryMode,
+            deliveryFee,
             bank: {
               bank_code: account.bank_code ?? "",
               bank_name: account.bank_code
@@ -169,11 +203,14 @@ export const POST = async (
       }
     }
 
-    // Telegram order alerts: ping each linked store the instant its items
-    // sell. Best-effort and invisible to the buyer — any failure is swallowed
-    // so alerts can never fail (or slow) an order.
+    // Telegram order alerts: ping each linked store — but ONLY when payment
+    // is already confirmed. Bank-transfer orders carry no money at creation
+    // (proof comes later via "I've made this transfer"), so the seller hears
+    // about those on proof submit, with the receipt attached — never here.
+    // Instant rails (card/crypto authorizations) notify at creation.
+    const isBankTransfer = providers.includes(BANK_TRANSFER_PROVIDER_ID)
     try {
-      if (telegramConfigured() && placedOrder) {
+      if (telegramConfigured() && placedOrder && !isBankTransfer) {
         const counts = new Map<string, number>()
         for (const item of (placedOrder.items ?? []) as any[]) {
           const sid = item?.product?.seller?.id as string | undefined

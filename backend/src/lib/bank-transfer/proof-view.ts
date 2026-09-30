@@ -24,5 +24,7 @@ export async function toBankTransferView(proof: PaymentProofRow) {
     confirmed_at: proof.confirmed_at ?? null,
     rejected_at: proof.rejected_at ?? null,
     expired_at: proof.expired_at ?? null,
+    delivery_mode: (proof as any).delivery_mode ?? null,
+    delivery_fee: (proof as any).delivery_fee ?? null,
   }
 }

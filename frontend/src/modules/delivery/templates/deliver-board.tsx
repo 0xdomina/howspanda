@@ -55,7 +55,11 @@ const JobCard = ({ job }: { job: any }) => (
       </p>
     </div>
     <div className="mt-3 flex items-center justify-between">
-      <p className="font-mono tabular-nums text-ink">{ngn(job.posted_price)}</p>
+      {Number(job.posted_price) > 0 ? (
+        <p className="font-mono tabular-nums text-ink">{ngn(job.posted_price)}</p>
+      ) : (
+        <p className="text-sm font-medium text-emerald-700">Open to offers</p>
+      )}
       <LocalizedClientLink
         href={`/deliver/${job.id}`}
         className="text-sm font-medium text-ink underline hover:text-ink-muted"

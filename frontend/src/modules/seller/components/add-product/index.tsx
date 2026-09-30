@@ -50,6 +50,7 @@ const AddProduct = ({
   const [flashSale, setFlashSale] = useState(false)
   const [homepageBanner, setHomepageBanner] = useState(false)
   const [mediaBusy, setMediaBusy] = useState(false)
+  const [deliveryMode, setDeliveryMode] = useState("")
 
   // The backend accepts the full admin shape for products that carry
   // options/variants. We serialize it so the server action can forward it
@@ -335,6 +336,44 @@ const AddProduct = ({
               className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
               data-testid="product-description-input"
             />
+          </div>
+
+          <div className="grid gap-3">
+            <div>
+              <label className="text-sm font-medium text-ink" htmlFor="product-delivery-mode">
+                Delivery
+              </label>
+              <select
+                id="product-delivery-mode"
+                name="delivery_mode"
+                value={deliveryMode}
+                onChange={(e) => setDeliveryMode(e.target.value)}
+                className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field text-ink focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
+                data-testid="product-delivery-input"
+              >
+                <option value="">Use store default</option>
+                <option value="fixed">Fixed fee — buyer pays with order</option>
+                <option value="free">Free delivery — you absorb it</option>
+                <option value="courier">Courier request — job posts on payment</option>
+              </select>
+            </div>
+            {deliveryMode === "fixed" && (
+              <div>
+                <label className="text-sm font-medium text-ink" htmlFor="product-delivery-fee">
+                  Delivery fee (NGN)
+                </label>
+                <input
+                  id="product-delivery-fee"
+                  name="delivery_fee"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="e.g. 1500"
+                  className="mt-1 block w-full px-4 py-2 border border-ink-hairline rounded bg-ui-bg-field focus:outline-none focus:ring-0 focus:shadow-borders-interactive-with-active"
+                  data-testid="product-delivery-fee-input"
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid gap-3 rounded-large border border-ink-hairline bg-paper-surface p-4">
