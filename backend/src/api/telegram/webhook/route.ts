@@ -12,6 +12,7 @@ import { sendBankTransferNotice } from "../../../lib/bank-transfer/notify"
 import { maybeAutoPostCourierJob } from "../../../lib/delivery/auto-post"
 import {
   SECRETARY_HELP,
+  MAIN_MENU_KEYBOARD,
   PAYOUT_REDIRECT,
   EDIT_FIELD_PROMPT,
   isPayoutAsk,
@@ -27,9 +28,20 @@ import {
   largestPhotoFileId,
   downloadTelegramFile,
   storeTelegramPhoto,
+  setProductList,
+  getProductList,
+  productCardText,
 } from "../../../lib/telegram/secretary"
 import createSellerProductWorkflow from "../../../workflows/marketplace/create-seller-product"
 import updateSellerProductWorkflow from "../../../workflows/marketplace/update-seller-product"
+import { deleteProductsWorkflow } from "@medusajs/medusa/core-flows"
+
+// Menu-first operation center: every entry point answers with the persistent
+// button menu so nothing needs memorizing. Buttons send plain words; the
+// router maps them to the same commands.
+async function sendMenu(chatId: number | string, text: string): Promise<boolean> {
+  return sendTelegramText(chatId, text, { reply_markup: MAIN_MENU_KEYBOARD })
+}
 
 // Public Telegram webhook (set via setWebhook with TELEGRAM_WEBHOOK_SECRET).
 // Link handshake (/start <code>) + seller secretary commands. Payouts are
@@ -74,6 +86,13 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       await handleConfirmStep(req, String(chatId))
     } else if (chatId && data.startsWith("proof:")) {
       await handleProofCallback(
+        req,
+        String(chatId),
+        callback.message?.message_id,
+        data
+      )
+    } else if (chatId && data.startsWith("p:")) {
+      await handleProductCallback(
         req,
         String(chatId),
         callback.message?.message_id,
@@ -156,25 +175,32 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
 
   const command = text.split(/\s+/)[0]?.toLowerCase() ?? ""
+  const word = text.trim().toLowerCase()
   try {
     switch (command) {
     case "/help":
     case "help":
       clearIfIdle(String(chatId))
-      await sendTelegramText(chatId, SECRETARY_HELP)
+      await sendMenu(chatId, SECRETARY_HELP)
       break
     case "/cancel":
     case "cancel":
       clearSecretarySession(String(chatId))
-      await sendTelegramText(chatId, "Cancelled. Send /help to see what I can do.")
+      await sendMenu(chatId, "Cancelled. The menu below runs everything.")
       break
     case "/unlink":
+    case "unlink":
       await handleUnlink(req, String(chatId), store.sellerId)
       break
     case "/products":
+    case "products":
+      clearSecretarySession(String(chatId))
       await handleProducts(req, String(chatId), store)
       break
     case "/new":
+    case "new":
+    case "add":
+      clearSecretarySession(String(chatId))
       startSecretarySession({
         chatId: String(chatId),
         sellerId: store.sellerId,
@@ -185,19 +211,37 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       await sendTelegramText(chatId, "What is the product title?")
       break
     case "/orders":
+    case "orders":
+      clearSecretarySession(String(chatId))
       await handleOrders(req, String(chatId), store)
       break
     case "/store":
+    case "store":
+      clearSecretarySession(String(chatId))
       await handleStore(req, String(chatId), store)
       break
     case "/edit":
+    case "edit":
       await handleEditStart(req, String(chatId), store)
       break
       default:
-        if (session && session.step !== "idle") {
+        if (/^\d+$/.test(word) && (!session || session.step === "idle")) {
+          // Number tap from a product list (no memorization needed).
+          await handleProductNumber(req, String(chatId), Number(word))
+        } else if (word === "add product") {
+          clearSecretarySession(String(chatId))
+          startSecretarySession({
+            chatId: String(chatId),
+            sellerId: store.sellerId,
+            sellerAdminId: store.sellerAdminId,
+            storeName: store.storeName,
+            step: "new_title",
+          })
+          await sendTelegramText(chatId, "What is the product title?")
+        } else if (session && session.step !== "idle") {
           await handleFlowText(req, String(chatId), text)
         } else if (text) {
-          await sendTelegramText(chatId, SECRETARY_HELP)
+          await sendMenu(chatId, SECRETARY_HELP)
         }
         break
     }
@@ -250,6 +294,7 @@ async function handleLinkCode(req: MedusaRequest, chatId: string, code: string) 
     chatId,
     storeName: (seller as any).name ?? "Your store",
   })
+  await sendMenu(chatId, "Use the buttons below to run your store.")
 }
 
 async function findStoreByChat(
@@ -291,7 +336,8 @@ async function handleUnlink(req: MedusaRequest, chatId: string, sellerId: string
   clearSecretarySession(chatId)
   await sendTelegramText(
     chatId,
-    "Unlinked. Order alerts and the secretary are off for this chat until you link again."
+    "Unlinked. Order alerts and the secretary are off for this chat until you link again.",
+    { reply_markup: { remove_keyboard: true } }
   )
 }
 
@@ -327,8 +373,132 @@ async function handleProducts(
     const min = amounts.length ? Math.min(...amounts) / 100 : null
     return `${i + 1}. ${p.title ?? "Untitled"} — ${min != null ? formatNgnMajor(min) : "no price"} · ${p.status ?? ""}`
   })
+  // Tappable cards: numbers open a detail card with Edit/Delete buttons.
+  setProductList(
+    chatId,
+    products.slice(0, 10).map((p: any, i: number) => ({
+      id: String(p.id),
+      title: String(p.title ?? "Untitled"),
+      detail: String(lines[i]).replace(/^\d+\.\s*/, ""),
+    }))
+  )
   if (products.length > 10) lines.push(`…and ${products.length - 10} more in Manage Business.`)
+  lines.push(``, `Reply with a number to manage it.`)
   await sendTelegramText(chatId, lines.join("\n"))
+}
+
+// Number tap from a cached product list → detail card with Edit/Delete.
+// Zero memorization: the list shows the numbers.
+async function handleProductNumber(
+  req: MedusaRequest,
+  chatId: string,
+  n: number
+): Promise<void> {
+  const store = await findStoreByChat(req, chatId).catch(() => null)
+  if (!store) {
+    await sendTelegramText(chatId, "Link this chat to a store first.")
+    return
+  }
+  const list = getProductList(chatId)
+  if (!list || !Number.isInteger(n) || n < 1 || n > list.length) {
+    await sendMenu(chatId, "That list expired. Tap Products for a fresh one.")
+    return
+  }
+  const entry = list[n - 1]
+  await sendTelegramText(chatId, productCardText(entry), {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "Edit", callback_data: `p:edit:${n}` },
+          { text: "Delete", callback_data: `p:del:${n}` },
+        ],
+      ],
+    },
+  })
+}
+
+async function handleProductCallback(
+  req: MedusaRequest,
+  chatId: string,
+  messageId: number | undefined,
+  data: string
+): Promise<void> {
+  const store = await findStoreByChat(req, chatId).catch(() => null)
+  if (!store) {
+    await sendTelegramText(chatId, "Link this chat to a store first.")
+    return
+  }
+  const [, action, nRaw] = data.split(":")
+  const n = Number(nRaw)
+  const list = getProductList(chatId) ?? []
+  const entry = Number.isInteger(n) && n >= 1 && n <= list.length ? list[n - 1] : null
+  if (!entry) {
+    await sendTelegramText(chatId, "That list expired. Tap Products for a fresh one.")
+    return
+  }
+
+  if (action === "edit") {
+    // Jump straight into the edit flow with this product preselected.
+    const s = startSecretarySession({
+      chatId,
+      sellerId: store.sellerId,
+      sellerAdminId: store.sellerAdminId,
+      storeName: store.storeName,
+      step: "edit_field",
+    })
+    s.edit = { list, productId: entry.id, productTitle: entry.title }
+    touchSecretarySession(s)
+    await sendTelegramText(chatId, `Editing "${entry.title}". ${EDIT_FIELD_PROMPT}`)
+    return
+  }
+
+  if (action === "del") {
+    await sendTelegramText(chatId, `Remove "${entry.title}"? This cannot be undone.`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "Yes, remove", callback_data: `p:delYes:${n}` },
+            { text: "Keep", callback_data: `p:delNo:${n}` },
+          ],
+        ],
+      },
+    })
+    return
+  }
+
+  if (action === "delNo") {
+    await sendTelegramText(chatId, "Kept.")
+    return
+  }
+
+  if (action === "delYes") {
+    try {
+      // Re-verify ownership at delete time: the product must still sit
+      // under this seller's store.
+      const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+      const { data: admins } = (await query.graph({
+        entity: "seller_admin",
+        fields: ["seller.products.id"],
+        filters: { id: [store.sellerAdminId] },
+      })) as { data: any[] }
+      const owned = ((admins[0]?.seller?.products ?? []) as { id: string }[]).some(
+        (p) => p.id === entry.id
+      )
+      if (!owned) {
+        await sendTelegramText(chatId, "That product is already gone.")
+        return
+      }
+      await deleteProductsWorkflow(req.scope).run({ input: { ids: [entry.id] } })
+      setProductList(
+        chatId,
+        list.filter((_, i) => i !== n - 1)
+      )
+      await sendMenu(chatId, `Removed "${entry.title}".`)
+    } catch {
+      await sendTelegramText(chatId, "Could not remove it. Try Manage Business.")
+    }
+    return
+  }
 }
 
 async function handleOrders(

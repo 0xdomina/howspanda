@@ -100,7 +100,7 @@ export function clearSecretarySession(chatId: string): void {
 }
 
 export const SECRETARY_HELP = [
-  `I am your store secretary.`,
+  `I am your store secretary. Use the buttons below.`,
   ``,
   `/products. Your products with prices and stock.`,
   `/new. Create a product step by step.`,
@@ -112,6 +112,46 @@ export const SECRETARY_HELP = [
   ``,
   `Payouts and bank accounts live in Manage Business only.`,
 ].join("\n")
+
+// Persistent menu keyboard: always on screen, zero memorization. Buttons
+// send plain words; the router maps them to the same commands.
+export const MAIN_MENU_KEYBOARD = {
+  keyboard: [
+    [{ text: "Products" }, { text: "Add product" }],
+    [{ text: "Orders" }, { text: "Store" }],
+    [{ text: "Help" }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+}
+
+/** Product rows for tappable cards (detail/edit/delete by number). */
+export type ProductListEntry = {
+  id: string
+  title: string
+  detail: string
+}
+
+const LIST_TTL_MS = 10 * 60 * 1000
+const productLists = new Map<string, { list: ProductListEntry[]; expiresAt: number }>()
+
+export function setProductList(chatId: string, list: ProductListEntry[]): void {
+  productLists.set(chatId, { list, expiresAt: Date.now() + LIST_TTL_MS })
+}
+
+export function getProductList(chatId: string): ProductListEntry[] | null {
+  const e = productLists.get(chatId)
+  if (!e) return null
+  if (e.expiresAt < Date.now()) {
+    productLists.delete(chatId)
+    return null
+  }
+  return e.list
+}
+
+export function productCardText(entry: ProductListEntry): string {
+  return [`${entry.title}`, entry.detail].filter(Boolean).join("\n")
+}
 
 export const PAYOUT_REDIRECT = [
   `I never move money from chat.`,
