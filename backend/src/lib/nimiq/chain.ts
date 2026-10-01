@@ -64,6 +64,7 @@ export async function verifyUsdtTransfer(input: {
   txHash: string
   merchant: string
   expectedBaseUnits: bigint
+  expectedSender?: string
 }): Promise<UsdtVerifyResult> {
   const url = rpcUrl()
   const receipt = await rpc<{
@@ -74,6 +75,13 @@ export async function verifyUsdtTransfer(input: {
   }>(url, "eth_getTransactionReceipt", [input.txHash])
   if (!receipt) return { ok: false, reason: "Transaction not found" }
   if (receipt.status !== "0x1") return { ok: false, reason: "Transaction failed on chain" }
+  if (input.expectedSender) {
+    // Bind the signer: the receipt has no `from`, so read the transaction.
+    const tx = await rpc<{ from?: string }>(url, "eth_getTransactionByHash", [input.txHash])
+    if (!tx?.from || tx.from.toLowerCase() !== input.expectedSender.toLowerCase()) {
+      return { ok: false, reason: "Sender mismatch" }
+    }
+  }
   const contract = usdtContract()
   const merchant = input.merchant.toLowerCase()
   let credited = 0n

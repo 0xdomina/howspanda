@@ -10,21 +10,19 @@ import {
 } from "../../../../modules/nimiq/service"
 import { resolveDelivery } from "../../../../lib/delivery/resolve"
 
-type QuoteItem = { product_id: string; variant_id: string; quantity: number }
-
 const QUOTE_TTL_MIN_DEFAULT = 10
 
-// Priced payment quote for Nimiq Pay wallets. Totals come from live catalog
-// prices + delivery resolution — never from client-sent amounts.
+// Priced payment quote from a real Medusa cart. Totals come from live catalog
+// prices + delivery resolution — never from client-sent amounts. Email is
+// optional (wallet-native buyers); the signer binds at verify time.
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const body = (req.body ?? {}) as {
+    cart_id?: string
     buyer_email?: string
     token?: string
-    items?: QuoteItem[]
   }
-  const email = (body.buyer_email ?? "").trim().toLowerCase()
-  if (!email || !email.includes("@")) {
-    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Buyer email needed")
+  if (!body.cart_id) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Cart needed")
   }
   if (body.token !== "USDT") {
     throw new MedusaError(
@@ -32,31 +30,36 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       "USDT only for now"
     )
   }
-  const items = (body.items ?? []).filter(
-    (i) => i?.product_id && i?.variant_id && Number.isInteger(i.quantity) && i.quantity > 0 && i.quantity <= 10
-  )
-  if (!items.length) {
-    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Quote needs items")
-  }
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
-  const { data: products } = (await query.graph({
-    entity: "product",
+  const { data: [cart] } = (await query.graph({
+    entity: "cart",
     fields: [
       "id",
-      "title",
-      "status",
-      "metadata",
-      "variants.id",
-      "variants.prices.amount",
-      "variants.prices.currency_code",
-      "seller.id",
-      "seller.delivery_fee",
-      "seller.free_delivery",
+      "email",
+      "completed_at",
+      "items.id",
+      "items.quantity",
+      "items.variant.id",
+      "items.variant.prices.amount",
+      "items.variant.prices.currency_code",
+      "items.product.id",
+      "items.product.title",
+      "items.product.status",
+      "items.product.metadata",
+      "items.product.seller.id",
+      "items.product.seller.delivery_fee",
+      "items.product.seller.free_delivery",
     ],
-    filters: { id: items.map((i) => i.product_id) },
+    filters: { id: [body.cart_id] },
   })) as { data: any[] }
-  const byId = new Map((products ?? []).map((p: any) => [p.id, p]))
+  if (!cart || cart.completed_at) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Cart unavailable")
+  }
+  const cartItems = (cart.items ?? []) as any[]
+  if (!cartItems.length) {
+    throw new MedusaError(MedusaError.Types.INVALID_DATA, "Cart is empty")
+  }
 
   let ngnMinor = 0
   const lines: {
@@ -68,26 +71,26 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     delivery_mode: string
     delivery_fee_minor: number
   }[] = []
-  for (const item of items) {
-    const product = byId.get(item.product_id)
-    const variant = (product?.variants ?? []).find((v: any) => v.id === item.variant_id)
+  for (const item of cartItems) {
+    const variant = item.variant
     const price = (variant?.prices ?? []).find(
       (p: any) => (p.currency_code ?? "ngn").toLowerCase() === "ngn"
     )
     const unit = Number(price?.amount)
+    const product = item.product
     if (!product || product.status !== "published" || !Number.isFinite(unit) || unit <= 0) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         "An item is unavailable"
       )
     }
-    ngnMinor += Math.round(unit) * item.quantity
+    ngnMinor += Math.round(unit) * Number(item.quantity || 1)
     const delivery = resolveDelivery(product.metadata, product.seller)
     lines.push({
       product_id: product.id,
-      variant_id: variant.id,
+      variant_id: variant?.id,
       title: product.title,
-      quantity: item.quantity,
+      quantity: Number(item.quantity || 1),
       unit_minor: Math.round(unit),
       delivery_mode: delivery.mode,
       delivery_fee_minor: delivery.fee,
@@ -95,9 +98,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     if (delivery.mode === "fixed") ngnMinor += delivery.fee
   }
 
-  // One seller per quote (bank-transfer parity; multi-seller carts split later).
   const sellerIds = new Set(
-    lines.map((l) => (byId.get(l.product_id) as any)?.seller?.id).filter(Boolean)
+    cartItems.map((i: any) => i?.product?.seller?.id).filter(Boolean)
   )
   if (sellerIds.size !== 1) {
     throw new MedusaError(
@@ -106,6 +108,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     )
   }
 
+  const email = (body.buyer_email ?? cart.email ?? "").trim().toLowerCase() || null
   const rate = usdtNgnRate()
   const merchant = merchantFor("USDT")
   const ttlMin = Number(process.env.NIMIQ_QUOTE_TTL_MIN) || QUOTE_TTL_MIN_DEFAULT
@@ -113,6 +116,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const reference = `HYS-NIM-${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`
   const quote = await nimiq.persistQuote({
     buyerEmail: email,
+    cartId: cart.id,
     token: "USDT",
     network: "polygon",
     amountTokenBase: ngnMinorToUsdtBase(ngnMinor),
@@ -128,11 +132,11 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     reference,
     token: "USDT",
     network: "polygon",
-    amount_token_base: quote.amount_token_base?.toString() ?? null,
+    amount_token_base: (quote as any).amount_token_base?.toString() ?? null,
     amount_ngn_minor: ngnMinor,
     usdt_ngn_rate: rate,
     merchant_address: merchant,
-    expires_at: quote.expires_at,
+    expires_at: (quote as any).expires_at,
     lines,
   })
 }

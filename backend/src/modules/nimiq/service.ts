@@ -56,7 +56,8 @@ class NimiqModuleService extends MedusaService({
 
   /** Persist a priced quote. Pricing itself is resolved by the caller. */
   async persistQuote(input: {
-    buyerEmail: string
+    buyerEmail?: string | null
+    cartId?: string | null
     token: "USDT" | "NIM"
     network: string
     amountTokenBase: bigint
@@ -67,7 +68,8 @@ class NimiqModuleService extends MedusaService({
     expiresAt: Date
   }) {
     const quote = await this.createNimiqQuotes({
-      buyer_email: input.buyerEmail,
+      buyer_email: input.buyerEmail ?? null,
+      cart_id: input.cartId ?? null,
       token: input.token,
       network: input.network,
       // Quote-size base units always fit safely (stablecoin, commerce sums).
@@ -101,7 +103,7 @@ class NimiqModuleService extends MedusaService({
    * unknown quote, non-quoted status, expiry, tx replay, chain mismatch all
    * reject without side effects. Returns the paid quote.
    */
-  async verifyPayment(input: { quoteId: string; txHash: string }) {
+  async verifyPayment(input: { quoteId: string; txHash: string; sender?: string }) {
     const txHash = (input.txHash ?? "").trim()
     if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
       throw new MedusaError(MedusaError.Types.INVALID_DATA, "Bad transaction hash")
@@ -137,6 +139,7 @@ class NimiqModuleService extends MedusaService({
       txHash,
       merchant: quote.merchant_address,
       expectedBaseUnits: BigInt(Number(quote.amount_token_base)),
+      expectedSender: input.sender,
     })
     if (!check.ok) {
       await this.markFailed(quote.id).catch(() => null)
@@ -151,6 +154,7 @@ class NimiqModuleService extends MedusaService({
         status: "paid" as const,
         tx_hash: txHash,
         verified_at: new Date(),
+        ...(input.sender ? { payer_address: input.sender.toLowerCase() } : {}),
       },
     ])
     return paid

@@ -11,7 +11,10 @@ import { model } from "@medusajs/framework/utils"
 //   failed  — verification rejected (wrong network/token/amount/destination)
 const NimiqQuote = model.define("nimiq_quote", {
   id: model.id().primaryKey(),
-  buyer_email: model.text(),
+  // Nullable: wallet-native buyers may skip email; receipt needs it.
+  buyer_email: model.text().nullable(),
+  // Wallet address bound at verify time: payer identity + refund destination.
+  payer_address: model.text().nullable(),
   token: model.enum(["USDT", "NIM"]),
   network: model.text(),
   // Token base units (USDT 6dp, NIM Luna). bigNumber: chain magnitudes.
@@ -30,6 +33,7 @@ const NimiqQuote = model.define("nimiq_quote", {
   tx_hash: model.text().nullable(),
   verified_at: model.dateTime().nullable(),
   order_id: model.text().nullable(),
+  cart_id: model.text().nullable(),
 })
 
 export default NimiqQuote
