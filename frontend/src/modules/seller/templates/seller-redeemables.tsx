@@ -5,9 +5,13 @@ import { ChangeEvent, useState, useTransition } from "react"
 import {
   cancelSellerRedeemable,
   createSellerRedeemable,
+  listSellerRedeemables,
+  listSellerRedemptions,
   redeemInStore,
   type SellerRedeemable,
+  type SellerRedemption,
 } from "@lib/data/seller"
+import { giftcardProgress, redeemableDisplayState } from "@lib/redeemables"
 import { encodeProductImage } from "@lib/media/image"
 import { uploadSellerMedia } from "@lib/data/seller-media"
 import RedeemableCard from "@modules/redeemables/components/redeemable-card"
@@ -78,7 +82,7 @@ const RedeemInStore = () => {
       </div>
       <div>
         <label className="mb-1 block text-xs text-ink-muted">
-          Amount to draw down (gift cards only — leave blank for vouchers/tickets)
+          Amount to draw down. Gift cards only. Leave blank for vouchers and tickets.
         </label>
         <input
           value={amount}
@@ -291,7 +295,7 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
       ) : (
         <div>
           <label className="mb-1 block text-xs text-ink-muted">
-            Face value (₦) {type === "ticket" ? "— door price" : "— loaded onto each card"}
+            Face value (₦){type === "ticket" ? ". Door price." : ". Loaded onto each card."}
           </label>
           <input
             value={faceValue}
@@ -342,7 +346,7 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
       </div>
       <div className="rounded-medium border border-ink-hairline bg-white/40 p-3">
         <p className="text-sm font-medium text-ink">Make it memorable</p>
-        <p className="mt-1 text-xs text-ink-muted">Pick the occasion — illustrated artwork buyers recognise instantly.</p>
+        <p className="mt-1 text-xs text-ink-muted">Pick the occasion. Buyers recognise the artwork instantly.</p>
         <div className="mt-3 grid grid-cols-4 gap-2">
           {CARD_OCCASIONS.map((o) => {
             const value = occasionDesignValue(o.id)
@@ -392,6 +396,71 @@ const CreateForm = ({ onCreated }: { onCreated: (code: string) => void }) => {
 // Tap a row to see the card exactly as the buyer receives it, with a share
 // action (native sheet, falls back to copy). Screenshotting the open card
 // gives sellers a ready-made visual to post anywhere.
+const channelLabel = (channel?: string) => {
+  if (channel === "in_store") return "In store"
+  if (channel === "checkout") return "Checkout"
+  return channel ?? "Use"
+}
+
+const RedemptionHistory = ({ redeemableId }: { redeemableId: string }) => {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [history, setHistory] = useState<SellerRedemption[] | null>(null)
+
+  const toggle = async () => {
+    const next = !open
+    setOpen(next)
+    if (next && history === null) {
+      setLoading(true)
+      try {
+        setHistory(await listSellerRedemptions(redeemableId))
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-medium border border-ink-hairline p-3">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="text-xs font-medium text-ink hover:underline"
+      >
+        {open ? "Hide history" : "Show history"}
+      </button>
+      {open && (
+        <div className="mt-2">
+          {loading ? (
+            <p className="text-xs text-ink-muted">Loading history.</p>
+          ) : !history || history.length === 0 ? (
+            <p className="text-xs text-ink-muted">No uses yet.</p>
+          ) : (
+            <ul className="divide-y divide-ink-hairline">
+              {history.map((h) => (
+                <li
+                  key={h.id}
+                  className="flex items-center justify-between gap-3 py-1.5 text-xs"
+                >
+                  <span className="font-medium text-ink">
+                    {money(h.amount_applied)}
+                  </span>
+                  <span className="text-ink-muted">
+                    {channelLabel(h.channel)}
+                    {h.created_at
+                      ? ` · ${new Date(h.created_at).toLocaleDateString()}`
+                      : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 const RedeemableRow = ({
   item: r,
   isOwner,
@@ -405,7 +474,15 @@ const RedeemableRow = ({
 }) => {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
-  const shareText = `${typeLabel(r.type)} · ${r.title ?? ""} — code ${r.code}. Redeem it on How's U.`
+  const shareText = `${typeLabel(r.type)} · ${r.title ?? ""}. Code ${r.code}. Redeem it on How's U.`
+  const state = redeemableDisplayState(r)
+  const progress = r.type === "gift_card" ? giftcardProgress(r) : null
+  const badgeClass =
+    state === "Active"
+      ? "bg-emerald-600/10 text-emerald-700"
+      : state === "Partially used"
+        ? "bg-amber-600/10 text-amber-700"
+        : "bg-ink/10 text-ink"
 
   const copyCode = async () => {
     try {
@@ -438,13 +515,15 @@ const RedeemableRow = ({
           </p>
           <p className="truncate text-xs text-ink-muted">
             <span className="font-mono">{r.code}</span>
-            {r.type === "gift_card" && r.balance != null
-              ? ` · ${money(r.balance)} left`
-              : r.face_value != null
-                ? ` · ${money(r.face_value)}`
-                : r.discount_type === "percent"
-                  ? ` · ${r.discount_value}% off`
-                  : ` · ${money(r.discount_value)} off`}
+            {r.type === "gift_card" && progress
+              ? ` · ${money(progress.left)} of ${money(progress.total)} left`
+              : r.type === "gift_card" && r.balance != null
+                ? ` · ${money(r.balance)} left`
+                : r.face_value != null
+                  ? ` · ${money(r.face_value)}`
+                  : r.discount_type === "percent"
+                    ? ` · ${r.discount_value}% off`
+                    : ` · ${money(r.discount_value)} off`}
             {r.issued_to_email ? ` · ${r.issued_to_email}` : ""}
             {r.expires_at
               ? ` · expires ${new Date(r.expires_at).toLocaleDateString()}`
@@ -453,13 +532,9 @@ const RedeemableRow = ({
         </button>
         <div className="flex shrink-0 items-center gap-3">
           <span
-            className={`rounded-full px-2 py-0.5 text-xs ${
-              r.status === "active"
-                ? "bg-emerald-600/10 text-emerald-700"
-                : "bg-ink/10 text-ink"
-            }`}
+            className={`rounded-full px-2 py-0.5 text-xs ${badgeClass}`}
           >
-            {r.status ?? "unknown"}
+            {state}
           </span>
           {isOwner && r.status === "active" && (
             <button
@@ -493,8 +568,10 @@ const RedeemableRow = ({
             eventStartsAt={r.event_starts_at}
             eventEndsAt={r.event_ends_at}
             expiresAt={r.expires_at}
+            status={r.status}
             mode="owned"
           />
+          <RedemptionHistory redeemableId={r.id} />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <ShareButton
               entity="redeemable"
@@ -503,7 +580,7 @@ const RedeemableRow = ({
               payload={{
                 url: `${getBaseURL()}/store`,
                 text: shareText,
-                title: `${r.title ?? "Gift"} — How's U`,
+                title: `${r.title ?? "Gift"} on How's U`,
               }}
             />
             <button
@@ -534,7 +611,10 @@ const RedeemablesClient = ({
   const [redeeming, setRedeeming] = useState(false)
   const [createdCode, setCreatedCode] = useState<string | null>(null)
   const [filterType, setFilterType] = useState("")
+  const [filterStatus, setFilterStatus] = useState("")
+  const [items, setItems] = useState(redeemables)
   const [isPending, startTransition] = useTransition()
+  const [isFiltering, startFiltering] = useTransition()
 
   const cancel = (id: string) => {
     startTransition(async () => {
@@ -543,15 +623,22 @@ const RedeemablesClient = ({
     })
   }
 
-  const active = redeemables.filter((r) => r.status === "active")
+  const changeStatus = (status: string) => {
+    setFilterStatus(status)
+    startFiltering(async () => {
+      setItems(await listSellerRedeemables(status ? { status } : {}))
+    })
+  }
+
+  const active = items.filter((r) => r.status === "active")
   const filtered = filterType
-    ? redeemables.filter((r) => r.type === filterType)
-    : redeemables
+    ? items.filter((r) => r.type === filterType)
+    : items
 
   const counts = {
-    gift_card: redeemables.filter((r) => r.type === "gift_card").length,
-    voucher: redeemables.filter((r) => r.type === "voucher").length,
-    ticket: redeemables.filter((r) => r.type === "ticket").length,
+    gift_card: items.filter((r) => r.type === "gift_card").length,
+    voucher: items.filter((r) => r.type === "voucher").length,
+    ticket: items.filter((r) => r.type === "ticket").length,
   }
 
   const buckets = [
@@ -600,7 +687,7 @@ const RedeemablesClient = ({
         )}
         {isOwner && createdCode && (
           <div className="mb-4 rounded-medium bg-ink/5 border border-ink-hairline p-3">
-            <p className="text-xs text-ink-muted">Code(s) created — share this with your buyer:</p>
+            <p className="text-xs text-ink-muted">Code created. Share it with your buyer:</p>
             <p className="mt-1 font-mono text-lg font-semibold text-ink">{createdCode}</p>
           </div>
         )}
@@ -633,16 +720,32 @@ const RedeemablesClient = ({
       <div className="rounded-large border border-ink-hairline bg-paper-surface p-4">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h3 className="font-display text-lg font-medium text-ink">Codes</h3>
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="rounded-medium border border-ink-hairline px-3 py-1.5 text-sm text-ink outline-none focus:border-ink"
-          >
-            <option value="">All types</option>
-            <option value="gift_card">Gift cards</option>
-            <option value="voucher">Vouchers</option>
-            <option value="ticket">Tickets</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              aria-label="Filter by type"
+              className="rounded-medium border border-ink-hairline px-3 py-1.5 text-sm text-ink outline-none focus:border-ink"
+            >
+              <option value="">All types</option>
+              <option value="gift_card">Gift cards</option>
+              <option value="voucher">Vouchers</option>
+              <option value="ticket">Tickets</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => changeStatus(e.target.value)}
+              disabled={isFiltering}
+              aria-label="Filter by status"
+              className="rounded-medium border border-ink-hairline px-3 py-1.5 text-sm text-ink outline-none focus:border-ink disabled:opacity-50"
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="redeemed">Spent</option>
+              <option value="expired">Expired</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
         {filtered.length === 0 ? (
           <p className="text-sm text-ink-muted">No codes yet.</p>

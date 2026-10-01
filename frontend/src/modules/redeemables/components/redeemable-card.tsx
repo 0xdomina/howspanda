@@ -4,6 +4,7 @@ import { useState } from "react"
 
 import { occasionFor } from "@lib/card-occasions"
 import { legacyGradientFor } from "@lib/store-skins"
+import { giftcardProgress, redeemableDisplayState } from "@lib/redeemables"
 
 const typeLabel = (type: string) =>
   type === "gift_card" ? "Gift card" : type === "voucher" ? "Voucher" : type === "product_gift" ? "Product gift" : "Ticket"
@@ -46,6 +47,7 @@ export type RedeemableCardProps = {
   eventStartsAt?: string | null
   eventEndsAt?: string | null
   expiresAt?: string | null
+  status?: string | null
   mode?: "preview" | "owned" | "listing"
 }
 
@@ -71,6 +73,7 @@ export default function RedeemableCard({
   eventStartsAt,
   eventEndsAt,
   expiresAt,
+  status,
   mode = "preview",
 }: RedeemableCardProps) {
   const [copied, setCopied] = useState(false)
@@ -85,16 +88,27 @@ export default function RedeemableCard({
       ? "Your collection pass"
       : "Your entry pass"
     : (occasion?.sentiment ?? "Made to keep")
+  const progress = giftcardProgress({
+    status,
+    balance,
+    face_value: faceValue,
+  })
+  const displayState =
+    status != null
+      ? redeemableDisplayState({ status, balance, face_value: faceValue })
+      : null
   const value =
     type === "voucher"
       ? discountValue
         ? `${discountType === "percent" ? `${discountValue}% off` : `${money(discountValue)} off`}`
         : "Your offer"
-      : balance != null && mode === "owned"
-        ? `${money(balance)} left`
-        : faceValue != null
-          ? `${money(faceValue)} value`
-          : "Your gift"
+      : mode === "owned" && progress
+        ? `${money(progress.left)} of ${money(progress.total)} left`
+        : balance != null && mode === "owned"
+          ? `${money(balance)} left`
+          : faceValue != null
+            ? `${money(faceValue)} value`
+            : "Your gift"
   const listingPrice = mode === "listing" && price != null ? money(price) : null
   const eventDate = dateLabel(eventStartsAt)
   const eventEnd = dateLabel(eventEndsAt)
@@ -148,9 +162,16 @@ export default function RedeemableCard({
               {storeName ?? "How's U"}
             </span>
           </div>
-          <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
-            {typeLabel(type)}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            {displayState && (
+              <span className="rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/85">
+                {displayState}
+              </span>
+            )}
+            <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+              {typeLabel(type)}
+            </span>
+          </div>
         </div>
 
         <div className="mt-9 min-h-[96px]">

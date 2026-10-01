@@ -895,6 +895,37 @@ export const cancelSellerRedeemable = async (
   }
 }
 
+export type SellerRedemption = {
+  id: string
+  amount_applied?: number | string | null
+  order_id?: string | null
+  channel?: string
+  created_at?: string
+}
+
+export const listSellerRedemptions = async (
+  id: string
+): Promise<SellerRedemption[]> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return []
+
+    return await sdk.client
+      .fetch<{ redemptions: SellerRedemption[] }>(
+        `/sellers/redeemables/${id}/redemptions`,
+        {
+          method: "GET",
+          headers,
+          cache: "no-store",
+        }
+      )
+      .then(({ redemptions }) => redemptions ?? [])
+      .catch(() => [])
+  } catch {
+    return []
+  }
+}
+
 export const redeemInStore = async (
   code: string,
   amount?: number
