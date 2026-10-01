@@ -15,7 +15,12 @@ import { isArcConfigured } from "./crypto/arc"
  *           is always on.
  */
 
-export type RailKey = "paystack" | "flutterwave" | "crypto-usdc" | "system_default"
+export type RailKey =
+  | "paystack"
+  | "flutterwave"
+  | "crypto-usdc"
+  | "nimiq"
+  | "system_default"
 export type RailKind = "fiat-card" | "crypto" | "manual"
 export type RailMode = "mock" | "test" | "live"
 
@@ -43,6 +48,16 @@ export const RAILS: RailMeta[] = [
     key: "crypto-usdc",
     providerId: "pp_crypto-usdc_crypto-usdc",
     label: "Pay with USDC",
+    kind: "crypto",
+  },
+  {
+    // Quote-and-verify wallet rail (Nimiq Pay: USDT on Polygon, NIM later).
+    // No Medusa payment provider: the wallet pays direct-to-merchant on
+    // chain and the backend verifies before marking paid. The template for
+    // future network rails (Arc-direct, bsc, ...) — new rail, same shape.
+    key: "nimiq",
+    providerId: "pp_nimiq_nimiq",
+    label: "Pay with Nimiq",
     kind: "crypto",
   },
   {
@@ -81,6 +96,10 @@ export function defaultRailEnabled(key: RailKey): boolean {
       return process.env.FLUTTERWAVE_ENABLED !== "false"
     case "crypto-usdc":
       return process.env.CRYPTO_ENABLED === "true"
+    case "nimiq":
+      // Off until a settlement wallet is configured. Explicit opt-in even
+      // then: real money needs a deliberate switch.
+      return process.env.NIMIQ_ENABLED === "true"
     case "system_default":
       return true
   }
@@ -110,6 +129,8 @@ function modeFromKey(
  *   - crypto-usdc:  mock unless a real Circle key OR an Arc dev wallet is
  *                   configured; the testnet↔mainnet switch comes from
  *                   CRYPTO_NETWORK_ENV (Arc is testnet-only today)
+ *   - nimiq:        mock unless a USDT settlement wallet is configured;
+ *                   testnet↔mainnet from NIMIQ_NETWORK_ENV (default test)
  */
 export function railMode(key: RailKey): RailMode {
   switch (key) {
@@ -132,6 +153,12 @@ export function railMode(key: RailKey): RailMode {
         return "mock"
       }
       return process.env.CRYPTO_NETWORK_ENV === "mainnet" ? "live" : "test"
+    }
+    case "nimiq": {
+      if (!process.env.NIMIQ_USDT_MERCHANT) {
+        return "mock"
+      }
+      return process.env.NIMIQ_NETWORK_ENV === "mainnet" ? "live" : "test"
     }
     case "system_default":
       return "mock"
