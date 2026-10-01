@@ -205,6 +205,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/campaigns",
     },
     {
+      resolve: "./src/modules/nimiq",
+    },
+    {
       resolve: "./src/modules/buyer-wallet",
     },
     {
