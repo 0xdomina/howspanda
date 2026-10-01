@@ -202,6 +202,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/growth",
     },
     {
+      resolve: "./src/modules/campaigns",
+    },
+    {
       resolve: "./src/modules/buyer-wallet",
     },
     {

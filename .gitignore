@@ -51,3 +51,7 @@ backend/list-buckets.js
 
 .vercel
 .env*.local
+
+# Public competition repo nested here (own git history + remote).
+# Never stage it into howsyou — push it only to its own origin.
+NimiqHowsu/

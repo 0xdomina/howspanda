@@ -650,6 +650,82 @@ export const PostChallengeSettleSchema = z.object({
   pool_ngn: z.number().positive(),
 })
 
+// Campaigns (Phase 1): plug-and-play reward campaigns live as `draft` until
+// admin flips them live; `reward_template` carries { kind, amount_ngn } and
+// `rules` carries per-event thresholds (e.g. minimum spend).
+export const PostCampaignCreateSchema = z.object({
+  name: z.string().min(2),
+  slug: z.string().min(2),
+  sponsor: z.string().max(200).optional(),
+  audience: z.enum(["sellers", "buyers", "all"]).default("all"),
+  store_ids: z.array(z.string().min(1)).max(50).optional(),
+  event: z.enum([
+    "visit",
+    "first_transaction",
+    "any_transaction",
+    "store_creation",
+    "referral_qualified",
+  ]),
+  rules: z.record(z.string(), z.unknown()).optional(),
+  reward_template: z
+    .object({
+      kind: z.enum([
+        "wallet_credit",
+        "seller_credit",
+        "giftcard_fixed",
+        "voucher_fixed",
+      ]),
+      amount_ngn: z.number().positive().optional(),
+    })
+    .optional(),
+  pool_ngn: z.number().min(0).optional(),
+  per_user_cap_ngn: z.number().positive().optional(),
+  global_cap_ngn: z.number().positive().optional(),
+  starts_at: z.coerce.date().optional(),
+  ends_at: z.coerce.date().optional(),
+  claim_until: z.coerce.date().optional(),
+})
+
+export const PatchCampaignUpdateSchema = z.object({
+  name: z.string().min(2).optional(),
+  sponsor: z.string().max(200).nullable().optional(),
+  status: z.enum(["draft", "live", "paused", "ended"]).optional(),
+  audience: z.enum(["sellers", "buyers", "all"]).optional(),
+  store_ids: z.array(z.string().min(1)).max(50).nullable().optional(),
+  event: z
+    .enum([
+      "visit",
+      "first_transaction",
+      "any_transaction",
+      "store_creation",
+      "referral_qualified",
+    ])
+    .optional(),
+  rules: z.record(z.string(), z.unknown()).nullable().optional(),
+  reward_template: z
+    .object({
+      kind: z.enum([
+        "wallet_credit",
+        "seller_credit",
+        "giftcard_fixed",
+        "voucher_fixed",
+      ]),
+      amount_ngn: z.number().positive().optional(),
+    })
+    .nullable()
+    .optional(),
+  pool_ngn: z.number().min(0).nullable().optional(),
+  per_user_cap_ngn: z.number().positive().nullable().optional(),
+  global_cap_ngn: z.number().positive().nullable().optional(),
+  starts_at: z.coerce.date().nullable().optional(),
+  ends_at: z.coerce.date().nullable().optional(),
+  claim_until: z.coerce.date().nullable().optional(),
+})
+
+export const PostCampaignSettleSchema = z.object({
+  pool_ngn: z.number().positive().optional(),
+})
+
 // Malls (Phase 10)
 export const PostMallCreateSchema = z.object({
   name: z.string().min(2),
@@ -1420,6 +1496,30 @@ export default defineMiddlewares({
       middlewares: [
         ADMIN_RATE_LIMIT,
         validateAndTransformBody(PostChallengeSettleSchema),
+      ],
+    },
+    {
+      matcher: "/admin/campaigns",
+      methods: ["GET", "POST"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostCampaignCreateSchema),
+      ],
+    },
+    {
+      matcher: "/admin/campaigns/:id",
+      methods: ["GET", "PATCH"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PatchCampaignUpdateSchema),
+      ],
+    },
+    {
+      matcher: "/admin/campaigns/:id/settle",
+      methods: ["POST"],
+      middlewares: [
+        ADMIN_RATE_LIMIT,
+        validateAndTransformBody(PostCampaignSettleSchema),
       ],
     },
     {
