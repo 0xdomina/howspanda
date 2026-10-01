@@ -109,7 +109,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   }
 
   const email = (body.buyer_email ?? cart.email ?? "").trim().toLowerCase() || null
-  const rate = usdtNgnRate()
+  const rate = await usdtNgnRate()
   const merchant = merchantFor("USDT")
   const ttlMin = Number(process.env.NIMIQ_QUOTE_TTL_MIN) || QUOTE_TTL_MIN_DEFAULT
   const nimiq: NimiqModuleService = req.scope.resolve(NIMIQ_MODULE)
@@ -119,7 +119,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     cartId: cart.id,
     token: "USDT",
     network: "polygon",
-    amountTokenBase: ngnMinorToUsdtBase(ngnMinor),
+    amountTokenBase: await ngnMinorToUsdtBase(ngnMinor),
     amountNgnMinor: ngnMinor,
     merchantAddress: merchant,
     reference,

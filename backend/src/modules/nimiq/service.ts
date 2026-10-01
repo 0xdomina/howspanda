@@ -1,6 +1,9 @@
 import { MedusaService, MedusaError } from "@medusajs/framework/utils"
 import NimiqQuote from "./models/nimiq-quote"
 import { verifyUsdtTransfer } from "../../lib/nimiq/chain"
+import { usdtNgnRate } from "../../lib/nimiq/rate"
+
+export { usdtNgnRate }
 
 const QUOTE_TTL_MIN_DEFAULT = 10
 
@@ -8,17 +11,6 @@ function quoteTtlMs(): number {
   const mins = Number(process.env.NIMIQ_QUOTE_TTL_MIN)
   const m = Number.isFinite(mins) && mins > 0 ? mins : QUOTE_TTL_MIN_DEFAULT
   return m * 60 * 1000
-}
-
-export function usdtNgnRate(): number {
-  const r = Number(process.env.NIMIQ_USDT_NGN_RATE)
-  if (!Number.isFinite(r) || r <= 0) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      "USDT pricing is not configured"
-    )
-  }
-  return r
 }
 
 export function merchantFor(token: "USDT" | "NIM"): string {
@@ -35,9 +27,9 @@ export function merchantFor(token: "USDT" | "NIM"): string {
   return addr
 }
 
-/** NGN minor → USDT base units (6dp) at the operator rate. */
-export function ngnMinorToUsdtBase(ngnMinor: number): bigint {
-  const usdtMajor = ngnMinor / 100 / usdtNgnRate()
+/** NGN minor → USDT base units (6dp) at the live quoted rate. */
+export async function ngnMinorToUsdtBase(ngnMinor: number): Promise<bigint> {
+  const usdtMajor = ngnMinor / 100 / (await usdtNgnRate())
   return BigInt(Math.round(usdtMajor * 1_000_000))
 }
 
