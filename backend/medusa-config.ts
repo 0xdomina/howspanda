@@ -137,6 +137,11 @@ module.exports = defineConfig({
                 endpoint: process.env.S3_ENDPOINT,
                 prefix: process.env.S3_PREFIX || "",
                 cache_control: "public, max-age=31536000, immutable",
+                // Backblaze B2 does not serve per-bucket virtual-hosted
+                // DNS (<bucket>.s3.<region>.backblazeb2.com NXDOMAINs), so
+                // the SDK must use path style. Without this every FILE
+                // upload (seller photos, Telegram photos) fails.
+                additional_client_config: { forcePathStyle: true },
               },
             },
           ],
