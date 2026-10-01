@@ -229,16 +229,28 @@ function botToken(): string | null {
   return process.env.TELEGRAM_BOT_TOKEN || null
 }
 
-/** Largest photo file_id from a Telegram message, if any. */
+/** Largest photo file_id from a Telegram message, if any. Falls back to a
+ *  sent-as-file image document (mime image/*) — downloads and camera shots
+ *  sent uncompressed arrive as documents, not photos. */
 export function largestPhotoFileId(msg: {
   photo?: { file_id?: string; file_size?: number }[]
+  document?: { file_id?: string; mime_type?: string; file_size?: number }
 }): string | null {
   const photos = msg?.photo ?? []
-  if (!photos.length) return null
-  const sorted = [...photos].sort(
-    (a, b) => (b.file_size ?? 0) - (a.file_size ?? 0)
-  )
-  return sorted[0]?.file_id ?? null
+  if (photos.length) {
+    const sorted = [...photos].sort(
+      (a, b) => (b.file_size ?? 0) - (a.file_size ?? 0)
+    )
+    if (sorted[0]?.file_id) return sorted[0].file_id
+  }
+  const doc = msg?.document
+  if (
+    doc?.file_id &&
+    (!doc.mime_type || doc.mime_type.toLowerCase().startsWith("image/"))
+  ) {
+    return doc.file_id
+  }
+  return null
 }
 
 async function telegramGetFilePath(fileId: string): Promise<string | null> {
@@ -279,19 +291,60 @@ export async function downloadTelegramFile(fileId: string): Promise<Buffer | nul
   }
 }
 
+const HEIF_BRANDS = new Set([
+  "heic",
+  "heix",
+  "hevc",
+  "hevx",
+  "heif",
+  "heis",
+  "heim",
+])
+
+function isHeifBuffer(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false
+  if (buffer.toString("latin1", 4, 8) !== "ftyp") return false
+  return HEIF_BRANDS.has(buffer.toString("latin1", 8, 12))
+}
+
+/**
+ * iPhone originals arrive as HEIC (camera shots sent as files, HEIC
+ * downloads). The sniffer rejects HEIC, so convert to JPEG first with the
+ * pure-JS converter (no native deps). Returns the original bytes when they
+ * are not HEIF, or null when conversion fails.
+ */
+async function maybeConvertHeic(buffer: Buffer): Promise<Buffer | null> {
+  if (!isHeifBuffer(buffer)) return buffer
+  try {
+    const { default: convert } = await import("heic-convert")
+    const out = (await convert({
+      buffer,
+      format: "JPEG",
+      quality: 0.92,
+    })) as unknown as Buffer
+    const jpeg = Buffer.from(out)
+    if (jpeg.length < 4 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return null
+    return jpeg
+  } catch {
+    return null
+  }
+}
 /**
  * Store a Telegram photo through the same pipeline as seller uploads: sniff
  * bytes, upload via FILE service (S3/B2) when configured, else local disk.
- * Returns the product-ready URL or null.
+ * iPhone HEIC originals are converted to JPEG first. Returns the
+ * product-ready URL or null.
  */
 export async function storeTelegramPhoto(
   buffer: Buffer,
   scope: { resolve(name: string): unknown }
 ): Promise<string | null> {
   if (buffer.length > 10 * 1024 * 1024) return null
+  const usable = await maybeConvertHeic(buffer)
+  if (!usable) return null
   let sniffed: { kind: string; ext: string; mime: string }
   try {
-    sniffed = sniffMedia(buffer)
+    sniffed = sniffMedia(usable)
   } catch {
     return null
   }
@@ -314,7 +367,7 @@ export async function storeTelegramPhoto(
       const uploaded = await fileService.upload({
         filename: `${randomUUID()}.${sniffed.ext}`,
         mimeType: sniffed.mime,
-        content: buffer.toString("base64"),
+        content: usable.toString("base64"),
         access: "private",
       })
       return uploaded.url
@@ -330,7 +383,7 @@ export async function storeTelegramPhoto(
     const target = path.resolve(dir, filename)
     if (target !== root && !target.startsWith(root + path.sep)) return null
     await mkdir(dir, { recursive: true })
-    await writeFile(target, buffer)
+    await writeFile(target, usable)
     return `/uploads/image/${filename}`
   } catch {
     return null

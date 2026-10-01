@@ -50,7 +50,9 @@ type TelegramUpdate = {
   message?: {
     chat?: { id?: number | string }
     text?: string
+    caption?: string
     photo?: { file_id?: string; file_size?: number }[]
+    document?: { file_id?: string; mime_type?: string; file_size?: number }
   }
   callback_query?: {
     id?: string
@@ -98,13 +100,22 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         callback.message?.message_id,
         data
       )
+    } else if (chatId && data.startsWith("ord:done:")) {
+      const store = await findStoreByChat(req, String(chatId)).catch(() => null)
+      if (!store) {
+        await sendTelegramText(String(chatId), "Link this chat to a store first.")
+      } else {
+        await handleOrderDelivered(req, String(chatId), store, data.split(":")[2] ?? "")
+      }
     }
     res.json({ ok: true })
     return
   }
 
   const chatId = update.message?.chat?.id
-  const text = (update.message?.text ?? "").trim()
+  // Captions ride on photo/document messages (DONE/SKIP sent with the
+  // picture counts as the word itself).
+  const text = (update.message?.text ?? update.message?.caption ?? "").trim()
   const photoFileId = largestPhotoFileId(update.message ?? {})
 
   // Always 200 quickly — Telegram retries anything else, and retries of a
@@ -521,11 +532,66 @@ async function handleOrders(
     const cur = String(l.currency_code ?? "ngn").toUpperCase()
     return `Order ${String(l.order_id).slice(-6)} · ${l.status} · ${cur} ${major.toLocaleString("en-NG")}`
   })
+  // Tappable actions per order: submitted proofs get Confirm/Reject (same
+  // one-click verdicts as the alerts), pending fulfilment gets Mark
+  // delivered. Fulfil the order without opening the website.
+  const buttons: { text: string; callback_data: string }[][] = []
+  for (const l of lines as any[]) {
+    const proof = await marketplace.bankTransferForOrder(l.order_id, store.sellerId).catch(() => null)
+    if (proof?.status === "submitted") {
+      buttons.push([
+        { text: `Confirm ${String(l.order_id).slice(-6)}`, callback_data: `proof:confirm:${l.order_id}` },
+        { text: "Reject", callback_data: `proof:reject:${l.order_id}` },
+      ])
+    } else if (l.status === "pending" && !(l as any).delivered_at) {
+      buttons.push([
+        { text: `Mark ${String(l.order_id).slice(-6)} delivered`, callback_data: `ord:done:${l.order_id}` },
+      ])
+    }
+  }
   const storefront = (process.env.STOREFRONT_URL || "https://hows-u.vercel.app").replace(/\/$/, "")
   await sendTelegramText(
     chatId,
-    [...rows, ``, `Full detail + fulfil in Manage Business: ${storefront}/ng/seller/orders`].join("\n")
+    [...rows, ``, `Full detail in Manage Business: ${storefront}/ng/seller/orders`].join("\n"),
+    buttons.length ? { reply_markup: { inline_keyboard: buttons } } : undefined
   )
+}
+
+// Fulfil from chat: mark the order delivered (starts the return window,
+// mirroring Manage Business). Ownership re-checked: the order must belong
+// to this seller's store.
+async function handleOrderDelivered(
+  req: MedusaRequest,
+  chatId: string,
+  store: { sellerId: string },
+  orderId: string
+): Promise<void> {
+  try {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: [order] } = (await query.graph({
+      entity: "order",
+      fields: ["id", "items.product.seller.id"],
+      filters: { id: [orderId] },
+    }).catch(() => ({ data: [] }))) as { data: any[] }
+    const mine = ((order as any)?.items ?? []).some(
+      (i: any) => i?.product?.seller?.id === store.sellerId
+    )
+    if (!mine) {
+      await sendTelegramText(chatId, "That order is not in your store.")
+      return
+    }
+    const marketplace: MarketplaceModuleService =
+      req.scope.resolve(MARKETPLACE_MODULE)
+    const count = await marketplace.markOrderDelivered(orderId)
+    await sendTelegramText(
+      chatId,
+      count > 0
+        ? "Marked delivered. The return window is now open."
+        : "Already marked delivered."
+    )
+  } catch {
+    await sendTelegramText(chatId, "Could not update it. Try Manage Business.")
+  }
 }
 
 async function handleStore(
@@ -924,7 +990,7 @@ async function handleEditPhoto(req: MedusaRequest, chatId: string, fileId: strin
   }
   const url = await storeTelegramPhoto(bytes, req.scope)
   if (!url) {
-    await sendTelegramText(chatId, "That file is not an accepted photo (JPG/PNG/WEBP, ≤10MB). Try another, or /cancel.")
+    await sendTelegramText(chatId, "That file did not work as a photo. Send a JPG, PNG, or camera shot under 10MB, or /cancel.")
     return
   }
   try {
@@ -963,7 +1029,7 @@ async function handlePhotoStep(req: MedusaRequest, chatId: string, fileId: strin
   }
   const url = await storeTelegramPhoto(bytes, req.scope)
   if (!url) {
-    await sendTelegramText(chatId, "That file is not an accepted photo (JPG/PNG/WEBP, ≤10MB). Try another, or DONE.")
+    await sendTelegramText(chatId, "That file did not work as a photo. Send a JPG, PNG, or camera shot under 10MB, or DONE.")
     return
   }
   session.draft.photos.push(url)
@@ -1288,3 +1354,4 @@ async function answerCallback(callbackId: string) {
     // Spinner dismissal is cosmetic.
   }
 }
+
