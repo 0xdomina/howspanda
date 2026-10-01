@@ -99,6 +99,24 @@ class MarketplaceModuleService extends MedusaService({
   }
 
   /**
+   * Dispatch recorded (seller endpoint or TG button). The parcel is en route;
+   * the return window still starts at delivery, not here. Idempotent.
+   */
+  async markOrderShipped(orderId: string, now: Date = new Date()) {
+    const lines = await this.resolveLinesForOrder(orderId)
+    const updates = lines
+      .filter((line) => line.status === "pending" && !line.shipped_at)
+      .map((line) => ({
+        id: line.id,
+        shipped_at: now,
+      }))
+    if (updates.length) {
+      await this.updateCommissionLines(updates)
+    }
+    return updates.length
+  }
+
+  /**
    * Delivery recorded (seller endpoint or core `delivery.created`).
    * Starts the return window. Idempotent — already-delivered lines skip.
    */

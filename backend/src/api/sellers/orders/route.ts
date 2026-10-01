@@ -79,6 +79,7 @@ export const GET = async (
       line.order_id,
       {
         status: line.status,
+        shipped_at: (line as any).shipped_at ?? null,
         delivered_at: line.delivered_at,
         confirmed_at: line.confirmed_at,
         held_at: line.held_at,

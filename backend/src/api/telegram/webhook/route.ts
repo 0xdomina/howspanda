@@ -107,6 +107,13 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       } else {
         await handleOrderDelivered(req, String(chatId), store, data.split(":")[2] ?? "")
       }
+    } else if (chatId && data.startsWith("ord:ship:")) {
+      const store = await findStoreByChat(req, String(chatId)).catch(() => null)
+      if (!store) {
+        await sendTelegramText(String(chatId), "Link this chat to a store first.")
+      } else {
+        await handleOrderShipped(req, String(chatId), store, data.split(":")[2] ?? "")
+      }
     }
     res.json({ ok: true })
     return
@@ -543,10 +550,17 @@ async function handleOrders(
         { text: `Confirm ${String(l.order_id).slice(-6)}`, callback_data: `proof:confirm:${l.order_id}` },
         { text: "Reject", callback_data: `proof:reject:${l.order_id}` },
       ])
-    } else if (l.status === "pending" && !(l as any).delivered_at) {
-      buttons.push([
-        { text: `Mark ${String(l.order_id).slice(-6)} delivered`, callback_data: `ord:done:${l.order_id}` },
-      ])
+    } else if (l.status === "pending" && !(l as any).delivered_at && !(l as any).held_at) {
+      const short = String(l.order_id).slice(-6)
+      if (!(l as any).shipped_at) {
+        buttons.push([
+          { text: `Ship ${short}`, callback_data: `ord:ship:${l.order_id}` },
+        ])
+      } else {
+        buttons.push([
+          { text: `Delivered ${short}`, callback_data: `ord:done:${l.order_id}` },
+        ])
+      }
     }
   }
   const storefront = (process.env.STOREFRONT_URL || "https://hows-u.vercel.app").replace(/\/$/, "")
@@ -555,6 +569,42 @@ async function handleOrders(
     [...rows, ``, `Full detail in Manage Business: ${storefront}/ng/seller/orders`].join("\n"),
     buttons.length ? { reply_markup: { inline_keyboard: buttons } } : undefined
   )
+}
+
+// Dispatch from chat: the parcel is en route (mirrors Manage Business).
+// Ownership re-checked like delivery.
+async function handleOrderShipped(
+  req: MedusaRequest,
+  chatId: string,
+  store: { sellerId: string },
+  orderId: string
+): Promise<void> {
+  try {
+    const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+    const { data: [order] } = (await query.graph({
+      entity: "order",
+      fields: ["id", "items.product.seller.id"],
+      filters: { id: [orderId] },
+    }).catch(() => ({ data: [] }))) as { data: any[] }
+    const mine = ((order as any)?.items ?? []).some(
+      (i: any) => i?.product?.seller?.id === store.sellerId
+    )
+    if (!mine) {
+      await sendTelegramText(chatId, "That order is not in your store.")
+      return
+    }
+    const marketplace: MarketplaceModuleService =
+      req.scope.resolve(MARKETPLACE_MODULE)
+    const count = await marketplace.markOrderShipped(orderId)
+    await sendTelegramText(
+      chatId,
+      count > 0
+        ? "Marked shipped. The buyer sees it is en route."
+        : "Already marked shipped."
+    )
+  } catch {
+    await sendTelegramText(chatId, "Could not update it. Try Manage Business.")
+  }
 }
 
 // Fulfil from chat: mark the order delivered (starts the return window,

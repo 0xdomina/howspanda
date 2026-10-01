@@ -515,6 +515,25 @@ export const markOrderDelivered = async (orderId: string): Promise<string | null
   }
 }
 
+export const markOrderShipped = async (orderId: string): Promise<string | null> => {
+  try {
+    const headers = await getSellerAuthHeaders()
+    if (!hasAuth(headers)) return "Not signed in as a seller."
+
+    await sdk.client.fetch(`/sellers/orders/${orderId}/mark-shipped`, {
+      method: "POST",
+      headers,
+    })
+
+    const tag = await getSellerCacheTag("seller")
+    revalidateTagSafely(tag)
+
+    return null
+  } catch (error: any) {
+    return error.toString()
+  }
+}
+
 export const confirmBankTransfer = async (
   orderId: string
 ): Promise<string | null> => {

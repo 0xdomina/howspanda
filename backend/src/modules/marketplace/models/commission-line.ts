@@ -27,6 +27,9 @@ const CommissionLine = model.define("commission_line", {
   reversal_reason: model.text().nullable(),
   // Escrow (Phase 6): release is driven by delivery + return window, not time
   parent_order_id: model.text().nullable(),
+  // Fulfilment timeline: shipped (en route, seller dispatched) precedes
+  // delivered (buyer has it, return window running).
+  shipped_at: model.dateTime().nullable(),
   delivered_at: model.dateTime().nullable(),
   confirmed_at: model.dateTime().nullable(),
   release_due_at: model.dateTime().nullable(),

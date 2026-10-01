@@ -88,6 +88,7 @@ export default function BuyerOrderActions({
   const open = pending.filter((l) => !l.held_at && !l.confirmed_at) ?? []
   const released = status?.lines.filter((l) => l.status !== "pending") ?? []
   const anyDelivered = status?.lines.some((l) => l.delivered_at) ?? false
+  const anyShipped = status?.lines.some((l) => l.shipped_at) ?? false
   const multiSeller = new Set(
     status?.lines.map((l) => l.seller_id).filter(Boolean)
   ).size > 1
@@ -108,8 +109,7 @@ export default function BuyerOrderActions({
       </div>
 
       {!unlocked ? (
-        <form onSubmit={unlock} className="flex flex-col gap-y-3">
-          <div>
+        <form onSubmit={unlock} className="flex flex-col gap-y-3">          <div>
             <label className={labelClass}>Your checkout email</label>
             <input
               type="email"
@@ -135,6 +135,31 @@ export default function BuyerOrderActions({
         </form>
       ) : (
         <div className="flex flex-col gap-y-5">
+          {(anyShipped || anyDelivered) && (
+            <ol className="flex flex-col gap-y-2" data-testid="delivery-timeline">
+              {(status?.lines ?? []).map((l) => {
+                const stage = l.held_at
+                  ? "Return in progress"
+                  : l.delivered_at
+                    ? "Delivered"
+                    : l.shipped_at
+                      ? "En route"
+                      : "Preparing"
+                return (
+                  <li key={l.id} className="flex items-center gap-2 text-sm">
+                    <span
+                      aria-hidden
+                      className={`h-2 w-2 rounded-full ${l.delivered_at ? "bg-emerald-600" : l.shipped_at ? "bg-amber-500" : "bg-ink/20"}`}
+                    />
+                    <span className="font-medium text-ink">{stage}</span>
+                    {l.seller?.name && (
+                      <span className="text-ink-muted">· {l.seller.name}</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          )}
           {totalHeld > 0 && (
             <div className="flex flex-col gap-y-3">
               <p className="text-sm text-ink-muted">

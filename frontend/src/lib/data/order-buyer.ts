@@ -9,6 +9,7 @@ export type EscrowLine = {
   status: string
   net_amount: number
   currency_code: string
+  shipped_at?: string | null
   delivered_at?: string | null
   confirmed_at?: string | null
   held_at?: string | null

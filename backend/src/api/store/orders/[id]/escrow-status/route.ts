@@ -46,6 +46,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       status: l.status,
       net_amount: Number(l.net_amount),
       currency_code: l.currency_code,
+      shipped_at: (l as any).shipped_at ?? null,
       delivered_at: l.delivered_at,
       confirmed_at: l.confirmed_at,
       held_at: l.held_at,

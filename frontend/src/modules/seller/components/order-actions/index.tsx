@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
-import { markOrderDelivered, confirmReturnReceived } from "@lib/data/seller"
+import { markOrderDelivered, markOrderShipped, confirmReturnReceived } from "@lib/data/seller"
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "In escrow",
@@ -21,8 +21,11 @@ function escrowSummary(escrow: any): string {
   if (escrow.delivered_at && escrow.status === "pending") {
     return "Delivered — awaiting buyer confirmation"
   }
+  if (escrow.shipped_at && escrow.status === "pending" && !escrow.delivered_at) {
+    return "En route — mark delivered on arrival"
+  }
   if (escrow.status === "pending") {
-    return "Awaiting dispatch — mark delivered to start the return window"
+    return "Awaiting dispatch — mark shipped, then delivered"
   }
   return STATUS_LABEL[escrow.status] ?? escrow.status
 }
@@ -32,6 +35,8 @@ const OrderActions = ({ order }: { order: any }) => {
   const [message, setMessage] = useState<string | null>(null)
   const router = useRouter()
   const escrow = order.escrow
+  const canMarkShipped =
+    escrow?.status === "pending" && !escrow.shipped_at && !escrow.held_at
   const canMarkDelivered =
     escrow?.status === "pending" && !escrow.delivered_at && !escrow.held_at
   const canConfirmReturn =
@@ -61,6 +66,16 @@ const OrderActions = ({ order }: { order: any }) => {
       <p className="mt-1 text-xs text-ink-muted">{escrowSummary(escrow)}</p>
       {message && (
         <p className="mt-2 text-xs text-rose-600">{message}</p>
+      )}
+      {canMarkShipped && (
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => run(() => markOrderShipped(order.id), "Marked as shipped.")}
+          className="mt-2 rounded-medium border border-ink-strong px-3 py-1.5 text-sm font-medium text-ink hover:bg-ink hover:text-white disabled:opacity-50"
+        >
+          {isPending ? "Marking…" : "Package and ship"}
+        </button>
       )}
       {canMarkDelivered && (
         <button
