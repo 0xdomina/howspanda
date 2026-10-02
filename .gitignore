@@ -55,3 +55,5 @@ backend/list-buckets.js
 # Public competition repo nested here (own git history + remote).
 # Never stage it into howsyou — push it only to its own origin.
 NimiqHowsu/
+# Macham AI SDK nested here (own git history + remote). Same rule.
+Macham/
