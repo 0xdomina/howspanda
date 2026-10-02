@@ -8,6 +8,10 @@ import {
 } from "@medusajs/framework/utils"
 import { MARKETPLACE_MODULE } from "../../../../../modules/marketplace"
 import MarketplaceModuleService from "../../../../../modules/marketplace/service"
+import { NIMIQ_MODULE } from "../../../../../modules/nimiq"
+import type NimiqModuleService from "../../../../../modules/nimiq/service"
+import { NOTIFICATIONS_MODULE } from "../../../../../modules/notifications"
+import type NotificationsModuleService from "../../../../../modules/notifications/service"
 import { requireSellerPermission } from "../../../../../lib/sellers/resolve-seller"
 
 const resolveOwnedLine = async (
@@ -52,5 +56,41 @@ export const POST = async (
     "return received by seller"
   )
 
-  res.json({ commission_line: commissionLine })
+  // Crypto-paid orders: the ledger reversal above is only half the refund.
+  // Send the tokens back to the verified payer automatically (best-effort).
+  let cryptoRefund: { status: string; tx_hash?: string | null } | null = null
+  try {
+    const nimiq: NimiqModuleService = req.scope.resolve(NIMIQ_MODULE)
+    const payout = await nimiq.requestPayout({ orderId: req.params.id })
+    const done = await nimiq.executePayout(payout.id).catch(() => null)
+    cryptoRefund = done
+      ? { status: (done as any).status, tx_hash: (done as any).tx_hash ?? null }
+      : { status: "failed" }
+    if (done && (done as any).status === "confirmed") {
+      const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
+      const { data: [order] } = (await query.graph({
+        entity: "order",
+        fields: ["id", "email"],
+        filters: { id: [req.params.id] },
+      }).catch(() => ({ data: [] }))) as { data: any[] }
+      if ((order as any)?.email) {
+        const notifications =
+          req.scope.resolve<NotificationsModuleService>(NOTIFICATIONS_MODULE)
+        await notifications
+          .enqueueEmail({
+            kind: "crypto_refund_confirmed",
+            recipient: "buyer",
+            to: (order as any).email,
+            subject: "Your refund is on its way",
+            body_html: `Your refund for order ${req.params.id} has been sent on chain. It lands in your wallet shortly.`,
+            payload: { order_id: req.params.id },
+          })
+          .catch(() => null)
+      }
+    }
+  } catch {
+    cryptoRefund = { status: "skipped" }
+  }
+
+  res.json({ commission_line: commissionLine, crypto_refund: cryptoRefund })
 }

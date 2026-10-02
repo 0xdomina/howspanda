@@ -1,5 +1,6 @@
 import { Module } from "@medusajs/framework/utils"
 import NimiqQuote from "./models/nimiq-quote"
+import NimiqPayout from "./models/nimiq-payout"
 import NimiqModuleService from "./service"
 
 export const NIMIQ_MODULE = "nimiq"
