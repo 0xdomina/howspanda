@@ -55,7 +55,13 @@ export const setSellerAuthToken = async (token: string) => {
 
 export const removeSellerAuthToken = async () => {
   const cookies = await nextCookies()
+  // Attribute-match setSellerAuthToken above: Safari ignores a deletion
+  // whose attributes do not cover the creation ones.
   cookies.set(SELLER_COOKIE, "", {
     maxAge: -1,
+    path: "/",
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
   })
 }

@@ -348,6 +348,9 @@ export async function signout(countryCode: string) {
   try {
     const { cookies: nextCookies } = await import("next/headers")
     const store = await nextCookies()
+    // Attribute-match the creation cookies (Better Auth sets __Secure-
+    // names with Secure + Path=/ in production). A __Secure- deletion
+    // without Secure is rejected, leaving a stale session behind.
     for (const name of [
       "better-auth.session_token",
       "__Secure-better-auth.session_token",
@@ -357,7 +360,13 @@ export async function signout(countryCode: string) {
       "__Secure-better-auth.dont_remember",
     ]) {
       try {
-        store.set(name, "", { maxAge: -1, path: "/" })
+        store.set(name, "", {
+          maxAge: -1,
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        })
       } catch {}
     }
   } catch {}

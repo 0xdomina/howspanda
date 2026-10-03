@@ -339,29 +339,16 @@ export async function storeTelegramPhoto(
   buffer: Buffer,
   scope: { resolve(name: string): unknown }
 ): Promise<string | null> {
-  // TEMP-DIAG-451: stage tracing for the all-photos-rejected incident.
-  // Remove after root cause lands. Logs sizes/stages only, never bytes/keys.
-  const tag = (s: string) => console.error(`[tgphoto] ${s}`)
-  tag(`start bytes=${buffer.length}`)
-  if (buffer.length > 10 * 1024 * 1024) {
-    tag("reject: over 10MB")
-    return null
-  }
+  if (buffer.length > 10 * 1024 * 1024) return null
   const usable = await maybeConvertHeic(buffer)
-  tag(`convert: ${usable ? `ok bytes=${usable.length} converted=${usable !== buffer}` : "FAILED"}`)
   if (!usable) return null
   let sniffed: { kind: string; ext: string; mime: string }
   try {
     sniffed = sniffMedia(usable)
-    tag(`sniff: kind=${sniffed.kind} ext=${sniffed.ext}`)
-  } catch (e: any) {
-    tag(`sniff throw: ${(e?.message ?? e).toString().slice(0, 100)}`)
+  } catch {
     return null
   }
-  if (sniffed.kind !== "image" || sniffed.ext === "gif") {
-    tag(`reject: kind/ext gate kind=${sniffed.kind} ext=${sniffed.ext}`)
-    return null
-  }
+  if (sniffed.kind !== "image" || sniffed.ext === "gif") return null
 
   if (
     process.env.S3_BUCKET &&
@@ -369,30 +356,27 @@ export async function storeTelegramPhoto(
     process.env.S3_SECRET_ACCESS_KEY
   ) {
     try {
+      // FileModuleService exposes createFiles (singular in/out), not
+      // upload — that lives on the S3 provider one layer down.
       const fileService = scope.resolve(Modules.FILE) as unknown as {
-        upload(input: {
+        createFiles(input: {
           filename: string
           mimeType: string
           content: string
           access: "private"
         }): Promise<{ url: string }>
       }
-      // TEMP-DIAG-451: remove with the stage tracing above.
-      console.error(`[tgphoto] file-branch: s3 configured, uploading ext=${sniffed.ext}`)
-      const uploaded = await fileService.upload({
+      const uploaded = await fileService.createFiles({
         filename: `${randomUUID()}.${sniffed.ext}`,
         mimeType: sniffed.mime,
         content: usable.toString("base64"),
         access: "private",
       })
-      console.error(`[tgphoto] file-branch: upload ok`)
       return uploaded.url
-    } catch (e: any) {
-      console.error(`[tgphoto] file-branch FAIL: ${(e?.message ?? e).toString().slice(0, 200)}`)
+    } catch {
       return null
     }
   }
-  console.error(`[tgphoto] disk-branch: s3 env missing, local write`)
 
   try {
     const filename = `${randomUUID()}.${sniffed.ext}`

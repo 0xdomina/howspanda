@@ -48,16 +48,15 @@ class AuthOtpModuleService extends MedusaService({ AuthOtp }) {
       expires_at: new Date(Date.now() + CODE_LIFETIME_MS),
     })
 
-    const deliveredCode = await sendOtp({
+    // Throws on any delivery failure, so a success here means the provider
+    // accepted the message. The raw code echoes only outside production.
+    await sendOtp({
       channel: "email",
       destination: email,
       code,
     })
 
-    const echoCode =
-      process.env.NODE_ENV !== "production" ? code : deliveredCode
-
-    return { code: process.env.NODE_ENV === "production" ? null : echoCode }
+    return { code: process.env.NODE_ENV === "production" ? null : code }
   }
 
   /**

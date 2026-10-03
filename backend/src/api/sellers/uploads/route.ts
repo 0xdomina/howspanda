@@ -126,14 +126,14 @@ export const POST = async (
     process.env.S3_SECRET_ACCESS_KEY
   ) {
     const fileService = req.scope.resolve(Modules.FILE) as unknown as {
-      upload(input: {
+      createFiles(input: {
         filename: string
         mimeType: string
         content: string
         access: "private"
-      }): Promise<{ url: string; key: string }>
+      }): Promise<{ url: string }>
     }
-    const uploaded = await fileService.upload({
+    const uploaded = await fileService.createFiles({
       filename,
       mimeType: sniffed.mime,
       content: file.buffer.toString("base64"),

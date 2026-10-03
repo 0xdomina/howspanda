@@ -1,43 +1,62 @@
 import { MedusaError } from "@medusajs/framework/utils"
 import { sendEmail as sendNotificationEmail } from "../notifications/transport"
 
-// Verification delivery seam for KYC OTPs. WIRED BUT OFF BY DEFAULT:
-// nothing actually emails/SMSes/WhatsApps until KYC_VERIFICATION_ENABLED=true.
-// Until then every call is a no-op that returns null (no code is exposed).
+// Verification delivery seam for auth + KYC OTPs. OFF BY DEFAULT:
+// nothing leaves the box until KYC_VERIFICATION_ENABLED=true.
 //
 // Post-launch, set:
 //   KYC_VERIFICATION_ENABLED=true
 //   KYC_VERIFICATION_CHANNEL=email | whatsapp
-// and configure the selected provider. The `mock` channel is dev-only.
+// and configure the selected provider. The `mock` channel is dev-only and
+// is refused in production so a misconfigured deploy fails loud instead of
+// reporting "sent" with nothing delivered.
+//
+// All failures throw a short user-facing message ("We could not send the
+// code. Please try again."). Provider detail stays in server logs only.
 
 export type OtpSendResult = string | null
 
+const SEND_FAILURE_MESSAGE =
+  "We could not send the code. Please try again."
+
+function logDeliveryFailure(detail: unknown) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "[otp] delivery failed",
+    detail instanceof Error ? detail.message : "unknown error"
+  )
+}
+
 export async function sendOtp(input: {
-  channel: "email"
+  channel: "email" | "whatsapp"
   destination: string
   code: string
 }): Promise<OtpSendResult> {
   if (process.env.KYC_VERIFICATION_ENABLED !== "true") {
+    // Fail loud in production so a missing toggle surfaces as an error
+    // instead of a stored code with no delivery. Dev keeps the offline
+    // no-op so local flows complete without a provider.
+    // eslint-disable-next-line no-console
+    console.error("[otp] verification disabled, code stored but not delivered")
     if (process.env.NODE_ENV === "production") {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        "Email verification is not configured on this deployment (KYC_VERIFICATION_ENABLED). Add it in Pandastack env and redeploy."
-      )
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, SEND_FAILURE_MESSAGE)
     }
     // dev: no-op
     return null
   }
 
-  const channel = process.env.KYC_VERIFICATION_CHANNEL || "mock"
+  const channel = process.env.KYC_VERIFICATION_CHANNEL || "email"
 
   switch (channel) {
     case "mock":
       // Dev/staging only: hand the code straight back. Refusing in production
       // prevents a misconfigured deployment from echoing OTPs to callers.
       if (process.env.NODE_ENV === "production") {
+        // eslint-disable-next-line no-console
+        console.error("[otp] mock channel refused in production")
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
-          "Mock OTP channel is not allowed in production"
+          SEND_FAILURE_MESSAGE
         )
       }
       return input.code
@@ -45,23 +64,28 @@ export async function sendOtp(input: {
       try {
         return await sendEmail(input.destination, input.code)
       } catch (error) {
-        // Keep SMTP/provider details in server logs only. The signup surface
-        // should receive a short recovery message rather than a raw relay
-        // error or an opaque generic 500.
-        // eslint-disable-next-line no-console
-        console.error(
-          "[otp] email delivery failed",
-          error instanceof Error ? error.message : "unknown error"
-        )
+        logDeliveryFailure(error)
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
-          "We couldn't send your verification code right now. Please try again."
+          SEND_FAILURE_MESSAGE
+        )
+      }
+    case "whatsapp":
+      try {
+        return await sendWhatsApp(input.destination, input.code)
+      } catch (error) {
+        logDeliveryFailure(error)
+        throw new MedusaError(
+          MedusaError.Types.INVALID_DATA,
+          SEND_FAILURE_MESSAGE
         )
       }
     default:
+      // eslint-disable-next-line no-console
+      console.error(`[otp] unknown verification channel "${channel}"`)
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        `Unknown KYC_VERIFICATION_CHANNEL "${channel}"`
+        SEND_FAILURE_MESSAGE
       )
   }
 }
@@ -71,11 +95,15 @@ export async function sendOtp(input: {
 // notification channel is set to `brevo`, without requiring a second provider
 // account or a second secret.
 async function sendEmail(destination: string, code: string): Promise<OtpSendResult> {
-  await sendNotificationEmail({
+  const result = await sendNotificationEmail({
     to: destination,
     subject: "Your How's U verification code",
     html: `<p>Your verification code is <strong>${code}</strong>. It expires in 15 minutes.</p>`,
   })
+  // eslint-disable-next-line no-console
+  console.log(
+    `[otp] email delivery ok channel=${result.channel} messageId=${result.messageId ?? "n/a"}`
+  )
   return null
 }
 
@@ -85,9 +113,11 @@ async function sendWhatsApp(destination: string, code: string): Promise<OtpSendR
   const token = process.env.KYC_WHATSAPP_ACCESS_TOKEN
   const phoneNumberId = process.env.KYC_WHATSAPP_PHONE_NUMBER_ID
   if (!token || !phoneNumberId) {
+    // eslint-disable-next-line no-console
+    console.error("[otp] whatsapp credentials missing")
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "KYC_WHATSAPP_ACCESS_TOKEN / KYC_WHATSAPP_PHONE_NUMBER_ID not configured"
+      SEND_FAILURE_MESSAGE
     )
   }
 
@@ -118,9 +148,11 @@ async function sendWhatsApp(destination: string, code: string): Promise<OtpSendR
   )
 
   if (!response.ok) {
+    // eslint-disable-next-line no-console
+    console.error(`[otp] whatsapp delivery failed status=${response.status}`)
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      `Failed to send WhatsApp verification (${response.status})`
+      SEND_FAILURE_MESSAGE
     )
   }
   return null

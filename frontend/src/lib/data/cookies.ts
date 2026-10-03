@@ -90,8 +90,14 @@ export const setAuthToken = async (token: string) => {
 
 export const removeAuthToken = async () => {
   const cookies = await nextCookies()
+  // Attribute-match setAuthToken above: Safari ignores a deletion whose
+  // attributes do not cover the creation ones.
   cookies.set("_medusa_jwt", "", {
     maxAge: -1,
+    path: "/",
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
   })
 }
 

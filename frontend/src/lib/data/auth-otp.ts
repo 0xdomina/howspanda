@@ -31,7 +31,7 @@ function toHumanError(error: any): { error: string; warming: boolean } {
   if (warming) {
     return {
       error:
-        "Our servers are waking up. Please wait a moment and try again — your details are safe.",
+        "Our servers are waking up. Please wait a moment and try again.",
       warming: true,
     }
   }

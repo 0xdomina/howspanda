@@ -21,6 +21,29 @@ type EmailSender = {
   address: string
 }
 
+// User-facing delivery failures stay short with a single next step.
+// Provider detail stays in server logs and the outbox last_error only.
+const SEND_FAILURE_MESSAGE = "We could not send the email. Please try again."
+
+function resolveChannel(): string {
+  const configured = (process.env.NOTIFICATIONS_CHANNEL || "").trim()
+  if (configured) {
+    return configured
+  }
+  // Brevo is the documented production path. When Brevo credentials exist
+  // but the channel was never set, prefer Brevo over the Resend default so
+  // a configured deploy actually delivers instead of failing on a missing
+  // Resend key.
+  if (
+    process.env.BREVO_API_KEY ||
+    process.env.KYC_EMAIL_API_KEY ||
+    process.env.BREVO_SMTP_HOST
+  ) {
+    return "brevo"
+  }
+  return "email"
+}
+
 function resolveSender(): EmailSender {
   // BREVO_SENDER_EMAIL must be a sender or authenticated domain in Brevo.
   // EMAIL_FROM remains the backwards-compatible fallback for existing deploys.
@@ -30,9 +53,11 @@ function resolveSender(): EmailSender {
   const address = (match?.[1] || configured).trim().toLowerCase()
 
   if (!address || !address.includes("@") || address.endsWith(".local")) {
+    // eslint-disable-next-line no-console
+    console.error("[notifications] email sender missing or invalid")
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "A verified email sender is not configured"
+      SEND_FAILURE_MESSAGE
     )
   }
 
@@ -49,20 +74,24 @@ export type SendResult = {
 
 export async function sendEmail(message: EmailMessage): Promise<SendResult> {
   if (process.env.NOTIFICATIONS_EMAIL_ENABLED !== "true") {
+    // eslint-disable-next-line no-console
+    console.error("[notifications] email disabled, message not delivered")
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      "Notifications email is not enabled (NOTIFICATIONS_EMAIL_ENABLED)"
+      SEND_FAILURE_MESSAGE
     )
   }
 
-  const channel = process.env.NOTIFICATIONS_CHANNEL || "email"
+  const channel = resolveChannel()
 
   switch (channel) {
     case "mock":
       if (process.env.NODE_ENV === "production") {
+        // eslint-disable-next-line no-console
+        console.error("[notifications] mock channel refused in production")
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
-          "Mock notification channel is not allowed in production"
+          SEND_FAILURE_MESSAGE
         )
       }
       // eslint-disable-next-line no-console
@@ -72,9 +101,11 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
     case "email": {
       const apiKey = process.env.EMAIL_API_KEY
       if (!apiKey) {
+        // eslint-disable-next-line no-console
+        console.error("[notifications] resend api key missing")
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
-          "EMAIL_API_KEY is not configured"
+          SEND_FAILURE_MESSAGE
         )
       }
       const sender = resolveSender()
@@ -94,9 +125,11 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
       })
 
       if (!response.ok) {
+        // eslint-disable-next-line no-console
+        console.error(`[notifications] resend delivery failed status=${response.status}`)
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
-          `Failed to send notification email (${response.status})`
+          SEND_FAILURE_MESSAGE
         )
       }
 
@@ -104,6 +137,10 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
         id?: string
       } | null
 
+      // eslint-disable-next-line no-console
+      console.log(
+        `[notifications] delivery ok channel=email messageId=${data?.id ?? "n/a"}`
+      )
       return { channel: "email", messageId: data?.id ?? null }
     }
 
@@ -140,9 +177,11 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
           })
 
           if (!response.ok) {
+            // eslint-disable-next-line no-console
+            console.error(`[notifications] brevo delivery failed status=${response.status}`)
             throw new MedusaError(
               MedusaError.Types.INVALID_DATA,
-              `Brevo email delivery failed (${response.status})`
+              SEND_FAILURE_MESSAGE
             )
           }
 
@@ -150,6 +189,10 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
             messageId?: string
           } | null
 
+          // eslint-disable-next-line no-console
+          console.log(
+            `[notifications] delivery ok channel=brevo messageId=${data?.messageId ?? "n/a"}`
+          )
           return { channel: "brevo", messageId: data?.messageId ?? null }
         } finally {
           clearTimeout(timeout)
@@ -162,9 +205,11 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
       const pass = process.env.BREVO_SMTP_PASS
 
       if (!host || !user || !pass) {
+        // eslint-disable-next-line no-console
+        console.error("[notifications] brevo smtp credentials missing")
         throw new MedusaError(
           MedusaError.Types.INVALID_DATA,
-          "BREVO_SMTP_HOST / BREVO_SMTP_USER / BREVO_SMTP_PASS are not configured"
+          SEND_FAILURE_MESSAGE
         )
       }
       const transporter = nodemailer.createTransport({
@@ -197,6 +242,10 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
           subject: message.subject,
           html: message.html,
         })
+        // eslint-disable-next-line no-console
+        console.log(
+          `[notifications] delivery ok channel=brevo messageId=${info.messageId ?? "n/a"}`
+        )
         return { channel: "brevo", messageId: info.messageId ?? null }
       } finally {
         transporter.close()
@@ -204,9 +253,11 @@ export async function sendEmail(message: EmailMessage): Promise<SendResult> {
     }
 
     default:
+      // eslint-disable-next-line no-console
+      console.error(`[notifications] unknown channel "${channel}"`)
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        `Unknown NOTIFICATIONS_CHANNEL "${channel}"`
+        SEND_FAILURE_MESSAGE
       )
   }
 }

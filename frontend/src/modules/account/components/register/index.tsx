@@ -97,21 +97,21 @@ const Register = ({ setCurrentView }: Props) => {
     return () => clearTimeout(t)
   }, [cooldown])
 
-  const sendCode = async () => {
-    if (cooldown > 0) return false
+  const sendCode = async (): Promise<{ sent: boolean; warming: boolean }> => {
+    if (cooldown > 0) return { sent: false, warming: false }
     setError(null)
     const res = await requestAuthOtp({
       email: email.trim(),
       purpose: "signup",
     })
     if (!res.ok) {
-      setError(res.error ?? "Could not send the code. Check your email and try again.")
-      return false
+      setError(res.error ?? "We could not send the code. Please try again.")
+      return { sent: false, warming: !!res.warming }
     }
     setSent(true)
     setCooldown(RESEND_SECONDS)
     setHint(`We sent a 6-digit code to ${email.trim()}. It expires in 15 minutes.`)
-    return true
+    return { sent: true, warming: false }
   }
 
   const requestCode = () => {
@@ -135,8 +135,8 @@ const Register = ({ setCurrentView }: Props) => {
       // Request only after the account details are valid. If the email is
       // already registered, the API returns a clear conflict and the user
       // stays on this step without receiving an unnecessary OTP.
-      const delivered = await sendCode()
-      if (delivered) {
+      const { sent } = await sendCode()
+      if (sent) {
         setOfflineMode(false)
         setStep("code")
       }
@@ -154,10 +154,16 @@ const Register = ({ setCurrentView }: Props) => {
       return
     }
     startTransition(async () => {
-      const delivered = await sendCode()
-      if (delivered) {
+      const { sent, warming } = await sendCode()
+      if (sent) {
         setOfflineMode(false)
         setStep("code")
+        return
+      }
+      // Only fall back to password-only signup when the backend is
+      // unreachable (cold start). Delivery errors must stay visible so a
+      // misconfigured sender never looks like "sent" with nothing arriving.
+      if (!warming) {
         return
       }
       // Email-code service unreachable (backend cold start) — offer instant
