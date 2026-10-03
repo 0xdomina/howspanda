@@ -11,7 +11,8 @@ Buyer / seller browser
         |
         +--> Vercel project 1: Next.js storefront + Manage Business
         |        |
-        |        +--> PandaStack: Medusa API + worker jobs
+        |        +--> InstaCloud: Medusa API + worker jobs
+        |        |            (Render service kept suspended as warm standby)
         |                     |
         |                     +--> Neon: PostgreSQL
         |                     +--> Aiven: Valkey/Redis
@@ -19,7 +20,7 @@ Buyer / seller browser
         |                     +--> Backblaze B2: private payment proofs
         |
         +--> optional Vercel project 2: Medusa Operations Console
-                 (static admin build, calls the same PandaStack API)
+                 (static admin build, calls the same InstaCloud API)
 ```
 
 The seller-facing “Manage Business” area is part of the storefront. It is the
@@ -56,18 +57,21 @@ The repository includes `backend/vercel.json` and the `build:admin` script for
 this project. The normal backend still serves `/app` unless the separate build
 overrides the path.
 
-### PandaStack — API and worker
+### InstaCloud — API and worker
 
-- Root directory: `backend`
-- Node.js: 22.12 or newer
-- Start command: `npm run start`
-- Listen on `0.0.0.0` and the port supplied by the platform.
+- Service `api` in project `hows-u-backend`, branch `main`, port 9000
+  (Dockerfile `EXPOSE`, `start-production.cjs` warmup proxy).
+- Node.js: 22.12 or newer (Docker `node:22.12-slim`).
 - Keep the Medusa API and scheduled worker jobs on the same service for the
   beta, or use a second small process once scheduled work grows.
-- Put all backend variables from `.env.deploy.example` in PandaStack's encrypted
-  environment settings. The PandaStack control-plane token is deployment-only
-  and must never be passed to the Medusa runtime or the browser.
-- Connect the deploy to the `dev` branch first; promote to `main` only after
+- Put all backend variables from `.env.deploy.example` in InstaCloud's
+  encrypted secret store (names must match; values never leave it).
+  A Render service with the same image stays suspended as warm standby —
+  resume it instead of rebuilding if InstaCloud ever needs cover.
+- Deploy from this machine with `insta deploy ./backend` (remote Docker
+  build, no local Docker). The gateway flaps occasionally — retry once
+  before investigating.
+- Connect new work to feature branches first; promote to `main` only after
   the smoke suite below passes.
 
 ### Neon — PostgreSQL
@@ -100,9 +104,10 @@ accepted.
 
 This lane is cost-conscious, not a guarantee of unlimited capacity. Medusa's
 general deployment guidance calls for at least 2 GB RAM for a comfortable
-server/worker process. PandaStack's free container is scale-to-zero, so
-the beta must be protected by bounded uploads, request rate limits, short cache
-TTLs, paginated seller lists, and no unbounded synchronous AI work.
+server/worker process. The free compute tier pauses projects when its
+monthly credit exhausts, so the beta must be protected by bounded uploads,
+request rate limits, short cache TTLs, paginated seller lists, and no
+unbounded synchronous AI work. Set usage alerts on day one.
 
 For 20–30 concurrent checkout attempts:
 
@@ -121,8 +126,8 @@ remain on Vercel while those limits are increased independently.
 ## Release and rollback lane
 
 1. Work on a feature branch.
-2. Merge to `dev`; Vercel creates a preview and PandaStack deploys the beta
-   environment.
+2. Merge to `dev`; Vercel creates a preview. Deploy the beta backend with
+   `insta deploy ./backend` and confirm `/health` reports ready.
 3. Run the frontend build, backend build, migration dry-run/preflight, and the
    smoke flow: sign in, browse, add to cart, checkout, submit bank proof, seller
    confirm/reject, seller product upload, courier KYC gate, and Manage Business.
@@ -161,8 +166,7 @@ the payment state.
 
 ## Reference limits
 
-- [PandaStack API reference](https://docs.pandastack.io/api)
-- [PandaStack deployment quick start](https://docs.pandastack.io/start/quickstart)
+- [InstaCloud docs](https://docs.instacloud.com/)
 - [Neon pricing](https://neon.com/pricing)
 - [Aiven Valkey free tier](https://aiven.io/docs/products/valkey/concepts/valkey-free-tier)
 - [Backblaze B2 pricing](https://www.backblaze.com/cloud-storage/pricing)

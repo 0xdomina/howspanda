@@ -1242,7 +1242,7 @@ export const createSellerProduct = async (
           delivery,
         }
 
-    // PandaStack may briefly return a warm-up 503 while the Medusa process is
+    // The backend may briefly return a warm-up 503 while the Medusa process is
     // waking. Retry only that explicit edge response; a timed-out or 5xx
     // product mutation is never repeated because its write outcome is unclear.
     for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -1619,3 +1619,4 @@ export const updateSellerTeamMemberPermissions = async (
     }
   }
 }
+

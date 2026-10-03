@@ -9,7 +9,7 @@ These rules are load-bearing. Follow them on every task unless the user explicit
 
 ## 1. Never touch hosted env vars without backup + explicit approval
 
-- Render / PandaStack / Vercel / Neon / Aiven env vars are production state. Never add, update, delete, bulk-PUT, or "restore" them unless the user explicitly asked for that exact change.
+- Render / InstaCloud / Vercel / Neon / Aiven env vars are production state. Never add, update, delete, bulk-PUT, or "restore" them unless the user explicitly asked for that exact change.
 - Render's `PUT /env-vars` **replaces the full set**: a partial payload deletes everything missing. Never call `scripts/render-env-restore.ps1`, `render-env-add.ps1`, or the Render env API directly without:
   1. Reading back the live set first (`scripts/render-env-check.ps1`) and saving the key list (names only, never values) to a timestamped local backup note.
   2. Confirming the exact key diff with the user.
@@ -19,7 +19,7 @@ These rules are load-bearing. Follow them on every task unless the user explicit
 ## 2. Never run upgrades / updates unasked
 
 - Never run `apt-get upgrade/dist-upgrade`, `npm update`, `yarn upgrade`, `medusa update/migrate-force`, or bump `package.json` / `Dockerfile` base images unless the user explicitly requested that upgrade.
-- Dependency and Node-image changes (backend requires Node >= 22.12) can take down Render/PandaStack builds. Prefer pinned versions; propose upgrades as a plan first, with rollback noted.
+- Dependency and Node-image changes (backend requires Node >= 22.12) can take down InstaCloud/Render builds. Prefer pinned versions; propose upgrades as a plan first, with rollback noted.
 - Never reboot, redeploy, or change branches on a hosted service (`render-redeploy.ps1`, `render-set-branch.ps1`) without explicit approval.
 
 ## 3. Deploy safely

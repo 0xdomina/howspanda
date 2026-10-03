@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 
-// Keeps PandaStack warm without being a cron ping that gets filtered.
+// Keeps the backend warm without being a cron ping that gets filtered.
 // Cycle: actively warm for 2 min (hits every 20s), then sleep 3 min.
 // Respects page visibility and online status - pauses when tab hidden/offline.
 // Mounted once in RootLayout so every visit contributes to warm traffic.
@@ -105,3 +105,4 @@ export default function WarmAgent({ build = "local" }: { build?: string }) {
 
   return null
 }
+

@@ -79,7 +79,7 @@ export const listProducts = async ({
     revalidate: 60,
   }
 
-  // PandaStack's free runtime sleeps on idle and answers 503 while warming.
+  // The free runtime sleeps on idle and answers 503 while warming.
   // Retry once without allowing a cold start to consume the whole page
   // function budget. The page can render its friendly empty state and the
   // next navigation will use the warmed service.
@@ -107,7 +107,7 @@ export const listProducts = async ({
 
           return {
             response: {
-              // Pre-Render products store absolute PandaStack media URLs.
+              // Older products store absolute media URLs from retired hosts.
               // Rebase to the live backend so images keep resolving.
               products: (products ?? []).map(rebaseProductMedia),
               count,
@@ -200,3 +200,4 @@ export const listProductsWithSort = async ({
     queryParams,
   }
 }
+

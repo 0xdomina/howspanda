@@ -1,10 +1,10 @@
 import { MEDUSA_BACKEND_URL } from "@lib/config"
 
-// Product media created before the Render migration stores absolute
-// PandaStack URLs (thumbnail, images[].url, variants[].images[].url,
-// metadata.homepage_banner_image, ...). PandaStack is retired — rebase those
-// origins onto the live backend so the /media proxy (same code, same B2 keys)
-// keeps serving them. B2 presigned URLs and all other hosts pass through.
+// Product media created under retired hosts stores absolute URLs
+// (thumbnail, images[].url, variants[].images[].url,
+// metadata.homepage_banner_image, ...). Rebase those origins onto the live
+// backend so the /media proxy (same code, same B2 keys) keeps serving them.
+// B2 presigned URLs and all other hosts pass through.
 //
 // Deep-walk: new media fields must keep working without code changes here.
 const LEGACY_MEDIA_HOSTS = [
@@ -20,6 +20,7 @@ const LEGACY_MEDIA_HOSTS = [
 const LIVE_BACKEND_HOSTS = [
   "https://hows-u-api.onrender.com",
   "http://hows-u-api.onrender.com",
+  "https://prod-main-api-2feb70-0034wf7vg1z.compute.instacloud-edge.com",
 ]
 
 export const rebaseMediaUrl = (

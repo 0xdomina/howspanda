@@ -7,7 +7,6 @@ import {
   notifySellerNewOrder,
   telegramConfigured,
 } from "../../../../lib/telegram/notify"
-import { appendCommerceEvent } from "../../../../lib/rialo/audit"
 
 // Settle a chain-paid quote into a real marketplace order: escrow lines,
 // commission split, and seller notification all ride the standard flow.
@@ -40,21 +39,6 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   await nimiq.updateNimiqQuotes([
     { id: quote.id, order_id: result.order.id },
   ] as any).catch(() => null)
-
-  // Best-effort Rialo DevNet audit trail. Never throws, never blocks.
-  try {
-    void appendCommerceEvent({
-      kind: "order-paid",
-      ref: result.order.id,
-      payload: {
-        order_id: result.order.id,
-        quote_id: quote.id,
-        reference: (quote as any).reference ?? null,
-      },
-    }).catch(() => null)
-  } catch {
-    // Audit never fails orders.
-  }
 
   // Payment is proven on chain, so the seller hears immediately (mirrors
   // instant rails — never the bank-transfer wait-for-proof path).

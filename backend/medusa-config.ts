@@ -14,7 +14,7 @@ loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 // signing auth tokens with a known value is a critical exposure. Dev/test keep
 // the lenient fallbacks so local work and the integration harness are untouched.
 const isProduction = process.env.NODE_ENV === 'production'
-// PandaStack injects KV_URL for the private in-platform Valkey store. Prefer
+// In-platform hosts inject KV_URL for the private Valkey store. Prefer
 // that low-latency internal connection in production and keep REDIS_URL as a
 // portable fallback for local development and other hosts.
 const redisUrl = process.env.KV_URL || process.env.REDIS_URL
@@ -22,8 +22,8 @@ const hasRedis = Boolean(
   redisUrl?.trim() && !["disabled", "none", "off"].includes(redisUrl.trim().toLowerCase())
 )
 if (isProduction) {
-  // PandaStack's free runtime can reach HTTPS/WebSocket endpoints even when
-  // raw PostgreSQL TCP egress is unavailable. Neon’s node-postgres-compatible
+  // Some sandboxed runtimes can reach HTTPS/WebSocket endpoints even when
+  // raw PostgreSQL TCP egress is unavailable. Neon's node-postgres-compatible
   // driver uses secure WebSockets while preserving Medusa/Knex transactions.
   neonConfig.webSocketConstructor = ws
 }
@@ -91,7 +91,7 @@ module.exports = defineConfig({
       ? {
           // Neon is an external managed PostgreSQL service. Keep TLS
           // certificate verification explicit and keep the pool modest for
-          // the split free-tier deployment (PandaStack + Neon + Valkey).
+          // the split free-tier deployment (compute + Neon + Valkey).
           databaseDriverOptions: {
             connection: {
               ssl: { rejectUnauthorized: true },

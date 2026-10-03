@@ -80,7 +80,7 @@ function publicUrlForKey(key: string) {
   let base = (
     explicit ||
     process.env.S3_URL ||
-    `${process.env.BACKEND_URL || "https://hows-u-api-final.pandastack.app"}/media`
+    `${process.env.BACKEND_URL || "https://prod-main-api-2feb70-0034wf7vg1z.compute.instacloud-edge.com"}/media`
   ).replace(/\/$/, "")
   // S3_URL is sometimes configured as a bare host (no /media path), which
   // used to emit proxy-less URLs that 404 everywhere. Guard it here.
